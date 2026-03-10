@@ -10,6 +10,7 @@ import { ManageModal }           from "./components/modals/ManageModal.jsx";
 import { RoadmapEditorModal }    from "./components/modals/RoadmapEditorModal.jsx";
 import { WelcomeScreen }         from "./components/screens/WelcomeScreen.jsx";
 import { Dashboard }             from "./components/screens/Dashboard.jsx";
+import { AIPanel }               from "./components/ai/AIPanel.jsx";
 
 export default function App() {
   const { roadmaps, setRoadmaps, progress, setProgress, notes, setNotes,
@@ -25,6 +26,7 @@ export default function App() {
   const [showManage,     setShowManage]     = useState(false);
   const [editorModal,    setEditorModal]    = useState(null);
   const [feedback,       setFeedback]       = useState(null);
+  const [aiOpen,         setAiOpen]         = useState(false);
   const importRef = useRef(null);
 
   const showFeedback = (ok, msg) => {
@@ -205,6 +207,21 @@ export default function App() {
                         onCreate={() => { setEditorModal({ existing: null }); setShowManage(false); }} />}
       {editorModal !== null && <RoadmapEditorModal existing={editorModal.existing}
                         onSave={handleSaveRoadmap} onClose={() => setEditorModal(null)} />}
+      <AIPanel open={aiOpen} onClose={() => setAiOpen(false)} roadmap={rm} progress={progress}
+        notes={notes} resources={resources} topicMeta={topicMeta} curSection={curSec} isMobile={isMobile} />
+      {/* Floating AI button */}
+      {rmKeys.length > 0 && (
+        <button onClick={() => setAiOpen(o => !o)}
+          style={{ position: "fixed", bottom: isMobile ? 72 : 24, right: 20, zIndex: 89,
+            width: 52, height: 52, borderRadius: "50%",
+            background: aiOpen ? "#7b5ea7" : "linear-gradient(135deg, #7b5ea7, #4361ee)",
+            border: "none", boxShadow: "0 4px 20px rgba(123,94,167,0.5)",
+            color: "#fff", fontSize: 22, cursor: "pointer",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            transition: "transform 0.2s", transform: aiOpen ? "rotate(45deg)" : "rotate(0deg)" }}>
+          {aiOpen ? "×" : "🤖"}
+        </button>
+      )}
     </>
   );
 
@@ -382,7 +399,7 @@ export default function App() {
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
           <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
             <h1 style={{ margin: 0, fontSize: 19, fontWeight: 700, letterSpacing: "-0.5px", color: "#fff" }}>Learning Tracker</h1>
-            <span style={{ fontSize: 11, color: "#555", fontFamily: "monospace" }}>GYPTOR</span>
+            <span style={{ fontSize: 11, color: "#555", fontFamily: "monospace" }}>roadmap.sh</span>
           </div>
           <div style={{ display: "flex", gap: 6 }}>
             <button onClick={handleExport} style={{ padding: "6px 12px", border: "none", borderRadius: 6, cursor: "pointer", fontFamily: "inherit", fontSize: 12, background: "#1e1e24", color: "#888" }}>⬇ Export</button>
