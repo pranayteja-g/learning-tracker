@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { callAI, loadAIConfig, saveAIConfig, PROVIDERS } from "../../ai/providers.js";
+import { useUsage } from "../../ai/useUsage.js";
 import { buildQuizContext, buildQuestionnaireContext, buildExplainContext, buildStudyPlanContext } from "../../ai/context.js";
 import { SYSTEM_PROMPT, buildQuizPrompt, buildQuestionnairePrompt, buildExplainPrompt, buildStudyPlanPrompt } from "../../ai/prompts.js";
 import { APIKeySetup }       from "./APIKeySetup.jsx";
@@ -9,10 +10,10 @@ import { ExplainView }       from "./ExplainView.jsx";
 import { StudyPlanView }     from "./StudyPlanView.jsx";
 
 const MODES = [
-  { id: "quiz",          label: "Quiz",         icon: "🧠", desc: "Multiple choice questions" },
-  { id: "questionnaire", label: "Questions",    icon: "💬", desc: "Open-ended study questions" },
-  { id: "explain",       label: "Explain",      icon: "📖", desc: "Deep dive on a topic" },
-  { id: "studyplan",     label: "Study Plan",   icon: "📅", desc: "Personalized 5-day plan" },
+  { id: "quiz",          label: "Quiz",      icon: "🧠", desc: "Multiple choice" },
+  { id: "questionnaire", label: "Questions", icon: "💬", desc: "Open-ended" },
+  { id: "explain",       label: "Explain",   icon: "📖", desc: "Deep dive" },
+  { id: "studyplan",     label: "Study Plan",icon: "📅", desc: "5-day plan" },
 ];
 
 const SCOPES   = ["section", "roadmap", "completed"];
@@ -27,22 +28,28 @@ function safeParseJSON(text) {
   }
 }
 
+function fmt(n) {
+  if (n >= 1000) return (n / 1000).toFixed(1).replace(/\.0$/, "") + "k";
+  return String(n);
+}
+
 export function AIPanel({ open, onClose, roadmap, progress, notes, resources, topicMeta, curSection, isMobile }) {
-  const [aiConfig,   setAIConfig]   = useState(loadAIConfig);
-  const [mode,       setMode]       = useState("quiz");
-  const [scope,      setScope]      = useState("section");
-  const [qCount,     setQCount]     = useState(5);
+  const [aiConfig,     setAIConfig]     = useState(loadAIConfig);
+  const [mode,         setMode]         = useState("quiz");
+  const [scope,        setScope]        = useState("section");
+  const [qCount,       setQCount]       = useState(5);
   const [explainTopic, setExplainTopic] = useState("");
-  const [result,     setResult]     = useState(null);
-  const [loading,    setLoading]    = useState(false);
-  const [error,      setError]      = useState("");
-  const [showSetup,  setShowSetup]  = useState(false);
+  const [result,       setResult]       = useState(null);
+  const [loading,      setLoading]      = useState(false);
+  const [error,        setError]        = useState("");
+  const [showSetup,    setShowSetup]    = useState(false);
+  const [lastUsed,     setLastUsed]     = useState(null); // token count from last call
 
-  const rm = roadmap;
-  const hasKey = !!aiConfig.keys?.[aiConfig.provider]?.trim();
-  const allTopics = rm ? Object.values(rm.sections).flat() : [];
+  const { usage, limit, recordUsage, saveLimit, resetUsage, isOverLimit, pct } = useUsage();
 
-  // Reset result when mode/scope changes
+  const rm      = roadmap;
+  const hasKey  = !!aiConfig.keys?.[aiConfig.provider]?.trim();
+
   useEffect(() => { setResult(null); setError(""); }, [mode, scope, qCount, explainTopic]);
 
   const handleSaveConfig = (cfg) => {
@@ -53,12 +60,18 @@ export function AIPanel({ open, onClose, roadmap, progress, notes, resources, to
 
   const handleGenerate = async () => {
     if (!rm || !hasKey) return;
+    if (isOverLimit) {
+      setError(`Daily token limit of ${fmt(limit.dailyTokenLimit)} reached. Resets at midnight UTC, or raise your limit in Settings.`);
+      return;
+    }
+
     setLoading(true);
     setError("");
     setResult(null);
+    setLastUsed(null);
 
     try {
-      const apiKey  = aiConfig.keys[aiConfig.provider];
+      const apiKey   = aiConfig.keys[aiConfig.provider];
       const provider = aiConfig.provider;
       let userPrompt = "";
       let ctx;
@@ -85,8 +98,13 @@ export function AIPanel({ open, onClose, roadmap, progress, notes, resources, to
         userPrompt = buildStudyPlanPrompt(ctx);
       }
 
-      const raw = await callAI({ provider, apiKey, systemPrompt: SYSTEM_PROMPT, userPrompt });
-      const parsed = safeParseJSON(raw);
+      const { text, usage: callUsage } = await callAI({ provider, apiKey, systemPrompt: SYSTEM_PROMPT, userPrompt });
+
+      // Record exact token counts returned by the API
+      recordUsage(callUsage);
+      setLastUsed(callUsage);
+
+      const parsed = safeParseJSON(text);
       setResult({ mode, data: parsed });
     } catch (err) {
       setError(err.message || "Something went wrong. Please try again.");
@@ -98,11 +116,13 @@ export function AIPanel({ open, onClose, roadmap, progress, notes, resources, to
   if (!open) return null;
 
   const panelWidth = isMobile ? "100vw" : "400px";
+  const barColor   = pct >= 90 ? "#e05252" : pct >= 70 ? "#ee9b00" : "#52b788";
 
   return (
     <>
       {/* Backdrop */}
-      <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 90 }} />
+      <div onClick={onClose}
+        style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 90 }} />
 
       {/* Panel */}
       <div style={{
@@ -111,6 +131,7 @@ export function AIPanel({ open, onClose, roadmap, progress, notes, resources, to
         zIndex: 91, display: "flex", flexDirection: "column",
         boxShadow: "-8px 0 40px rgba(0,0,0,0.5)", overflowY: "auto",
       }}>
+
         {/* Header */}
         <div style={{ padding: "16px 20px", borderBottom: "1px solid #1e1e24",
           display: "flex", justifyContent: "space-between", alignItems: "center",
@@ -134,10 +155,31 @@ export function AIPanel({ open, onClose, roadmap, progress, notes, resources, to
           </div>
         </div>
 
+        {/* Mini usage bar in header — always visible when key is set */}
+        {hasKey && !showSetup && limit.enabled && (
+          <div style={{ padding: "6px 20px", borderBottom: "1px solid #1e1e24",
+            display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{ flex: 1, background: "#1e1e24", borderRadius: 3, height: 4, overflow: "hidden" }}>
+              <div style={{ height: "100%", width: `${pct}%`, background: barColor, borderRadius: 3, transition: "width 0.4s" }} />
+            </div>
+            <div style={{ fontSize: 10, color: barColor, flexShrink: 0, fontVariantNumeric: "tabular-nums" }}>
+              {fmt(usage.totalTokens || 0)} / {fmt(limit.dailyTokenLimit)}
+            </div>
+          </div>
+        )}
+
         {/* Setup panel */}
         {showSetup && (
           <div style={{ borderBottom: "1px solid #1e1e24" }}>
-            <APIKeySetup config={aiConfig} onSave={handleSaveConfig} />
+            <APIKeySetup
+              config={aiConfig}
+              onSave={handleSaveConfig}
+              usage={usage}
+              limit={limit}
+              pct={pct}
+              onResetUsage={resetUsage}
+              onSaveLimit={saveLimit}
+            />
           </div>
         )}
 
@@ -146,7 +188,7 @@ export function AIPanel({ open, onClose, roadmap, progress, notes, resources, to
             <div style={{ fontSize: 32, marginBottom: 12 }}>🔑</div>
             <div style={{ fontSize: 14, color: "#ccc", marginBottom: 8 }}>Set up your free API key to get started</div>
             <div style={{ fontSize: 12, color: "#555", marginBottom: 20 }}>
-              Works with Google Gemini and Groq — both are completely free with no credit card.
+              Works with Groq and Google Gemini — both are completely free, no credit card needed.
             </div>
             <button onClick={() => setShowSetup(true)}
               style={{ padding: "10px 24px", background: "#7b5ea7", border: "none",
@@ -176,7 +218,6 @@ export function AIPanel({ open, onClose, roadmap, progress, notes, resources, to
             {/* Options */}
             <div style={{ padding: "14px 20px", borderBottom: "1px solid #1e1e24" }}>
 
-              {/* Scope picker for quiz/questionnaire */}
               {(mode === "quiz" || mode === "questionnaire") && (
                 <>
                   <div style={{ fontSize: 11, color: "#555", textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>Scope</div>
@@ -212,7 +253,6 @@ export function AIPanel({ open, onClose, roadmap, progress, notes, resources, to
                 </>
               )}
 
-              {/* Topic picker for explain */}
               {mode === "explain" && (
                 <>
                   <div style={{ fontSize: 11, color: "#555", textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>Topic to explain</div>
@@ -230,31 +270,54 @@ export function AIPanel({ open, onClose, roadmap, progress, notes, resources, to
                 </>
               )}
 
-              {/* Study plan — no options needed */}
               {mode === "studyplan" && (
                 <div style={{ fontSize: 12, color: "#666", lineHeight: 1.6 }}>
-                  Generates a personalized 5-day study plan based on your current progress in <strong style={{ color: "#ccc" }}>{rm?.label}</strong>.
+                  Generates a personalized 5-day plan based on your current progress in <strong style={{ color: "#ccc" }}>{rm?.label}</strong>.
+                </div>
+              )}
+
+              {/* Over-limit warning */}
+              {isOverLimit && (
+                <div style={{ marginTop: 12, padding: "10px 12px", background: "#2e1a1a",
+                  border: "1px solid #6a2d2d", borderRadius: 8, fontSize: 12, color: "#e05252" }}>
+                  ⛔ Daily token limit reached. Resets at midnight UTC.{" "}
+                  <span onClick={() => setShowSetup(true)}
+                    style={{ textDecoration: "underline", cursor: "pointer" }}>
+                    Raise limit →
+                  </span>
                 </div>
               )}
 
               {/* Generate button */}
-              <button onClick={handleGenerate} disabled={loading || (mode === "explain" && !explainTopic)}
+              <button onClick={handleGenerate}
+                disabled={loading || (mode === "explain" && !explainTopic) || isOverLimit}
                 style={{ width: "100%", marginTop: 14, padding: "11px",
-                  background: loading || (mode === "explain" && !explainTopic) ? "#1e1e24" : rm?.color,
+                  background: loading || (mode === "explain" && !explainTopic) || isOverLimit
+                    ? "#1e1e24" : rm?.color,
                   border: "none", borderRadius: 8,
-                  color: loading || (mode === "explain" && !explainTopic) ? "#444" : "#fff",
-                  fontSize: 13, fontWeight: 600, cursor: loading ? "default" : "pointer",
+                  color: loading || (mode === "explain" && !explainTopic) || isOverLimit ? "#444" : "#fff",
+                  fontSize: 13, fontWeight: 600,
+                  cursor: loading || isOverLimit ? "default" : "pointer",
                   fontFamily: "inherit" }}>
                 {loading ? "Generating…" : `Generate ${MODES.find(m => m.id === mode)?.label}`}
               </button>
 
-              {/* Provider badge */}
-              <div style={{ textAlign: "center", marginTop: 8, fontSize: 10, color: "#333" }}>
-                via {PROVIDERS[aiConfig.provider]?.name} · {PROVIDERS[aiConfig.provider]?.model}
-              </div>
+              {/* Last call token count */}
+              {lastUsed && !loading && (
+                <div style={{ textAlign: "center", marginTop: 8, fontSize: 10, color: "#444" }}>
+                  Last call: {fmt(lastUsed.promptTokens)} in + {fmt(lastUsed.completionTokens)} out
+                  {" "}= <strong style={{ color: "#555" }}>{fmt(lastUsed.promptTokens + lastUsed.completionTokens)} tokens</strong>
+                  {" "}· via {PROVIDERS[aiConfig.provider]?.name}
+                </div>
+              )}
+              {!lastUsed && !loading && (
+                <div style={{ textAlign: "center", marginTop: 8, fontSize: 10, color: "#333" }}>
+                  via {PROVIDERS[aiConfig.provider]?.name} · {PROVIDERS[aiConfig.provider]?.model}
+                </div>
+              )}
             </div>
 
-            {/* Loading spinner */}
+            {/* Loading */}
             {loading && (
               <div style={{ padding: "32px 20px", textAlign: "center" }}>
                 <div style={{ fontSize: 28, marginBottom: 10, animation: "spin 1s linear infinite" }}>⚙️</div>

@@ -21,9 +21,9 @@ export const AI_STORAGE_KEY = "learning-tracker-ai-config-v1";
 export function loadAIConfig() {
   try {
     const raw = localStorage.getItem(AI_STORAGE_KEY);
-    return raw ? JSON.parse(raw) : { provider: "gemini", keys: {} };
+    return raw ? JSON.parse(raw) : { provider: "groq", keys: {} };
   } catch {
-    return { provider: "gemini", keys: {} };
+    return { provider: "groq", keys: {} };
   }
 }
 
@@ -32,6 +32,7 @@ export function saveAIConfig(config) {
 }
 
 // ── Call the AI ───────────────────────────────────────────────────────────────
+// Always returns { text, usage: { promptTokens, completionTokens } }
 export async function callAI({ provider, apiKey, systemPrompt, userPrompt }) {
   if (provider === "gemini") return callGemini({ apiKey, systemPrompt, userPrompt });
   if (provider === "groq")   return callGroq({ apiKey, systemPrompt, userPrompt });
@@ -55,7 +56,15 @@ async function callGemini({ apiKey, systemPrompt, userPrompt }) {
     throw new Error(err?.error?.message || `Gemini error ${res.status}`);
   }
   const data = await res.json();
-  return data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+  const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+  const meta = data.usageMetadata || {};
+  return {
+    text,
+    usage: {
+      promptTokens:     meta.promptTokenCount     || 0,
+      completionTokens: meta.candidatesTokenCount || 0,
+    },
+  };
 }
 
 async function callGroq({ apiKey, systemPrompt, userPrompt }) {
@@ -80,5 +89,14 @@ async function callGroq({ apiKey, systemPrompt, userPrompt }) {
     throw new Error(err?.error?.message || `Groq error ${res.status}`);
   }
   const data = await res.json();
-  return data.choices?.[0]?.message?.content || "";
+  const text = data.choices?.[0]?.message?.content || "";
+  // Groq returns exact token counts — perfectly accurate
+  const u = data.usage || {};
+  return {
+    text,
+    usage: {
+      promptTokens:     u.prompt_tokens     || 0,
+      completionTokens: u.completion_tokens || 0,
+    },
+  };
 }
