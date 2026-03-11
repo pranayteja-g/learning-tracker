@@ -2,7 +2,7 @@ import { useState } from "react";
 import { COLOR_PALETTE } from "../../constants/templates.js";
 import { slugify } from "../../utils/roadmap.js";
 import { callAI, loadAIConfig, PROVIDERS } from "../../ai/providers.js";
-import { ROADMAP_SYSTEM_PROMPT, buildRoadmapPrompt } from "../../ai/prompts.js";
+import { ROADMAP_SYSTEM_PROMPT, buildRoadmapPrompt, ROADMAP_CATEGORIES } from "../../ai/prompts.js";
 
 function isValidHex(str) { return /^#[0-9a-fA-F]{6}$/.test(str); }
 
@@ -19,28 +19,29 @@ function AIGeneratePanel({ onGenerated, defaultColor, defaultAccent }) {
   const aiConfig = loadAIConfig();
   const hasKey   = !!aiConfig.keys?.[aiConfig.provider]?.trim();
 
-  const [topic,  setTopic]  = useState("");
-  const [extras, setExtras] = useState("");
-  const [loading, setLoad]  = useState(false);
-  const [error,   setError] = useState("");
-  const [preview, setPreview] = useState(null); // generated roadmap before accepting
+  const [topic,    setTopic]    = useState("");
+  const [extras,   setExtras]   = useState("");
+  const [category, setCategory] = useState("tech");
+  const [loading,  setLoad]     = useState(false);
+  const [error,    setError]    = useState("");
+  const [preview,  setPreview]  = useState(null);
+
+  const selectedCat = ROADMAP_CATEGORIES.find(c => c.id === category);
 
   const generate = async () => {
     if (!topic.trim()) { setError("Enter a topic name first."); return; }
     setLoad(true); setError(""); setPreview(null);
-
     try {
       const { text } = await callAI({
         temperature:  0,
         provider:     aiConfig.provider,
         apiKey:       aiConfig.keys[aiConfig.provider],
         systemPrompt: ROADMAP_SYSTEM_PROMPT,
-        userPrompt:   buildRoadmapPrompt(topic.trim(), extras),
+        userPrompt:   buildRoadmapPrompt(topic.trim(), extras, category),
       });
       const data = safeParseJSON(text);
       if (!data.label || !data.sections) throw new Error("Incomplete roadmap returned. Try again.");
-
-      const totalTopics = Object.values(data.sections).flat().length;
+      const totalTopics   = Object.values(data.sections).flat().length;
       const totalSections = Object.keys(data.sections).length;
       setPreview({ ...data, totalTopics, totalSections });
     } catch (e) {
@@ -52,35 +53,66 @@ function AIGeneratePanel({ onGenerated, defaultColor, defaultAccent }) {
 
   const accept = () => {
     if (!preview) return;
-    onGenerated({
-      label:    preview.label,
-      sections: preview.sections,
-      color:    defaultColor,
-      accent:   defaultAccent,
-    });
+    onGenerated({ label: preview.label, sections: preview.sections, color: defaultColor, accent: defaultAccent });
   };
 
   if (!hasKey) return (
     <div style={{ textAlign: "center", padding: "24px 0" }}>
       <div style={{ fontSize: 28, marginBottom: 10 }}>🔑</div>
       <div style={{ fontSize: 13, color: "#ccc", marginBottom: 6 }}>No AI key configured</div>
-      <div style={{ fontSize: 12, color: "#555" }}>
-        Open the 🤖 AI panel and go to Settings to add a free Groq or Gemini key.
-      </div>
+      <div style={{ fontSize: 12, color: "#555" }}>Open the 🤖 AI panel → Settings to add a free Groq or Gemini key.</div>
     </div>
   );
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+
+      {/* Category picker */}
+      <div>
+        <label style={{ fontSize: 11, color: "#888", display: "block", marginBottom: 8,
+          textTransform: "uppercase", letterSpacing: 1 }}>Category</label>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6, marginBottom: 4 }}>
+          {ROADMAP_CATEGORIES.map(cat => {
+            const active = category === cat.id;
+            return (
+              <button key={cat.id} onClick={() => { setCategory(cat.id); setPreview(null); }}
+                style={{ padding: "10px 6px", borderRadius: 8, cursor: "pointer",
+                  border: `1px solid ${active ? cat.color : "#2a2a35"}`,
+                  background: active ? cat.color + "22" : "#0f0f13",
+                  fontFamily: "inherit", textAlign: "center", transition: "all 0.15s" }}>
+                <div style={{ fontSize: 18, marginBottom: 3 }}>{cat.icon}</div>
+                <div style={{ fontSize: 11, fontWeight: active ? 700 : 400,
+                  color: active ? cat.color : "#666" }}>{cat.label}</div>
+              </button>
+            );
+          })}
+        </div>
+        {/* Category description */}
+        <div style={{ fontSize: 11, color: "#555", padding: "6px 10px", background: "#0f0f13",
+          borderRadius: 6, border: `1px solid ${selectedCat.color}33` }}>
+          <span style={{ color: selectedCat.color }}>{selectedCat.icon}</span>{" "}
+          <strong style={{ color: "#777" }}>{selectedCat.label}:</strong>{" "}
+          {selectedCat.desc}
+        </div>
+      </div>
 
       {/* Topic input */}
       <div>
         <label style={{ fontSize: 11, color: "#888", display: "block", marginBottom: 7,
-          textTransform: "uppercase", letterSpacing: 1 }}>Topic / Technology *</label>
-        <input value={topic} onChange={e => { setTopic(e.target.value); setError(""); }}
+          textTransform: "uppercase", letterSpacing: 1 }}>Topic *</label>
+        <input value={topic} onChange={e => { setTopic(e.target.value); setError(""); setPreview(null); }}
           onKeyDown={e => e.key === "Enter" && !loading && generate()}
-          placeholder="e.g. Docker, PostgreSQL, TypeScript, Kubernetes…"
-          style={{ width: "100%", background: "#0f0f13", border: `1px solid ${error && !topic.trim() ? "#6a2d2d" : "#2a2a35"}`,
+          placeholder={
+            category === "tech"     ? "e.g. Docker, TypeScript, PostgreSQL, Kubernetes…" :
+            category === "school"   ? "e.g. Biology, World History, Geography, Economics…" :
+            category === "language" ? "e.g. French, Japanese, Hindi, Arabic, Spanish…" :
+            category === "science"  ? "e.g. Organic Chemistry, Quantum Physics, Genetics…" :
+            category === "maths"    ? "e.g. Calculus, Linear Algebra, Statistics, Geometry…" :
+            category === "creative" ? "e.g. Watercolour Painting, Music Theory, UX Design…" :
+            "e.g. Public Speaking, Chess, Cooking, Personal Finance…"
+          }
+          style={{ width: "100%", background: "#0f0f13",
+            border: `1px solid ${error && !topic.trim() ? "#6a2d2d" : "#2a2a35"}`,
             borderRadius: 7, padding: "10px 12px", color: "#e8e6e0", fontSize: 14,
             fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
       </div>
@@ -90,35 +122,40 @@ function AIGeneratePanel({ onGenerated, defaultColor, defaultAccent }) {
         <label style={{ fontSize: 11, color: "#888", display: "block", marginBottom: 7,
           textTransform: "uppercase", letterSpacing: 1 }}>Extra Instructions (optional)</label>
         <textarea value={extras} onChange={e => setExtras(e.target.value)}
-          placeholder="e.g. focus on backend usage, include testing, skip GUI topics, emphasize cloud deployment…"
-          rows={3}
+          placeholder={
+            category === "tech"     ? "e.g. focus on backend, include testing, skip GUI…" :
+            category === "school"   ? "e.g. GCSE level, include exam techniques, for 14-year-olds…" :
+            category === "language" ? "e.g. focus on conversational fluency, include JLPT N5 prep…" :
+            category === "science"  ? "e.g. A-level depth, include lab skills, focus on calculations…" :
+            category === "maths"    ? "e.g. include proofs, focus on problem-solving, university level…" :
+            category === "creative" ? "e.g. digital tools only, beginner-friendly, include portfolio tips…" :
+            "Any specific focus, audience, or depth requirements…"
+          }
+          rows={2}
           style={{ width: "100%", background: "#0f0f13", border: "1px solid #2a2a35",
             borderRadius: 7, padding: "10px 12px", color: "#e8e6e0", fontSize: 13,
             fontFamily: "inherit", outline: "none", boxSizing: "border-box",
             resize: "vertical", lineHeight: 1.6 }} />
-        <div style={{ fontSize: 11, color: "#444", marginTop: 5 }}>
-          Leave blank for a comprehensive general-purpose roadmap.
-        </div>
       </div>
 
-      {/* Info callout */}
-      <div style={{ background: "#0f0f13", border: "1px solid #1e1e24", borderRadius: 8, padding: "10px 13px" }}>
-        <div style={{ fontSize: 11, color: "#555", lineHeight: 1.6 }}>
-          <span style={{ color: "#7b8cde" }}>ℹ</span> Uses temperature 0 for maximum consistency.
-          Re-generating the same topic will produce a 95–99% identical roadmap every time.
-          Via <strong style={{ color: "#888" }}>{PROVIDERS[aiConfig.provider]?.name}</strong>.
-        </div>
+      {/* Info row */}
+      <div style={{ fontSize: 11, color: "#444", display: "flex", alignItems: "center", gap: 6 }}>
+        <span style={{ color: "#7b8cde" }}>ℹ</span>
+        Temperature 0 · max consistency · via {PROVIDERS[aiConfig.provider]?.name}
       </div>
 
       {/* Generate button */}
       <button onClick={generate} disabled={loading || !topic.trim()}
         style={{ width: "100%", padding: "12px", fontWeight: 700, fontSize: 14,
-          background: loading || !topic.trim() ? "#1e1e24" : "linear-gradient(135deg, #7b5ea7, #4361ee)",
+          background: loading || !topic.trim() ? "#1e1e24"
+            : `linear-gradient(135deg, ${selectedCat.color}, ${selectedCat.color}99)`,
           border: "none", borderRadius: 8,
           color: loading || !topic.trim() ? "#444" : "#fff",
           cursor: loading || !topic.trim() ? "default" : "pointer",
-          fontFamily: "inherit" }}>
-        {loading ? "⚙️ Generating roadmap…" : "✨ Generate Roadmap"}
+          fontFamily: "inherit", transition: "background 0.2s" }}>
+        {loading
+          ? `⚙️ Generating ${selectedCat.label} roadmap…`
+          : `${selectedCat.icon} Generate ${selectedCat.label} Roadmap`}
       </button>
 
       {error && (
@@ -128,12 +165,18 @@ function AIGeneratePanel({ onGenerated, defaultColor, defaultAccent }) {
 
       {/* Preview */}
       {preview && (
-        <div style={{ background: "#0f0f13", border: "1px solid #2a2a35", borderRadius: 10, overflow: "hidden" }}>
-          {/* Preview header */}
+        <div style={{ background: "#0f0f13", border: `1px solid ${selectedCat.color}44`,
+          borderRadius: 10, overflow: "hidden" }}>
           <div style={{ padding: "14px 16px", borderBottom: "1px solid #1e1e24",
             display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <div>
-              <div style={{ fontSize: 15, fontWeight: 700, color: "#fff" }}>{preview.label}</div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ fontSize: 11, background: selectedCat.color + "22",
+                  color: selectedCat.color, padding: "2px 8px", borderRadius: 4, fontWeight: 700 }}>
+                  {selectedCat.icon} {selectedCat.label}
+                </span>
+              </div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: "#fff", marginTop: 6 }}>{preview.label}</div>
               <div style={{ fontSize: 11, color: "#555", marginTop: 2 }}>
                 {preview.totalSections} sections · {preview.totalTopics} topics
               </div>
@@ -145,7 +188,7 @@ function AIGeneratePanel({ onGenerated, defaultColor, defaultAccent }) {
           <div style={{ maxHeight: 260, overflowY: "auto", padding: "10px 16px" }}>
             {Object.entries(preview.sections).map(([sec, topics]) => (
               <div key={sec} style={{ marginBottom: 12 }}>
-                <div style={{ fontSize: 12, fontWeight: 700, color: "#c4b5fd", marginBottom: 5 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: selectedCat.color, marginBottom: 5 }}>
                   {sec} <span style={{ color: "#444", fontWeight: 400 }}>({topics.length})</span>
                 </div>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
@@ -161,7 +204,7 @@ function AIGeneratePanel({ onGenerated, defaultColor, defaultAccent }) {
           {/* Actions */}
           <div style={{ padding: "12px 16px", borderTop: "1px solid #1e1e24", display: "flex", gap: 8 }}>
             <button onClick={accept}
-              style={{ flex: 1, padding: "10px", background: "#7b5ea7", border: "none",
+              style={{ flex: 1, padding: "10px", background: selectedCat.color, border: "none",
                 borderRadius: 7, color: "#fff", fontSize: 13, fontWeight: 700,
                 cursor: "pointer", fontFamily: "inherit" }}>
               Open in Editor →
