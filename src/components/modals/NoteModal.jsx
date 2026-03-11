@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect } from "react";
 import { isValidUrl } from "../../utils/roadmap.js";
 import { callAIWithSearch, loadAIConfig } from "../../ai/providers.js";
-import { RESOURCES_SYSTEM_PROMPT, buildFindResourcesPrompt } from "../../ai/prompts.js";
+import { RESOURCES_SYSTEM_PROMPT, buildFindResourcesPrompt, buildTopicCheatSheetPrompt, INTERVIEW_SYSTEM_PROMPT } from "../../ai/prompts.js";
 import { useUsage } from "../../ai/useUsage.js";
+import { CheatSheetView } from "../interview/CheatSheetView.jsx";
 
 const DIFFICULTIES = ["easy", "medium", "hard"];
 const TIME_OPTIONS = ["< 1 hour", "1–2 hours", "2–5 hours", "5–10 hours", "10+ hours"];
@@ -37,13 +38,16 @@ export function NoteModal({ noteModal, roadmaps, notes, resources, topicMeta, on
   const [aiResults,   setAiResults]   = useState(null); // suggested resources before adding
   const [audience,    setAudience]    = useState("");
   const [showAudience, setShowAudience] = useState(false);
+  const [cheatSheet,   setCheatSheet]   = useState(null);
+  const [csLoading,    setCsLoading]    = useState(false);
+  const [csError,      setCsError]      = useState("");
 
   const { recordUsage } = useUsage();
   const textareaRef = useRef(null);
 
   useEffect(() => { if (tab === "notes" && textareaRef.current) textareaRef.current.focus(); }, [tab]);
-  // Clear AI results when switching away from resources tab
-  useEffect(() => { if (tab !== "resources") setAiResults(null); }, [tab]);
+  // Clear AI results and cheat sheet when switching away from resources tab
+  useEffect(() => { if (tab !== "resources") { setAiResults(null); setCheatSheet(null); } }, [tab]);
 
   const addLink = () => {
     if (!linkUrl.trim()) { setLinkError("URL is required"); return; }
@@ -81,6 +85,32 @@ export function NoteModal({ noteModal, roadmaps, notes, resources, topicMeta, on
       setAiError(e.message || "Search failed. Please try again.");
     } finally {
       setAiLoading(false);
+    }
+  };
+
+  // ── Find topic-specific cheat sheet ──────────────────────────────────────
+  const findTopicCheatSheet = async () => {
+    const aiConfig = loadAIConfig();
+    if (!aiConfig.keys?.[aiConfig.provider]?.trim()) {
+      setCsError("No AI key set. Open the 🤖 AI panel → Settings to add one."); return;
+    }
+    const sectionKey = Object.entries(rm?.sections || {}).find(([, ts]) => ts.includes(topic))?.[0] || "";
+    setCsLoading(true); setCsError(""); setCheatSheet(null);
+    try {
+      const { text, usage } = await callAIWithSearch({
+        provider:     aiConfig.keys[aiConfig.provider] ? aiConfig.provider : "groq",
+        apiKey:       aiConfig.keys[aiConfig.provider],
+        systemPrompt: INTERVIEW_SYSTEM_PROMPT,
+        userPrompt:   buildTopicCheatSheetPrompt(topic, rm?.label || rmKey, sectionKey),
+      });
+      recordUsage(usage);
+      const parsed = JSON.parse(text.replace(/```json\n?/g,"").replace(/```\n?/g,"").trim());
+      if (!parsed.mustKnow) throw new Error("Incomplete cheat sheet returned.");
+      setCheatSheet(parsed);
+    } catch(e) {
+      setCsError(e.message || "Generation failed. Try again.");
+    } finally {
+      setCsLoading(false);
     }
   };
 
@@ -189,6 +219,33 @@ export function NoteModal({ noteModal, roadmaps, notes, resources, topicMeta, on
                   </div>
                 )}
               </div>
+
+              {/* ── Topic Cheat Sheet ── */}
+              <div style={{ background: "#0f0f13", border: "1px solid #1e1e24", borderRadius: 10, padding: "14px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: "#ccc" }}>🗺️ Topic Cheat Sheet</div>
+                    <div style={{ fontSize: 11, color: "#555", marginTop: 2 }}>Interview-focused summary for this topic only</div>
+                  </div>
+                </div>
+                <button onClick={findTopicCheatSheet} disabled={csLoading}
+                  style={{ width: "100%", padding: "9px", fontWeight: 600, fontSize: 13,
+                    background: csLoading ? "#1e1e24" : `linear-gradient(135deg, #e07b39, #ee9b00)`,
+                    border: "none", borderRadius: 7,
+                    color: csLoading ? "#444" : "#fff",
+                    cursor: csLoading ? "default" : "pointer", fontFamily: "inherit" }}>
+                  {csLoading ? "⚙️ Generating cheat sheet…" : "✨ Generate Topic Cheat Sheet"}
+                </button>
+                {csError && (
+                  <div style={{ marginTop: 10, padding: "8px 10px", background: "#2e1a1a",
+                    border: "1px solid #6a2d2d", borderRadius: 6, fontSize: 12, color: "#e05252" }}>
+                    ✕ {csError}
+                  </div>
+                )}
+              </div>
+
+              {/* Cheat sheet result */}
+              {cheatSheet && <CheatSheetView data={cheatSheet} rm={rm} />}
 
               {/* ── AI suggested results ── */}
               {aiResults && (

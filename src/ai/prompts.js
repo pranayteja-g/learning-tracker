@@ -415,3 +415,53 @@ Respond with ONLY valid JSON:
   "redFlags": ["mistake 1", "mistake 2", "mistake 3", "mistake 4"]
 }`;
 }
+
+// ── Topic expansion prompt ────────────────────────────────────────────────────
+export function buildTopicExpansionPrompt(topic, sectionName, roadmapLabel) {
+  return `A learning roadmap for "${roadmapLabel}" has a topic called "${topic}" inside the section "${sectionName}".
+
+This topic is too broad — expand it into specific, atomic subtopics that guide someone to actually learn it.
+
+Rules:
+- Generate 6-12 subtopics
+- Each subtopic must be more specific than the parent topic
+- Order them from foundational to advanced
+- Use title case, concise names (1-6 words)
+- No vague subtopics like "${topic} Basics" or "${topic} Advanced"
+- Each subtopic should be something a learner can study independently
+- Good example for "Django": ["Django Project Structure", "URL Routing", "Views & Templates", "Django ORM", "QuerySets", "Migrations", "Django Admin", "Forms & Validation", "Authentication & Permissions", "REST Framework Basics", "Deployment with Gunicorn"]
+- Bad example: ["Learn Django", "Django Stuff", "Advanced Django"]
+
+Respond with ONLY a JSON array of strings, nothing else:
+["Subtopic One", "Subtopic Two", "Subtopic Three"]`;
+}
+
+// ── Topic cheat sheet prompt ──────────────────────────────────────────────────
+export function buildTopicCheatSheetPrompt(topic, roadmapLabel, sectionName) {
+  return `Create a focused interview cheat sheet for the topic "${topic}" from a ${roadmapLabel} roadmap (section: "${sectionName}").
+
+This is a deep-dive cheat sheet for ONE specific topic — not the whole roadmap.
+
+Rules:
+- Cover everything an interviewer might ask specifically about "${topic}"
+- Include key facts, definitions, code patterns, common gotchas
+- Quick Tips should be specific to this topic, not generic interview advice
+- Red Flags should be mistakes candidates make when asked about this specific topic
+
+Respond with ONLY valid JSON:
+{
+  "title": "${topic} — Interview Cheat Sheet",
+  "oneliner": "One sentence: what ${topic} is in plain English",
+  "mustKnow": [
+    { "topic": "specific aspect", "oneliner": "what to say about it" }
+  ],
+  "goodToKnow": [
+    { "topic": "...", "oneliner": "..." }
+  ],
+  "bonusPoints": [
+    { "topic": "...", "oneliner": "..." }
+  ],
+  "quickTips": ["tip 1", "tip 2", "tip 3", "tip 4"],
+  "redFlags": ["mistake 1", "mistake 2", "mistake 3"]
+}`;
+}

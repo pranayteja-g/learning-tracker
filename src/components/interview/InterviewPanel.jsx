@@ -35,9 +35,10 @@ function fmt(n) {
   return n >= 1000 ? (n/1000).toFixed(1).replace(/\.0$/,"") + "k" : String(n);
 }
 
-export function InterviewPanel({ open, onClose, roadmap, progress, isMobile }) {
+export function InterviewPanel({ open, onClose, roadmap, progress, isMobile, roadmaps }) {
   const [mode,      setMode]      = useState("interview");
-  const [timeSecs,  setTimeSecs]  = useState(600);
+  const [timeSecs,       setTimeSecs]       = useState(600);
+  const [selectedRmKeys, setSelectedRmKeys] = useState([]);
   const [result,    setResult]    = useState(null);
   const [loading,   setLoading]   = useState(false);
   const [error,     setError]     = useState("");
@@ -48,7 +49,28 @@ export function InterviewPanel({ open, onClose, roadmap, progress, isMobile }) {
   const aiConfig = loadAIConfig();
   const hasKey  = !!aiConfig.keys?.[aiConfig.provider]?.trim();
 
-  const ctx = rm ? { roadmapName: rm.label, sections: rm.sections } : null;
+  // Build context from selected roadmaps (or fall back to active roadmap)
+  const allRmKeys = roadmaps ? Object.keys(roadmaps) : [];
+  const activeKeys = selectedRmKeys.length > 0 ? selectedRmKeys : (rm ? [rm.id] : []);
+
+  const ctx = activeKeys.length > 0 ? (() => {
+    if (activeKeys.length === 1) {
+      const r = roadmaps?.[activeKeys[0]] || rm;
+      return r ? { roadmapName: r.label, sections: r.sections } : null;
+    }
+    // Multi-roadmap: merge sections, prefix section names with roadmap label
+    const merged = {};
+    const labels = [];
+    activeKeys.forEach(k => {
+      const r = roadmaps?.[k];
+      if (!r) return;
+      labels.push(r.label);
+      Object.entries(r.sections).forEach(([sec, topics]) => {
+        merged[`${r.label} — ${sec}`] = topics;
+      });
+    });
+    return { roadmapName: labels.join(" + "), sections: merged };
+  })() : null;
 
   const handleGenerate = async () => {
     if (!rm || !hasKey) return;
@@ -137,6 +159,45 @@ export function InterviewPanel({ open, onClose, roadmap, progress, isMobile }) {
           </div>
         ) : (
           <>
+            {/* Roadmap selector — only show if multiple roadmaps exist */}
+            {allRmKeys.length > 1 && (
+              <div style={{ padding: "14px 20px 0", borderBottom: "1px solid #1e1e24" }}>
+                <div style={{ fontSize: 11, color: "#555", textTransform: "uppercase",
+                  letterSpacing: 1, marginBottom: 8 }}>Scope — select roadmaps</div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 5, marginBottom: 12 }}>
+                  {allRmKeys.map(k => {
+                    const r = roadmaps[k];
+                    const active = activeKeys.includes(k);
+                    return (
+                      <button key={k}
+                        onClick={() => setSelectedRmKeys(prev =>
+                          prev.includes(k) ? prev.filter(x => x !== k) : [...prev, k]
+                        )}
+                        style={{ padding: "8px 12px", textAlign: "left",
+                          background: active ? r.color + "18" : "#0f0f13",
+                          border: `1px solid ${active ? r.color + "66" : "#2a2a35"}`,
+                          borderRadius: 7, cursor: "pointer", fontFamily: "inherit",
+                          display: "flex", alignItems: "center", gap: 10 }}>
+                        <div style={{ width: 10, height: 10, borderRadius: "50%",
+                          background: active ? r.color : "#333", flexShrink: 0 }} />
+                        <span style={{ fontSize: 13, color: active ? r.accent : "#666",
+                          fontWeight: active ? 600 : 400 }}>{r.label}</span>
+                        {k === rm?.id && (
+                          <span style={{ fontSize: 10, color: "#444", marginLeft: "auto" }}>current</span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+                {activeKeys.length > 1 && (
+                  <div style={{ fontSize: 11, color: "#555", marginBottom: 12, padding: "6px 10px",
+                    background: "#0f0f13", borderRadius: 6, border: "1px solid #1e1e24" }}>
+                    ℹ AI will pick the most interview-critical topics across all {activeKeys.length} roadmaps.
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Mode grid */}
             <div style={{ padding: "14px 20px 0", borderBottom: "1px solid #1e1e24" }}>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 14 }}>
