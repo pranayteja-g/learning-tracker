@@ -31,6 +31,7 @@ export function NoteModal({ noteModal, roadmaps, notes, resources, topicMeta, on
   const [linkUrl,     setLinkUrl]     = useState("");
   const [linkError,   setLinkError]   = useState("");
   const [tab,         setTab]         = useState("notes");
+  const [expanded,    setExpanded]    = useState(false);
 
   // AI resource finding state
   const [aiLoading,   setAiLoading]   = useState(false);
@@ -130,7 +131,7 @@ export function NoteModal({ noteModal, roadmaps, notes, resources, topicMeta, on
     <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)",
       display: "flex", alignItems: "center", justifyContent: "center", zIndex: 200, padding: 16 }}>
       <div onClick={e => e.stopPropagation()} style={{ background: "#16161b", border: "1px solid #2a2a35",
-        borderRadius: 12, width: "100%", maxWidth: 500, boxShadow: "0 20px 60px rgba(0,0,0,0.6)",
+        borderRadius: 12, width: "100%", maxWidth: expanded && tab === "notes" ? 780 : 500, boxShadow: "0 20px 60px rgba(0,0,0,0.6)", transition: "max-width 0.2s",
         display: "flex", flexDirection: "column", maxHeight: "92vh" }}>
 
         {/* Header */}
@@ -165,11 +166,23 @@ export function NoteModal({ noteModal, roadmaps, notes, resources, topicMeta, on
 
           {/* ── Notes tab ── */}
           {tab === "notes" && (
-            <textarea ref={textareaRef} value={note} onChange={e => setNote(e.target.value)}
-              placeholder="Add your notes, key concepts, takeaways…"
-              style={{ width: "100%", minHeight: 160, background: "#0f0f13", border: "1px solid #2a2a35",
-                borderRadius: 7, padding: "10px 12px", color: "#e8e6e0", fontSize: 14, fontFamily: "inherit",
-                resize: "vertical", outline: "none", boxSizing: "border-box", lineHeight: 1.7 }} />
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                <button onClick={() => setExpanded(v => !v)}
+                  style={{ fontSize: 11, padding: "4px 10px", background: "transparent",
+                    border: "1px solid #2a2a35", borderRadius: 5,
+                    color: expanded ? "#c4b5fd" : "#555", cursor: "pointer", fontFamily: "inherit" }}>
+                  {expanded ? "⊡ Collapse" : "⊞ Expand"}
+                </button>
+              </div>
+              <textarea ref={textareaRef} value={note} onChange={e => setNote(e.target.value)}
+                placeholder="Add your notes, key concepts, takeaways…"
+                style={{ width: "100%", minHeight: expanded ? 420 : 160,
+                  background: "#0f0f13", border: "1px solid #2a2a35",
+                  borderRadius: 7, padding: "10px 12px", color: "#e8e6e0",
+                  fontSize: expanded ? 15 : 14, fontFamily: "inherit",
+                  resize: "vertical", outline: "none", boxSizing: "border-box", lineHeight: 1.8 }} />
+            </div>
           )}
 
           {/* ── Resources tab ── */}

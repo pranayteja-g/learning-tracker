@@ -154,6 +154,7 @@ export default function App() {
   // ── Welcome ────────────────────────────────────────────────────────────────
   if (rmKeys.length === 0) return (
     <>
+      <style>{globalStyle}</style>
       <WelcomeScreen onImportBackup={handleImportBackup} onImportRoadmap={handleImportRoadmap}
         onCreate={() => setEditorModal({ existing: null })} />
       {feedback && <Toast feedback={feedback} isMobile={isMobile} />}
@@ -207,9 +208,21 @@ export default function App() {
     </div>
   );
 
+  // ── Global style: prevent iOS zoom on input focus ────────────────────────
+  // iOS zooms when an input has font-size < 16px. We force 16px on focus globally.
+  const globalStyle = `
+    @media screen and (max-width: 768px) {
+      input, textarea, select {
+        font-size: 16px !important;
+      }
+    }
+    * { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+  `;
+
   // ── Overlays ───────────────────────────────────────────────────────────────
   const Overlays = () => (
     <>
+      <style>{globalStyle}</style>
       {feedback    && <Toast feedback={feedback} isMobile={isMobile} />}
       {noteModal   && <NoteModal noteModal={noteModal} roadmaps={roadmaps} notes={notes}
                         resources={resources} topicMeta={topicMeta} onSave={saveNote} onClose={() => setNoteModal(null)} />}
