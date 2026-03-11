@@ -105,3 +105,60 @@ Create a realistic study plan. Respond with ONLY valid JSON, no other text:
   "milestone": "What completing this week's plan unlocks or sets up for next week"
 }`;
 }
+
+// ── Roadmap generation system prompt (separate, stricter) ─────────────────────
+export const ROADMAP_SYSTEM_PROMPT = `You are an expert curriculum designer specializing in software engineering learning roadmaps.
+Your job is to generate exhaustive, professionally structured learning roadmaps in the style of roadmap.sh.
+You MUST respond with ONLY valid JSON — no markdown fences, no explanation, no extra text whatsoever.
+Your output must be deterministic: given the same topic and instructions, always produce the same roadmap.`;
+
+// ── Roadmap generation prompt ─────────────────────────────────────────────────
+export function buildRoadmapPrompt(topic, extraInstructions) {
+  const extras = extraInstructions?.trim()
+    ? `\nAdditional instructions from the user: "${extraInstructions.trim()}"\n`
+    : "";
+
+  return `Generate a complete, exhaustive learning roadmap for: "${topic}"
+${extras}
+STRICT RULES — follow every rule exactly:
+
+COVERAGE:
+- Start from absolute zero basics — assume the learner knows nothing
+- Cover every major concept, tool, pattern, and subtopic a professional needs
+- Include both theoretical concepts and practical skills
+- Do NOT skip foundational topics even if they seem obvious
+- Aim for 60-120 total topics spread across sections
+
+SECTIONS:
+- Group topics into 6-12 logical sections ordered from beginner to advanced
+- Section names must be short (2-5 words), clear, and professional
+- Each section must have at least 5 topics, ideally 8-15
+- Sections must flow logically — prerequisites always come before the concepts that need them
+
+TOPICS:
+- Each topic must be a specific, atomic concept — not a vague category
+- Topic names must be concise (1-6 words), consistent in style
+- Use title case for all topic names
+- No duplicate topics across sections
+- No vague topics like "Advanced Concepts" or "Other Features"
+- Good examples: "Stack vs Heap Memory", "Thread Safety", "Builder Pattern", "SQL Joins"
+- Bad examples: "Memory stuff", "Advanced Java", "Various patterns"
+
+ORDERING:
+- Within each section, topics must be ordered from simpler to more complex
+- A learner should be able to complete topics top-to-bottom without needing knowledge from later sections
+
+CONSISTENCY RULE (critical):
+- Topic names must always use the same canonical form
+- Always use the most widely recognized industry-standard name for each concept
+- Never use synonyms or alternate names — pick one and always use it
+
+Respond with ONLY this JSON structure, nothing else:
+{
+  "label": "canonical name for this technology (e.g. 'Java', 'React', 'Docker')",
+  "sections": {
+    "Section Name": ["Topic One", "Topic Two", "Topic Three"],
+    "Section Name 2": ["Topic A", "Topic B"]
+  }
+}`;
+}

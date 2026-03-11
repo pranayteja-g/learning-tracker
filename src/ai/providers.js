@@ -33,18 +33,18 @@ export function saveAIConfig(config) {
 
 // ── Call the AI ───────────────────────────────────────────────────────────────
 // Always returns { text, usage: { promptTokens, completionTokens } }
-export async function callAI({ provider, apiKey, systemPrompt, userPrompt }) {
-  if (provider === "gemini") return callGemini({ apiKey, systemPrompt, userPrompt });
-  if (provider === "groq")   return callGroq({ apiKey, systemPrompt, userPrompt });
+export async function callAI({ provider, apiKey, systemPrompt, userPrompt, temperature = 0.7 }) {
+  if (provider === "gemini") return callGemini({ apiKey, systemPrompt, userPrompt, temperature });
+  if (provider === "groq")   return callGroq({ apiKey, systemPrompt, userPrompt, temperature });
   throw new Error("Unknown provider: " + provider);
 }
 
-async function callGemini({ apiKey, systemPrompt, userPrompt }) {
+async function callGemini({ apiKey, systemPrompt, userPrompt, temperature = 0.7 }) {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
   const body = {
     system_instruction: { parts: [{ text: systemPrompt }] },
     contents: [{ role: "user", parts: [{ text: userPrompt }] }],
-    generationConfig: { temperature: 0.7, maxOutputTokens: 2048 },
+    generationConfig: { temperature, maxOutputTokens: 2048 },
   };
   const res = await fetch(url, {
     method: "POST",
@@ -67,7 +67,7 @@ async function callGemini({ apiKey, systemPrompt, userPrompt }) {
   };
 }
 
-async function callGroq({ apiKey, systemPrompt, userPrompt }) {
+async function callGroq({ apiKey, systemPrompt, userPrompt, temperature = 0.7 }) {
   const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
     headers: {
@@ -80,7 +80,7 @@ async function callGroq({ apiKey, systemPrompt, userPrompt }) {
         { role: "system", content: systemPrompt },
         { role: "user",   content: userPrompt },
       ],
-      temperature: 0.7,
+      temperature,
       max_tokens: 2048,
     }),
   });
