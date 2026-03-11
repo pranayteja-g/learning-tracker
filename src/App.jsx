@@ -58,6 +58,16 @@ export default function App() {
     setNoteModal(null);
   };
 
+  // Append AI explanation to a topic's notes (never overwrites)
+  const appendToNote = (rmKey, topic, text) => {
+    setNotes(n => {
+      const existing = n[`${rmKey}::${topic}`] || "";
+      const separator = existing.trim() ? "\n\n---\n\n" : "";
+      return { ...n, [`${rmKey}::${topic}`]: existing + separator + text };
+    });
+    showFeedback(true, `Explanation saved to "${topic}" notes`);
+  };
+
   const toggleAll = (key, sectionKey) => {
     const ts = roadmaps[key].sections[sectionKey];
     const allDone = ts.every(t => progress[`${key}::${t}`]);
@@ -210,9 +220,10 @@ export default function App() {
       {editorModal !== null && <RoadmapEditorModal existing={editorModal.existing}
                         onSave={handleSaveRoadmap} onClose={() => setEditorModal(null)} />}
       <AIPanel open={aiOpen} onClose={() => setAiOpen(false)} roadmap={rm} progress={progress}
-        notes={notes} resources={resources} topicMeta={topicMeta} curSection={curSec} isMobile={isMobile} />
+        notes={notes} resources={resources} topicMeta={topicMeta} curSection={curSec} isMobile={isMobile}
+        onSaveToNotes={appendToNote} />
       <InterviewPanel open={interviewOpen} onClose={() => setInterviewOpen(false)}
-        roadmap={rm} progress={progress} isMobile={isMobile} />
+        roadmap={rm} progress={progress} isMobile={isMobile} roadmaps={roadmaps} />
       {/* Floating buttons */}
       {rmKeys.length > 0 && (
         <>

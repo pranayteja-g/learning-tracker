@@ -1,12 +1,31 @@
-export function ExplainView({ data, rm }) {
+import { useState } from "react";
+
+export function ExplainView({ data, rm, topic, rmKey, onSaveToNotes }) {
+  const [saved,   setSaved]   = useState(false);
+
   const sections = [
-    { key: "whatItIs",       label: "What it is",         icon: "📖" },
-    { key: "howItWorks",     label: "How it works",       icon: "⚙️" },
-    { key: "whenToUse",      label: "When to use it",     icon: "🎯" },
-    { key: "example",        label: "Example",            icon: "💻" },
-    { key: "commonMistakes", label: "Common mistakes",    icon: "⚠️" },
-    { key: "keyTakeaway",    label: "Key takeaway",       icon: "💡" },
+    { key: "whatItIs",       label: "What it is",      icon: "📖" },
+    { key: "howItWorks",     label: "How it works",    icon: "⚙️" },
+    { key: "whenToUse",      label: "When to use it",  icon: "🎯" },
+    { key: "example",        label: "Example",         icon: "💻" },
+    { key: "commonMistakes", label: "Common mistakes", icon: "⚠️" },
+    { key: "keyTakeaway",    label: "Key takeaway",    icon: "💡" },
   ];
+
+  const handleSave = () => {
+    if (!onSaveToNotes) return;
+    // Build a clean text representation to append to notes
+    const lines = [`## AI Explanation: ${topic}`, ""];
+    if (data.summary)        lines.push(`**Summary:** ${data.summary}`, "");
+    if (data.whatItIs)       lines.push(`**What it is:** ${data.whatItIs}`, "");
+    if (data.howItWorks)     lines.push(`**How it works:** ${data.howItWorks}`, "");
+    if (data.whenToUse)      lines.push(`**When to use:** ${data.whenToUse}`, "");
+    if (data.example)        lines.push(`**Example:**\n${data.example}`, "");
+    if (data.commonMistakes) lines.push(`**Common mistakes:** ${data.commonMistakes}`, "");
+    if (data.keyTakeaway)    lines.push(`**Key takeaway:** ${data.keyTakeaway}`);
+    onSaveToNotes(rmKey, topic, lines.join("\n"));
+    setSaved(true);
+  };
 
   return (
     <div style={{ padding: "0 20px 20px" }}>
@@ -31,6 +50,19 @@ export function ExplainView({ data, rm }) {
           </div>
         </div>
       ))}
+
+      {/* Save to notes button */}
+      {onSaveToNotes && (
+        <button onClick={handleSave} disabled={saved}
+          style={{ width: "100%", marginTop: 8, padding: "10px",
+            background: saved ? "#1a2e1a" : "#1e1e24",
+            border: `1px solid ${saved ? "#52b78844" : "#2a2a35"}`,
+            borderRadius: 8, color: saved ? "#52b788" : "#888",
+            fontSize: 13, cursor: saved ? "default" : "pointer",
+            fontFamily: "inherit", fontWeight: saved ? 600 : 400 }}>
+          {saved ? "✓ Saved to notes" : "📋 Save explanation to notes"}
+        </button>
+      )}
     </div>
   );
 }
