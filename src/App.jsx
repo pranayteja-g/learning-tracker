@@ -11,6 +11,7 @@ import { RoadmapEditorModal }    from "./components/modals/RoadmapEditorModal.js
 import { WelcomeScreen }         from "./components/screens/WelcomeScreen.jsx";
 import { Dashboard }             from "./components/screens/Dashboard.jsx";
 import { AIPanel }               from "./components/ai/AIPanel.jsx";
+import { InterviewPanel }        from "./components/interview/InterviewPanel.jsx";
 
 export default function App() {
   const { roadmaps, setRoadmaps, progress, setProgress, notes, setNotes,
@@ -27,6 +28,7 @@ export default function App() {
   const [editorModal,    setEditorModal]    = useState(null);
   const [feedback,       setFeedback]       = useState(null);
   const [aiOpen,         setAiOpen]         = useState(false);
+  const [interviewOpen,  setInterviewOpen]  = useState(false);
   const importRef = useRef(null);
 
   const showFeedback = (ok, msg) => {
@@ -209,18 +211,34 @@ export default function App() {
                         onSave={handleSaveRoadmap} onClose={() => setEditorModal(null)} />}
       <AIPanel open={aiOpen} onClose={() => setAiOpen(false)} roadmap={rm} progress={progress}
         notes={notes} resources={resources} topicMeta={topicMeta} curSection={curSec} isMobile={isMobile} />
-      {/* Floating AI button */}
+      <InterviewPanel open={interviewOpen} onClose={() => setInterviewOpen(false)}
+        roadmap={rm} progress={progress} isMobile={isMobile} />
+      {/* Floating buttons */}
       {rmKeys.length > 0 && (
-        <button onClick={() => setAiOpen(o => !o)}
-          style={{ position: "fixed", bottom: isMobile ? 72 : 24, right: 20, zIndex: 89,
-            width: 52, height: 52, borderRadius: "50%",
-            background: aiOpen ? "#7b5ea7" : "linear-gradient(135deg, #7b5ea7, #4361ee)",
-            border: "none", boxShadow: "0 4px 20px rgba(123,94,167,0.5)",
-            color: "#fff", fontSize: 22, cursor: "pointer",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            transition: "transform 0.2s", transform: aiOpen ? "rotate(45deg)" : "rotate(0deg)" }}>
-          {aiOpen ? "×" : "🤖"}
-        </button>
+        <>
+          {/* Interview Prep — left side */}
+          <button onClick={() => { setInterviewOpen(o => !o); setAiOpen(false); }}
+            style={{ position: "fixed", bottom: isMobile ? 72 : 24, left: 20, zIndex: 89,
+              width: 52, height: 52, borderRadius: "50%",
+              background: interviewOpen ? "#e07b39" : "linear-gradient(135deg, #e07b39, #ee9b00)",
+              border: "none", boxShadow: "0 4px 20px rgba(224,123,57,0.5)",
+              color: "#fff", fontSize: 22, cursor: "pointer",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              transition: "transform 0.2s", transform: interviewOpen ? "rotate(45deg)" : "rotate(0deg)" }}>
+            {interviewOpen ? "×" : "🎯"}
+          </button>
+          {/* AI Assistant — right side */}
+          <button onClick={() => { setAiOpen(o => !o); setInterviewOpen(false); }}
+            style={{ position: "fixed", bottom: isMobile ? 72 : 24, right: 20, zIndex: 89,
+              width: 52, height: 52, borderRadius: "50%",
+              background: aiOpen ? "#7b5ea7" : "linear-gradient(135deg, #7b5ea7, #4361ee)",
+              border: "none", boxShadow: "0 4px 20px rgba(123,94,167,0.5)",
+              color: "#fff", fontSize: 22, cursor: "pointer",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              transition: "transform 0.2s", transform: aiOpen ? "rotate(45deg)" : "rotate(0deg)" }}>
+            {aiOpen ? "×" : "🤖"}
+          </button>
+        </>
       )}
     </>
   );
