@@ -33,7 +33,7 @@ function fmt(n) {
   return String(n);
 }
 
-export function AIPanel({ open, onClose, roadmap, progress, notes, resources, topicMeta, curSection, isMobile }) {
+export function AIPanel({ open, onClose, roadmap, progress, notes, resources, topicMeta, curSection, isMobile, onSaveToNotes }) {
   const [aiConfig,     setAIConfig]     = useState(loadAIConfig);
   const [mode,         setMode]         = useState("quiz");
   const [scope,        setScope]        = useState("section");
@@ -350,7 +350,7 @@ export function AIPanel({ open, onClose, roadmap, progress, notes, resources, to
 
                 {result.mode === "quiz"          && <QuizView          questions={result.data} rm={rm} />}
                 {result.mode === "questionnaire" && <QuestionnaireView questions={result.data} rm={rm} />}
-                {result.mode === "explain"       && <ExplainView       data={result.data}      rm={rm} />}
+                {result.mode === "explain"       && <ExplainView       data={result.data}      rm={rm} topic={explainTopic} rmKey={rm?.id} onSaveToNotes={onSaveToNotes} />}
                 {result.mode === "studyplan"     && <StudyPlanView     data={result.data}      rm={rm} />}
               </div>
             )}

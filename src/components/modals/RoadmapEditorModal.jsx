@@ -2,7 +2,7 @@ import { useState } from "react";
 import { COLOR_PALETTE } from "../../constants/templates.js";
 import { slugify } from "../../utils/roadmap.js";
 import { callAI, loadAIConfig, PROVIDERS } from "../../ai/providers.js";
-import { ROADMAP_SYSTEM_PROMPT, buildRoadmapPrompt, ROADMAP_CATEGORIES } from "../../ai/prompts.js";
+import { ROADMAP_SYSTEM_PROMPT, buildRoadmapPrompt, ROADMAP_CATEGORIES, buildTopicExpansionPrompt } from "../../ai/prompts.js";
 
 function isValidHex(str) { return /^#[0-9a-fA-F]{6}$/.test(str); }
 
@@ -235,6 +235,7 @@ export function RoadmapEditorModal({ existing, onSave, onClose }) {
   const [accent,    setAccent]    = useState(existing?.accent || COLOR_PALETTE[0].accent);
   const [hexColor,  setHexColor]  = useState(existing?.color  || COLOR_PALETTE[0].color);
   const [hexAccent, setHexAccent] = useState(existing?.accent || COLOR_PALETTE[0].accent);
+  const [expanding, setExpanding] = useState(null); // "si-ti" key of topic being expanded
   const [sections,  setSections]  = useState(
     existing
       ? Object.entries(existing.sections).map(([name, topics]) => ({ name, topics: [...topics], newTopic: "" }))
@@ -267,6 +268,39 @@ export function RoadmapEditorModal({ existing, onSave, onClose }) {
     ? { ...sec, topics: sec.topics.map((t, tidx) => tidx === ti ? val : t) } : sec));
   const moveTopicUp   = (si, ti) => { if (ti===0) return; setSections(s => s.map((sec,idx) => { if(idx!==si) return sec; const t=[...sec.topics]; [t[ti-1],t[ti]]=[t[ti],t[ti-1]]; return {...sec,topics:t}; })); };
   const moveTopicDown = (si, ti) => setSections(s => s.map((sec,idx) => { if(idx!==si) return sec; if(ti>=sec.topics.length-1) return sec; const t=[...sec.topics]; [t[ti],t[ti+1]]=[t[ti+1],t[ti]]; return {...sec,topics:t}; }));
+
+  // ── Expand a topic into subtopics via AI ────────────────────────────────────
+  const expandTopic = async (si, ti) => {
+    const aiConfig = loadAIConfig();
+    if (!aiConfig.keys?.[aiConfig.provider]?.trim()) return;
+    const key = `${si}-${ti}`;
+    setExpanding(key);
+    try {
+      const topic   = sections[si].topics[ti];
+      const secName = sections[si].name;
+      const { text } = await callAI({
+        provider:     aiConfig.provider,
+        apiKey:       aiConfig.keys[aiConfig.provider],
+        systemPrompt: "You are an expert curriculum designer. Respond with ONLY valid JSON — no markdown fences, no extra text.",
+        userPrompt:   buildTopicExpansionPrompt(topic, secName, label || "this roadmap"),
+        temperature:  0,
+      });
+      const cleaned = text.replace(/```json\n?/g,"").replace(/```\n?/g,"").trim();
+      const subtopics = JSON.parse(cleaned);
+      if (!Array.isArray(subtopics)) throw new Error("bad format");
+      // Replace the original topic with the expanded subtopics
+      setSections(s => s.map((sec, idx) => {
+        if (idx !== si) return sec;
+        const newTopics = [...sec.topics];
+        newTopics.splice(ti, 1, ...subtopics);
+        return { ...sec, topics: newTopics };
+      }));
+    } catch(e) {
+      // silently fail — topic stays unchanged
+    } finally {
+      setExpanding(null);
+    }
+  };
 
   // ── AI generated → load into editor ─────────────────────────────────────────
   const handleAIGenerated = (rm) => {
@@ -439,6 +473,16 @@ export function RoadmapEditorModal({ existing, onSave, onClose }) {
                             style={{ flex: 1, background: "#16161b", border: "1px solid #2a2a35",
                               borderRadius: 5, padding: "6px 10px", color: "#ccc",
                               fontSize: 13, fontFamily: "inherit", outline: "none" }} />
+                          <button
+                            onClick={() => expandTopic(si, ti)}
+                            disabled={!!expanding}
+                            title="Expand this topic into subtopics with AI"
+                            style={{ background: "transparent", border: "1px solid #2a2a35",
+                              borderRadius: 4, color: expanding === `${si}-${ti}` ? "#7b5ea7" : "#444",
+                              fontSize: 11, cursor: expanding ? "default" : "pointer",
+                              padding: "3px 6px", flexShrink: 0 }}>
+                            {expanding === `${si}-${ti}` ? "⚙️" : "✨"}
+                          </button>
                           <button onClick={() => removeTopic(si, ti)}
                             style={{ background: "transparent", border: "none", color: "#444",
                               fontSize: 16, cursor: "pointer", padding: "0 2px" }}>×</button>
