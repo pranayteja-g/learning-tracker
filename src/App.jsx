@@ -69,9 +69,39 @@ export default function App() {
   };
 
   const toggleAll = (key, sectionKey) => {
-    const ts = roadmaps[key].sections[sectionKey];
-    const allDone = ts.every(t => progress[`${key}::${t}`]);
-    ts.forEach(t => setProgress(p => ({ ...p, [`${key}::${t}`]: !allDone })));
+    const ts    = roadmaps[key].sections[sectionKey];
+    const flat  = flatTopicNames(ts);
+    const allDone = flat.every(t => progress[`${key}::${t}`]);
+    flat.forEach(t => setProgress(p => ({ ...p, [`${key}::${t}`]: !allDone })));
+  };
+
+  // Toggle collapsed state of a parent topic (up to 2 levels)
+  const handleToggleCollapse = (sectionKey, parentName, subName) => {
+    setRoadmaps(prev => {
+      const rm = prev[rmKey];
+      const section = rm.sections[sectionKey];
+      let newSection;
+      if (!subName) {
+        // Toggle top-level parent
+        newSection = section.map(t =>
+          topicName(t) === parentName && isExpanded(t)
+            ? { ...t, collapsed: t.collapsed === false ? true : false }
+            : t
+        );
+      } else {
+        // Toggle level-2 parent inside a top-level parent
+        newSection = section.map(t => {
+          if (topicName(t) !== parentName || !isExpanded(t)) return t;
+          const newSubs = t.subtopics.map(st =>
+            topicName(st) === subName && isExpanded(st)
+              ? { ...st, collapsed: st.collapsed === false ? true : false }
+              : st
+          );
+          return { ...t, subtopics: newSubs };
+        });
+      }
+      return { ...prev, [rmKey]: { ...rm, sections: { ...rm.sections, [sectionKey]: newSection } } };
+    });
   };
 
   // ── Roadmap CRUD ───────────────────────────────────────────────────────────
@@ -168,12 +198,10 @@ export default function App() {
   const TopicList = ({ sectionKey }) => (
     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
       {rm.sections[sectionKey]?.map(topic => (
-        <TopicCard key={topic} topic={topic} rmKey={rmKey} rm={rm}
-          isDone={!!progress[`${rmKey}::${topic}`]}
-          hasNote={notes[`${rmKey}::${topic}`] || ""}
-          hasMeta={topicMeta[`${rmKey}::${topic}`] || {}}
-          hasResources={(resources[`${rmKey}::${topic}`] || []).length > 0}
-          onToggle={toggle} onOpenNote={openNote} />
+        <TopicCard key={topicName(topic)} topic={topic} rmKey={rmKey} rm={rm}
+          progress={progress} notes={notes} resources={resources} topicMeta={topicMeta}
+          onToggle={toggle} onOpenNote={openNote}
+          onToggleCollapse={(parentName, subName) => handleToggleCollapse(sectionKey, parentName, subName)} />
       ))}
     </div>
   );
@@ -358,7 +386,8 @@ export default function App() {
 
             {sections.map(section => {
               const ts   = rm.sections[section];
-              const done = ts.filter(t => progress[`${rmKey}::${t}`]).length;
+              const flat = flatTopicNames(ts);
+              const done = flat.filter(t => progress[`${rmKey}::${t}`]).length;
               return (
                 <div key={section} onClick={() => { setActiveSection(section); setMobileScreen("topics"); }}
                   style={{ background: "#16161b", borderRadius: 10, padding: "13px 16px", marginBottom: 8,
@@ -500,7 +529,8 @@ export default function App() {
             </div>
             {sections.map(section => {
               const ts     = rm.sections[section];
-              const done   = ts.filter(t => progress[`${rmKey}::${t}`]).length;
+              const flat   = flatTopicNames(ts);
+              const done   = flat.filter(t => progress[`${rmKey}::${t}`]).length;
               const active = curSec === section && view === "sections";
               return (
                 <button key={section} onClick={() => { setActiveSection(section); setView("sections"); }}

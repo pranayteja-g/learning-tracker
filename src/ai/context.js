@@ -1,3 +1,4 @@
+import { flatTopicNames, topicName } from "../utils/topics.js";
 // Builds minimal, scoped context objects for each AI feature.
 // We never send the entire app state — only what's relevant to the request.
 
@@ -7,16 +8,17 @@ export function buildQuizContext({ roadmap, progress, scope, sectionKey }) {
   let topics = [];
 
   if (scope === "section" && sectionKey) {
-    const ts = roadmap.sections[sectionKey] || [];
-    topics = ts.map(t => ({ topic: t, done: !!progress[`${rmId}::${t}`], section: sectionKey }));
+    const ts   = roadmap.sections[sectionKey] || [];
+    const flat = flatTopicNames(ts);
+    topics = flat.map(t => ({ topic: t, done: !!progress[`${rmId}::${t}`], section: sectionKey }));
   } else if (scope === "completed") {
     for (const [sec, ts] of Object.entries(roadmap.sections))
-      for (const t of ts)
+      for (const t of flatTopicNames(ts))
         if (progress[`${rmId}::${t}`]) topics.push({ topic: t, done: true, section: sec });
   } else {
     // full roadmap
     for (const [sec, ts] of Object.entries(roadmap.sections))
-      for (const t of ts)
+      for (const t of flatTopicNames(ts))
         topics.push({ topic: t, done: !!progress[`${rmId}::${t}`], section: sec });
   }
 
@@ -49,6 +51,7 @@ export function buildStudyPlanContext({ roadmap, progress }) {
   let completed = [], upcoming = [];
 
   for (const [sec, ts] of Object.entries(roadmap.sections)) {
+    const _flat = flatTopicNames(ts);
     for (const t of ts) {
       if (progress[`${rmId}::${t}`]) completed.push({ topic: t, section: sec });
       else upcoming.push({ topic: t, section: sec });
