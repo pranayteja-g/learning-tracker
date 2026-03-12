@@ -2,7 +2,7 @@ import { useState } from "react";
 
 const DIFF_COLOR = { easy: "#52b788", medium: "#ee9b00", hard: "#e05252" };
 
-export function QuizView({ questions, rm }) {
+export function QuizView({ questions, rm, onQuizComplete }) {
   const [answers,   setAnswers]   = useState({});
   const [submitted, setSubmitted] = useState(false);
   const [current,   setCurrent]   = useState(0);
@@ -163,7 +163,7 @@ export function QuizView({ questions, rm }) {
                 fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>
               Next →
             </button>
-          : <button onClick={() => setSubmitted(true)}
+          : <button onClick={() => { setSubmitted(true); onQuizComplete?.(score, totalQ); }}
               disabled={Object.keys(answers).length < totalQ}
               style={{ flex: 1, padding: "9px",
                 background: Object.keys(answers).length < totalQ ? "#1e1e24" : rm.color,
