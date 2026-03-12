@@ -129,6 +129,7 @@ export function InterviewPanel({ open, onClose, roadmap, progress, isMobile, roa
       {/* Panel — slides in from LEFT */}
       <div style={{
         position: "fixed", top: 0, left: 0, bottom: 0, width: panelWidth,
+        paddingTop: "env(safe-area-inset-top)",
         background: "#13131a", borderRight: "1px solid #1e1e24",
         zIndex: 91, display: "flex", flexDirection: "column",
         boxShadow: "8px 0 40px rgba(0,0,0,0.5)", overflowY: "auto",
