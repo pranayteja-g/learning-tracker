@@ -131,6 +131,7 @@ export function AIPanel({ open, onClose, roadmap, progress, notes, resources, to
         background: "#13131a", borderLeft: "1px solid #1e1e24",
         zIndex: 91, display: "flex", flexDirection: "column",
         boxShadow: "-8px 0 40px rgba(0,0,0,0.5)", overflowY: "auto",
+        paddingTop: "env(safe-area-inset-top)",
       }}>
 
         {/* Header */}
@@ -264,7 +265,7 @@ export function AIPanel({ open, onClose, roadmap, progress, notes, resources, to
                     <option value="">Select a topic…</option>
                     {rm && Object.entries(rm.sections).map(([sec, topics]) => (
                       <optgroup key={sec} label={sec}>
-                        {topics.map(t => <option key={t} value={t}>{t}</option>)}
+                        {allTopicNames(topics).map(t => <option key={t} value={t}>{t}</option>)}
                       </optgroup>
                     ))}
                   </select>
