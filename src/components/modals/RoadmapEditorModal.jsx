@@ -3,6 +3,7 @@ import { COLOR_PALETTE } from "../../constants/templates.js";
 import { slugify } from "../../utils/roadmap.js";
 import { callAI, loadAIConfig, PROVIDERS } from "../../ai/providers.js";
 import { ROADMAP_SYSTEM_PROMPT, buildRoadmapPrompt, ROADMAP_CATEGORIES, buildTopicExpansionPrompt } from "../../ai/prompts.js";
+import { topicName, isExpanded, expandTopic, expandSubtopic } from "../../utils/topics.js";
 
 function isValidHex(str) { return /^#[0-9a-fA-F]{6}$/.test(str); }
 
@@ -265,38 +266,57 @@ export function RoadmapEditorModal({ existing, onSave, onClose }) {
   const removeTopic = (si, ti) => setSections(s => s.map((sec, idx) => idx === si
     ? { ...sec, topics: sec.topics.filter((_, tidx) => tidx !== ti) } : sec));
   const renameTopic = (si, ti, val) => setSections(s => s.map((sec, idx) => idx === si
-    ? { ...sec, topics: sec.topics.map((t, tidx) => tidx === ti ? val : t) } : sec));
+    ? { ...sec, topics: sec.topics.map((t, tidx) => tidx === ti
+        ? (isExpanded(t) ? { ...t, name: val } : val) : t) } : sec));
   const moveTopicUp   = (si, ti) => { if (ti===0) return; setSections(s => s.map((sec,idx) => { if(idx!==si) return sec; const t=[...sec.topics]; [t[ti-1],t[ti]]=[t[ti],t[ti-1]]; return {...sec,topics:t}; })); };
   const moveTopicDown = (si, ti) => setSections(s => s.map((sec,idx) => { if(idx!==si) return sec; if(ti>=sec.topics.length-1) return sec; const t=[...sec.topics]; [t[ti],t[ti+1]]=[t[ti+1],t[ti]]; return {...sec,topics:t}; }));
 
   // ── Expand a topic into subtopics via AI ────────────────────────────────────
-  const expandTopic = async (si, ti) => {
+  const expandTopicAI = async (si, ti, parentIdx = null) => {
     const aiConfig = loadAIConfig();
     if (!aiConfig.keys?.[aiConfig.provider]?.trim()) return;
-    const key = `${si}-${ti}`;
+    const key = parentIdx !== null ? `${si}-${parentIdx}-${ti}` : `${si}-${ti}`;
     setExpanding(key);
     try {
-      const topic   = sections[si].topics[ti];
-      const secName = sections[si].name;
+      const secTopics = sections[si].topics;
+      const secName   = sections[si].name;
+      // Get the target topic — either top-level or a subtopic
+      let targetTopic, parentTopic;
+      if (parentIdx !== null) {
+        parentTopic = secTopics[parentIdx];
+        targetTopic = topicName(isExpanded(parentTopic)
+          ? parentTopic.subtopics[ti] : parentTopic);
+      } else {
+        targetTopic = topicName(secTopics[ti]);
+      }
       const { text } = await callAI({
         provider:     aiConfig.provider,
         apiKey:       aiConfig.keys[aiConfig.provider],
         systemPrompt: "You are an expert curriculum designer. Respond with ONLY valid JSON — no markdown fences, no extra text.",
-        userPrompt:   buildTopicExpansionPrompt(topic, secName, label || "this roadmap"),
+        userPrompt:   buildTopicExpansionPrompt(targetTopic, secName, label || "this roadmap"),
         temperature:  0,
       });
-      const cleaned = text.replace(/```json\n?/g,"").replace(/```\n?/g,"").trim();
-      const subtopics = JSON.parse(cleaned);
-      if (!Array.isArray(subtopics)) throw new Error("bad format");
-      // Replace the original topic with the expanded subtopics
+      const cleaned   = text.replace(/```json\n?/g,"").replace(/```\n?/g,"").trim();
+      const newSubs   = JSON.parse(cleaned);
+      if (!Array.isArray(newSubs)) throw new Error("bad format");
+
       setSections(s => s.map((sec, idx) => {
         if (idx !== si) return sec;
-        const newTopics = [...sec.topics];
-        newTopics.splice(ti, 1, ...subtopics);
+        let newTopics;
+        if (parentIdx !== null) {
+          // Expand a subtopic one level deeper
+          newTopics = expandSubtopic(sec.topics, topicName(sec.topics[parentIdx]),
+            targetTopic, newSubs);
+        } else {
+          // Expand a top-level topic
+          newTopics = sec.topics.map((t, i) =>
+            i === ti ? { name: topicName(t), subtopics: newSubs, collapsed: false } : t
+          );
+        }
         return { ...sec, topics: newTopics };
       }));
     } catch(e) {
-      // silently fail — topic stays unchanged
+      // silently fail
     } finally {
       setExpanding(null);
     }
@@ -456,38 +476,143 @@ export function RoadmapEditorModal({ existing, onSave, onClose }) {
 
                     {/* Topics */}
                     <div style={{ display: "flex", flexDirection: "column", gap: 5, marginBottom: 8 }}>
-                      {sec.topics.map((topic, ti) => (
-                        <div key={ti} style={{ display: "flex", gap: 5, alignItems: "center" }}>
-                          <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
-                            {[
-                              { fn: () => moveTopicUp(si, ti),   disabled: ti === 0,                 arrow: "▲" },
-                              { fn: () => moveTopicDown(si, ti), disabled: ti === sec.topics.length-1, arrow: "▼" },
-                            ].map(({ fn, disabled, arrow }) => (
-                              <button key={arrow} onClick={fn} disabled={disabled}
-                                style={{ background: "transparent", border: "none",
-                                  color: disabled ? "#252525" : "#444", cursor: disabled ? "default" : "pointer",
-                                  fontSize: 9, lineHeight: 1, padding: "1px 3px" }}>{arrow}</button>
-                            ))}
+                      {sec.topics.map((topic, ti) => {
+                        const tName = topicName(topic);
+                        const hasChildren = isExpanded(topic);
+                        return (
+                          <div key={ti}>
+                            {/* Top-level row */}
+                            <div style={{ display: "flex", gap: 5, alignItems: "center" }}>
+                              <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
+                                {[
+                                  { fn: () => moveTopicUp(si, ti),   disabled: ti === 0,                   arrow: "▲" },
+                                  { fn: () => moveTopicDown(si, ti), disabled: ti === sec.topics.length-1, arrow: "▼" },
+                                ].map(({ fn, disabled, arrow }) => (
+                                  <button key={arrow} onClick={fn} disabled={disabled}
+                                    style={{ background: "transparent", border: "none",
+                                      color: disabled ? "#252525" : "#444", cursor: disabled ? "default" : "pointer",
+                                      fontSize: 9, lineHeight: 1, padding: "1px 3px" }}>{arrow}</button>
+                                ))}
+                              </div>
+                              <input value={tName} onChange={e => renameTopic(si, ti, e.target.value)}
+                                style={{ flex: 1, background: "#16161b",
+                                  border: `1px solid ${hasChildren ? "#7b5ea744" : "#2a2a35"}`,
+                                  borderRadius: 5, padding: "6px 10px",
+                                  color: hasChildren ? "#c4b5fd" : "#ccc",
+                                  fontSize: 13, fontFamily: "inherit", outline: "none" }} />
+                              {!hasChildren && (
+                                <button onClick={() => expandTopicAI(si, ti)} disabled={!!expanding}
+                                  title="Expand into subtopics with AI"
+                                  style={{ background: "transparent", border: "1px solid #2a2a35",
+                                    borderRadius: 4, color: expanding === `${si}-${ti}` ? "#7b5ea7" : "#444",
+                                    fontSize: 11, cursor: expanding ? "default" : "pointer",
+                                    padding: "3px 6px", flexShrink: 0 }}>
+                                  {expanding === `${si}-${ti}` ? "⚙️" : "✨"}
+                                </button>
+                              )}
+                              <button onClick={() => removeTopic(si, ti)}
+                                style={{ background: "transparent", border: "none", color: "#444",
+                                  fontSize: 16, cursor: "pointer", padding: "0 2px" }}>×</button>
+                            </div>
+
+                            {/* Subtopics */}
+                            {hasChildren && (
+                              <div style={{ marginLeft: 26, marginTop: 4,
+                                borderLeft: "2px solid #7b5ea733", paddingLeft: 10,
+                                display: "flex", flexDirection: "column", gap: 4 }}>
+                                {topic.subtopics.map((st, sti) => {
+                                  const stName = topicName(st);
+                                  const stHasChildren = isExpanded(st);
+                                  return (
+                                    <div key={sti}>
+                                      <div style={{ display: "flex", gap: 5, alignItems: "center" }}>
+                                        <span style={{ color: "#333", fontSize: 10, width: 14,
+                                          textAlign: "right", flexShrink: 0 }}>
+                                          {String.fromCharCode(97 + sti)}.
+                                        </span>
+                                        <input value={stName}
+                                          onChange={e => setSections(s => s.map((sec2, i) => i !== si ? sec2 : {
+                                            ...sec2, topics: sec2.topics.map((t, j) => j !== ti ? t : {
+                                              ...t, subtopics: t.subtopics.map((st2, k) =>
+                                                k === sti ? (isExpanded(st2) ? {...st2, name: e.target.value} : e.target.value) : st2
+                                              )
+                                            })
+                                          }))}
+                                          style={{ flex: 1, background: "#16161b",
+                                            border: `1px solid ${stHasChildren ? "#4361ee44" : "#2a2a35"}`,
+                                            borderRadius: 5, padding: "5px 9px",
+                                            color: stHasChildren ? "#7b8cde" : "#aaa",
+                                            fontSize: 12, fontFamily: "inherit", outline: "none" }} />
+                                        {!stHasChildren && (
+                                          <button onClick={() => expandTopicAI(si, sti, ti)} disabled={!!expanding}
+                                            title="Expand into sub-subtopics"
+                                            style={{ background: "transparent", border: "1px solid #2a2a35",
+                                              borderRadius: 4, color: expanding === `${si}-${ti}-${sti}` ? "#4361ee" : "#333",
+                                              fontSize: 10, cursor: expanding ? "default" : "pointer",
+                                              padding: "2px 5px", flexShrink: 0 }}>
+                                            {expanding === `${si}-${ti}-${sti}` ? "⚙️" : "✨"}
+                                          </button>
+                                        )}
+                                        <button onClick={() => setSections(s => s.map((sec2, i) => i !== si ? sec2 : {
+                                            ...sec2, topics: sec2.topics.map((t, j) => j !== ti ? t : {
+                                              ...t, subtopics: t.subtopics.filter((_, k) => k !== sti)
+                                            })
+                                          }))}
+                                          style={{ background: "transparent", border: "none", color: "#333",
+                                            fontSize: 13, cursor: "pointer", padding: "0 2px" }}>×</button>
+                                      </div>
+                                      {/* Level 2 subtopics */}
+                                      {stHasChildren && (
+                                        <div style={{ marginLeft: 20, marginTop: 3,
+                                          borderLeft: "2px solid #4361ee33", paddingLeft: 8,
+                                          display: "flex", flexDirection: "column", gap: 3 }}>
+                                          {st.subtopics.map((sst, ssti) => (
+                                            <div key={ssti} style={{ display: "flex", gap: 5, alignItems: "center" }}>
+                                              <span style={{ color: "#333", fontSize: 9, flexShrink: 0 }}>·</span>
+                                              <input value={topicName(sst)}
+                                                onChange={e => setSections(s => s.map((sec2, i) => i !== si ? sec2 : {
+                                                  ...sec2, topics: sec2.topics.map((t, j) => j !== ti ? t : {
+                                                    ...t, subtopics: t.subtopics.map((st2, k) => k !== sti ? st2 : {
+                                                      ...st2, subtopics: st2.subtopics.map((sst2, l) =>
+                                                        l === ssti ? e.target.value : sst2
+                                                      )
+                                                    })
+                                                  })
+                                                }))}
+                                                style={{ flex: 1, background: "#16161b", border: "1px solid #2a2a35",
+                                                  borderRadius: 5, padding: "4px 8px", color: "#777",
+                                                  fontSize: 11, fontFamily: "inherit", outline: "none" }} />
+                                              <button onClick={() => setSections(s => s.map((sec2, i) => i !== si ? sec2 : {
+                                                  ...sec2, topics: sec2.topics.map((t, j) => j !== ti ? t : {
+                                                    ...t, subtopics: t.subtopics.map((st2, k) => k !== sti ? st2 : {
+                                                      ...st2, subtopics: st2.subtopics.filter((_, l) => l !== ssti)
+                                                    })
+                                                  })
+                                                }))}
+                                                style={{ background: "transparent", border: "none", color: "#333",
+                                                  fontSize: 11, cursor: "pointer", padding: "0 2px" }}>×</button>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                                <button onClick={() => setSections(s => s.map((sec2, i) => i !== si ? sec2 : {
+                                    ...sec2, topics: sec2.topics.map((t, j) => j !== ti ? t : {
+                                      ...t, subtopics: [...t.subtopics, "New Subtopic"]
+                                    })
+                                  }))}
+                                  style={{ fontSize: 11, color: "#444", background: "transparent",
+                                    border: "1px dashed #2a2a35", borderRadius: 5, padding: "4px 8px",
+                                    cursor: "pointer", fontFamily: "inherit", alignSelf: "flex-start" }}>
+                                  + add subtopic
+                                </button>
+                              </div>
+                            )}
                           </div>
-                          <input value={topic} onChange={e => renameTopic(si, ti, e.target.value)}
-                            style={{ flex: 1, background: "#16161b", border: "1px solid #2a2a35",
-                              borderRadius: 5, padding: "6px 10px", color: "#ccc",
-                              fontSize: 13, fontFamily: "inherit", outline: "none" }} />
-                          <button
-                            onClick={() => expandTopic(si, ti)}
-                            disabled={!!expanding}
-                            title="Expand this topic into subtopics with AI"
-                            style={{ background: "transparent", border: "1px solid #2a2a35",
-                              borderRadius: 4, color: expanding === `${si}-${ti}` ? "#7b5ea7" : "#444",
-                              fontSize: 11, cursor: expanding ? "default" : "pointer",
-                              padding: "3px 6px", flexShrink: 0 }}>
-                            {expanding === `${si}-${ti}` ? "⚙️" : "✨"}
-                          </button>
-                          <button onClick={() => removeTopic(si, ti)}
-                            style={{ background: "transparent", border: "none", color: "#444",
-                              fontSize: 16, cursor: "pointer", padding: "0 2px" }}>×</button>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
 
                     {/* Add topic */}

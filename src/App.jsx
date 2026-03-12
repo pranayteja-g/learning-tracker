@@ -1,7 +1,8 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useAppStorage }         from "./storage/hooks.js";
 import { useIsMobile }           from "./hooks/useIsMobile.js";
 import { validateRoadmap, downloadJSON, getRoadmapStats, getNextUp } from "./utils/roadmap.js";
+import { flatTopicNames, allTopicNames, topicName, isExpanded } from "./utils/topics.js";
 import { Toast }                 from "./components/ui/Toast.jsx";
 import { TopicCard }             from "./components/ui/TopicCard.jsx";
 import { RadialProgress }        from "./components/ui/RadialProgress.jsx";
@@ -12,6 +13,10 @@ import { WelcomeScreen }         from "./components/screens/WelcomeScreen.jsx";
 import { Dashboard }             from "./components/screens/Dashboard.jsx";
 import { AIPanel }               from "./components/ai/AIPanel.jsx";
 import { InterviewPanel }        from "./components/interview/InterviewPanel.jsx";
+import { SearchOverlay }         from "./components/ui/SearchOverlay.jsx";
+import { StreakBadge }           from "./components/ui/StreakBadge.jsx";
+import { InstallPrompt }        from "./components/ui/InstallPrompt.jsx";
+import { useStreak }            from "./hooks/useStreak.js";
 
 export default function App() {
   const { roadmaps, setRoadmaps, progress, setProgress, notes, setNotes,
@@ -29,6 +34,8 @@ export default function App() {
   const [feedback,       setFeedback]       = useState(null);
   const [aiOpen,         setAiOpen]         = useState(false);
   const [interviewOpen,  setInterviewOpen]  = useState(false);
+  const [searchOpen,     setSearchOpen]     = useState(false);
+  const { streak, recordActivity, studiedToday } = useStreak();
   const importRef = useRef(null);
 
   const showFeedback = (ok, msg) => {
@@ -46,8 +53,11 @@ export default function App() {
   const nextUp   = rm ? getNextUp(rm, progress) : [];
 
   // ── Topic actions ──────────────────────────────────────────────────────────
-  const toggle = (key, topic) =>
+  const toggle = (key, topic) => {
+    const wasUndone = !progress[`${key}::${topic}`];
     setProgress(p => ({ ...p, [`${key}::${topic}`]: !p[`${key}::${topic}`] }));
+    if (wasUndone) recordActivity();
+  };
 
   const openNote = (key, topic) => setNoteModal({ roadmap: key, topic });
 
@@ -68,10 +78,67 @@ export default function App() {
     showFeedback(true, `Explanation saved to "${topic}" notes`);
   };
 
+  // Global Cmd+K / Ctrl+K to open search
+  useEffect(() => {
+    const handler = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        setSearchOpen(o => !o);
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
+
+  // Navigate to a search result
+  const handleSearchNavigate = (item) => {
+    if (item.type === "section") {
+      setActiveRoadmap(item.rmKey);
+      setActiveSection(item.section);
+      if (isMobile) setMobileScreen("topics"); else setView("topics");
+    } else {
+      // topic — navigate to its section
+      setActiveRoadmap(item.rmKey);
+      setActiveSection(item.section);
+      if (isMobile) setMobileScreen("topics"); else setView("topics");
+      // Open note modal if it has a note, otherwise just navigate
+    }
+  };
+
   const toggleAll = (key, sectionKey) => {
-    const ts = roadmaps[key].sections[sectionKey];
-    const allDone = ts.every(t => progress[`${key}::${t}`]);
-    ts.forEach(t => setProgress(p => ({ ...p, [`${key}::${t}`]: !allDone })));
+    const ts    = roadmaps[key].sections[sectionKey];
+    const flat  = flatTopicNames(ts);
+    const allDone = flat.every(t => progress[`${key}::${t}`]);
+    flat.forEach(t => setProgress(p => ({ ...p, [`${key}::${t}`]: !allDone })));
+  };
+
+  // Toggle collapsed state of a parent topic (up to 2 levels)
+  const handleToggleCollapse = (sectionKey, parentName, subName) => {
+    setRoadmaps(prev => {
+      const rm = prev[rmKey];
+      const section = rm.sections[sectionKey];
+      let newSection;
+      if (!subName) {
+        // Toggle top-level parent
+        newSection = section.map(t =>
+          topicName(t) === parentName && isExpanded(t)
+            ? { ...t, collapsed: t.collapsed === false ? true : false }
+            : t
+        );
+      } else {
+        // Toggle level-2 parent inside a top-level parent
+        newSection = section.map(t => {
+          if (topicName(t) !== parentName || !isExpanded(t)) return t;
+          const newSubs = t.subtopics.map(st =>
+            topicName(st) === subName && isExpanded(st)
+              ? { ...st, collapsed: st.collapsed === false ? true : false }
+              : st
+          );
+          return { ...t, subtopics: newSubs };
+        });
+      }
+      return { ...prev, [rmKey]: { ...rm, sections: { ...rm.sections, [sectionKey]: newSection } } };
+    });
   };
 
   // ── Roadmap CRUD ───────────────────────────────────────────────────────────
@@ -145,6 +212,16 @@ export default function App() {
     );
   };
 
+  // ── Global style: prevent iOS zoom on input focus ────────────────────────
+  const globalStyle = `
+    @media screen and (max-width: 768px) {
+      input, textarea, select {
+        font-size: 16px !important;
+      }
+    }
+    * { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+  `;
+
   // ── Loading ────────────────────────────────────────────────────────────────
   if (!loaded) return (
     <div style={{ minHeight: "100vh", background: "#0f0f13", display: "flex", alignItems: "center",
@@ -154,6 +231,7 @@ export default function App() {
   // ── Welcome ────────────────────────────────────────────────────────────────
   if (rmKeys.length === 0) return (
     <>
+      <style>{globalStyle}</style>
       <WelcomeScreen onImportBackup={handleImportBackup} onImportRoadmap={handleImportRoadmap}
         onCreate={() => setEditorModal({ existing: null })} />
       {feedback && <Toast feedback={feedback} isMobile={isMobile} />}
@@ -167,12 +245,10 @@ export default function App() {
   const TopicList = ({ sectionKey }) => (
     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
       {rm.sections[sectionKey]?.map(topic => (
-        <TopicCard key={topic} topic={topic} rmKey={rmKey} rm={rm}
-          isDone={!!progress[`${rmKey}::${topic}`]}
-          hasNote={notes[`${rmKey}::${topic}`] || ""}
-          hasMeta={topicMeta[`${rmKey}::${topic}`] || {}}
-          hasResources={(resources[`${rmKey}::${topic}`] || []).length > 0}
-          onToggle={toggle} onOpenNote={openNote} />
+        <TopicCard key={topicName(topic)} topic={topic} rmKey={rmKey} rm={rm}
+          progress={progress} notes={notes} resources={resources} topicMeta={topicMeta}
+          onToggle={toggle} onOpenNote={openNote}
+          onToggleCollapse={(parentName, subName) => handleToggleCollapse(sectionKey, parentName, subName)} />
       ))}
     </div>
   );
@@ -210,6 +286,11 @@ export default function App() {
   // ── Overlays ───────────────────────────────────────────────────────────────
   const Overlays = () => (
     <>
+      <style>{globalStyle}</style>
+      <SearchOverlay open={searchOpen} onClose={() => setSearchOpen(false)}
+        roadmaps={roadmaps} notes={notes} resources={resources}
+        onNavigate={handleSearchNavigate} isMobile={isMobile} />
+      <InstallPrompt />
       {feedback    && <Toast feedback={feedback} isMobile={isMobile} />}
       {noteModal   && <NoteModal noteModal={noteModal} roadmaps={roadmaps} notes={notes}
                         resources={resources} topicMeta={topicMeta} onSave={saveNote} onClose={() => setNoteModal(null)} />}
@@ -273,15 +354,20 @@ export default function App() {
             )}
             <h1 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: "#fff" }}>{screenTitle[mobileScreen]}</h1>
           </div>
-          <div style={{ display: "flex", gap: 5 }}>
-            <button onClick={handleExport} style={{ padding: "6px 10px", border: "none", borderRadius: 5, cursor: "pointer", fontFamily: "inherit", fontSize: 12, background: "#1e1e24", color: "#888" }}>⬇</button>
-            <button onClick={() => importRef.current?.click()} style={{ padding: "6px 10px", border: "none", borderRadius: 5, cursor: "pointer", fontFamily: "inherit", fontSize: 12, background: "#1e1e24", color: "#888" }}>⬆</button>
-            <input ref={importRef} type="file" accept=".json" onChange={handleImportRoadmap} style={{ display: "none" }} />
-            <button onClick={() => setShowManage(true)} style={{ padding: "6px 10px", border: "none", borderRadius: 5, cursor: "pointer", fontFamily: "inherit", fontSize: 12, background: "#1e1e24", color: "#888" }}>⚙️</button>
+          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            <StreakBadge streak={{ ...streak, studiedToday }} isMobile={true} />
+            <button onClick={() => setSearchOpen(true)}
+              style={{ width: 36, height: 36, display: "flex", alignItems: "center", justifyContent: "center",
+                border: "none", borderRadius: 8, cursor: "pointer", background: "#1e1e24", color: "#888", fontSize: 16 }}>🔍</button>
             <button onClick={() => setMobileScreen(s => s === "dashboard" ? "roadmaps" : "dashboard")}
-              style={{ padding: "6px 10px", border: "none", borderRadius: 5, cursor: "pointer", fontFamily: "inherit", fontSize: 12,
+              style={{ width: 36, height: 36, display: "flex", alignItems: "center", justifyContent: "center",
+                border: "none", borderRadius: 8, cursor: "pointer", fontSize: 16,
                 background: mobileScreen === "dashboard" ? "#7b5ea7" : "#1e1e24",
                 color: mobileScreen === "dashboard" ? "#fff" : "#888" }}>📊</button>
+            <button onClick={() => setShowManage(true)}
+              style={{ width: 36, height: 36, display: "flex", alignItems: "center", justifyContent: "center",
+                border: "none", borderRadius: 8, cursor: "pointer", background: "#1e1e24", color: "#888", fontSize: 16 }}>⚙️</button>
+            <input ref={importRef} type="file" accept=".json" onChange={handleImportRoadmap} style={{ display: "none" }} />
           </div>
         </div>
 
@@ -291,7 +377,7 @@ export default function App() {
         )}
 
         {mobileScreen === "roadmaps" && (
-          <div style={{ padding: "16px", paddingBottom: "80px" }}>
+          <div style={{ padding: "16px", paddingBottom: "96px" }}>
             {Object.values(roadmaps).map(val => {
               const s = getRoadmapStats(val, progress);
               return (
@@ -345,18 +431,19 @@ export default function App() {
 
             {sections.map(section => {
               const ts   = rm.sections[section];
-              const done = ts.filter(t => progress[`${rmKey}::${t}`]).length;
+              const flat = flatTopicNames(ts);
+              const done = flat.filter(t => progress[`${rmKey}::${t}`]).length;
               return (
                 <div key={section} onClick={() => { setActiveSection(section); setMobileScreen("topics"); }}
                   style={{ background: "#16161b", borderRadius: 10, padding: "13px 16px", marginBottom: 8,
-                    border: `1px solid ${done === ts.length ? rm.color + "55" : "#1e1e24"}`, cursor: "pointer",
+                    border: `1px solid ${done === flat.length ? rm.color + "55" : "#1e1e24"}`, cursor: "pointer",
                     display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                   <div>
                     <div style={{ fontSize: 14, color: done === ts.length ? rm.accent : "#ccc", fontWeight: 500 }}>{section}</div>
-                    <div style={{ fontSize: 11, color: "#555", marginTop: 2 }}>{done}/{ts.length} completed</div>
+                    <div style={{ fontSize: 11, color: "#555", marginTop: 2 }}>{done}/{flat.length} completed</div>
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    {done === ts.length && <span style={{ color: rm.accent }}>✓</span>}
+                    {done === flat.length && <span style={{ color: rm.accent }}>✓</span>}
                     <span style={{ color: "#444", fontSize: 20 }}>›</span>
                   </div>
                 </div>
@@ -369,12 +456,12 @@ export default function App() {
           <div style={{ padding: "16px", paddingBottom: "80px" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
               <span style={{ fontSize: 12, color: "#555" }}>
-                {rm.sections[curSec]?.filter(t => progress[`${rmKey}::${t}`]).length} of {rm.sections[curSec]?.length} completed
+                {flatTopicNames(rm.sections[curSec] || []).filter(t => progress[`${rmKey}::${t}`]).length} of {flatTopicNames(rm.sections[curSec] || []).length} completed
               </span>
               <button onClick={() => toggleAll(rmKey, curSec)}
                 style={{ fontSize: 12, padding: "5px 12px", background: "#1e1e24", border: "1px solid #2a2a35",
                   borderRadius: 5, color: "#777", cursor: "pointer", fontFamily: "inherit" }}>
-                {rm.sections[curSec]?.every(t => progress[`${rmKey}::${t}`]) ? "Uncheck all" : "Check all"}
+                {flatTopicNames(rm.sections[curSec] || []).every(t => progress[`${rmKey}::${t}`]) ? "Uncheck all" : "Check all"}
               </button>
             </div>
             <TopicList sectionKey={curSec} />
@@ -396,11 +483,12 @@ export default function App() {
             const active = val.id === rmKey && mobileScreen !== "dashboard";
             return (
               <button key={val.id} onClick={() => goToRoadmap(val.id)}
-                style={{ flex: 1, padding: "10px 4px 14px", border: "none", background: "transparent",
+                style={{ flex: 1, padding: "8px 4px 16px", border: "none", background: "transparent",
                   color: active ? val.color : "#555", cursor: "pointer", fontFamily: "inherit",
-                  borderTop: active ? `2px solid ${val.color}` : "2px solid transparent", fontSize: 11 }}>
-                <div style={{ fontWeight: active ? 700 : 400 }}>{val.label.split(" ")[0]}</div>
-                <div style={{ fontSize: 10, marginTop: 1, opacity: 0.8 }}>{s.pct}%</div>
+                  borderTop: active ? `2px solid ${val.color}` : "2px solid transparent",
+                  fontSize: 11, minHeight: 56 }}>
+                <div style={{ fontWeight: active ? 700 : 400, fontSize: 12 }}>{val.label.split(" ")[0]}</div>
+                <div style={{ fontSize: 10, marginTop: 2, opacity: 0.8 }}>{s.pct}%</div>
               </button>
             );
           })}
@@ -487,7 +575,8 @@ export default function App() {
             </div>
             {sections.map(section => {
               const ts     = rm.sections[section];
-              const done   = ts.filter(t => progress[`${rmKey}::${t}`]).length;
+              const flat   = flatTopicNames(ts);
+              const done   = flat.filter(t => progress[`${rmKey}::${t}`]).length;
               const active = curSec === section && view === "sections";
               return (
                 <button key={section} onClick={() => { setActiveSection(section); setView("sections"); }}

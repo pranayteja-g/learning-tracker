@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { callAI, loadAIConfig, saveAIConfig, PROVIDERS } from "../../ai/providers.js";
 import { useUsage } from "../../ai/useUsage.js";
 import { buildQuizContext, buildQuestionnaireContext, buildExplainContext, buildStudyPlanContext } from "../../ai/context.js";
+import { flatTopicNames, allTopicNames, topicName } from "../../utils/topics.js";
 import { SYSTEM_PROMPT, buildQuizPrompt, buildQuestionnairePrompt, buildExplainPrompt, buildStudyPlanPrompt } from "../../ai/prompts.js";
 import { APIKeySetup }       from "./APIKeySetup.jsx";
 import { QuizView }          from "./QuizView.jsx";
@@ -86,7 +87,7 @@ export function AIPanel({ open, onClose, roadmap, progress, notes, resources, to
         userPrompt = buildQuestionnairePrompt(ctx, qCount);
       } else if (mode === "explain") {
         if (!explainTopic) throw new Error("Please select a topic to explain.");
-        const sec = Object.entries(rm.sections).find(([, ts]) => ts.includes(explainTopic))?.[0] || "";
+        const sec = Object.entries(rm.sections).find(([, ts]) => allTopicNames(ts).includes(explainTopic))?.[0] || "";
         ctx = buildExplainContext({
           roadmap: rm, topic: explainTopic, sectionKey: sec,
           notes: notes[`${rm.id}::${explainTopic}`],

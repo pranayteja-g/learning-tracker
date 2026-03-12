@@ -40,14 +40,16 @@ export function CheatSheetView({ data, rm }) {
   return (
     <div style={{ padding: "0 20px 20px" }}>
       {/* Header + actions */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
-        <div>
-          <div style={{ fontSize: 15, fontWeight: 700, color: "#fff" }}>{data.title}</div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start",
+        marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: "#fff",
+            wordBreak: "break-word" }}>{data.title}</div>
           <div style={{ fontSize: 11, color: "#555", marginTop: 2 }}>
             {data.mustKnow.length + data.goodToKnow.length + data.bonusPoints.length} topics
           </div>
         </div>
-        <div style={{ display: "flex", gap: 6 }}>
+        <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
           <button onClick={() => downloadMarkdown(data)}
             style={{ padding: "6px 10px", background: "#1e1e24", border: "1px solid #2a2a35",
               borderRadius: 6, color: "#888", fontSize: 11, cursor: "pointer", fontFamily: "inherit" }}
@@ -77,12 +79,13 @@ export function CheatSheetView({ data, rm }) {
               overflow: "hidden" }}>
               {items.map((item, i) => (
                 <div key={i} style={{ padding: "9px 13px", borderBottom: i < items.length - 1 ? "1px solid #1e1e24" : "none",
-                  display: "flex", gap: 10, alignItems: "baseline" }}>
+                  display: "flex", gap: 8, alignItems: "flex-start", flexWrap: "wrap" }}>
                   <div style={{ fontSize: 12, fontWeight: 700, color: cfg.color,
-                    flexShrink: 0, minWidth: 0 }}>
+                    flexShrink: 0, maxWidth: "100%" }}>
                     {item.topic}
                   </div>
-                  <div style={{ fontSize: 12, color: "#888", lineHeight: 1.5 }}>
+                  <div style={{ fontSize: 12, color: "#888", lineHeight: 1.5,
+                    wordBreak: "break-word", overflowWrap: "anywhere", minWidth: 0, flex: 1 }}>
                     — {item.oneliner}
                   </div>
                 </div>
@@ -101,9 +104,10 @@ export function CheatSheetView({ data, rm }) {
             {data.quickTips.map((tip, i) => (
               <div key={i} style={{ padding: "8px 13px",
                 borderBottom: i < data.quickTips.length - 1 ? "1px solid #1e1e24" : "none",
-                display: "flex", gap: 10, alignItems: "baseline" }}>
+                display: "flex", gap: 10, alignItems: "flex-start" }}>
                 <span style={{ fontSize: 11, color: "#7b8cde", flexShrink: 0, fontWeight: 700 }}>{i+1}.</span>
-                <span style={{ fontSize: 12, color: "#888", lineHeight: 1.5 }}>{tip}</span>
+                <span style={{ fontSize: 12, color: "#888", lineHeight: 1.5,
+                  wordBreak: "break-word", overflowWrap: "anywhere" }}>{tip}</span>
               </div>
             ))}
           </div>
@@ -119,9 +123,10 @@ export function CheatSheetView({ data, rm }) {
             {data.redFlags.map((flag, i) => (
               <div key={i} style={{ padding: "8px 13px",
                 borderBottom: i < data.redFlags.length - 1 ? "1px solid #1e1e24" : "none",
-                display: "flex", gap: 10, alignItems: "baseline" }}>
+                display: "flex", gap: 10, alignItems: "flex-start" }}>
                 <span style={{ fontSize: 11, color: "#e05252", flexShrink: 0 }}>✕</span>
-                <span style={{ fontSize: 12, color: "#888", lineHeight: 1.5 }}>{flag}</span>
+                <span style={{ fontSize: 12, color: "#888", lineHeight: 1.5,
+                  wordBreak: "break-word", overflowWrap: "anywhere" }}>{flag}</span>
               </div>
             ))}
           </div>
