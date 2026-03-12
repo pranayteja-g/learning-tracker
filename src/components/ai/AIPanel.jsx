@@ -39,6 +39,7 @@ export function AIPanel({ open, onClose, roadmap, progress, notes, resources, to
   const [mode,         setMode]         = useState("quiz");
   const [scope,        setScope]        = useState("section");
   const [qCount,       setQCount]       = useState(5);
+  const [difficulty,   setDifficulty]   = useState("mixed");
   const [explainTopic, setExplainTopic] = useState("");
   const [result,       setResult]       = useState(null);
   const [loading,      setLoading]      = useState(false);
@@ -51,7 +52,7 @@ export function AIPanel({ open, onClose, roadmap, progress, notes, resources, to
   const rm      = roadmap;
   const hasKey  = !!aiConfig.keys?.[aiConfig.provider]?.trim();
 
-  useEffect(() => { setResult(null); setError(""); }, [mode, scope, qCount, explainTopic]);
+  useEffect(() => { setResult(null); setError(""); }, [mode, scope, qCount, difficulty, explainTopic]);
 
   const handleSaveConfig = (cfg) => {
     saveAIConfig(cfg);
@@ -80,7 +81,7 @@ export function AIPanel({ open, onClose, roadmap, progress, notes, resources, to
       if (mode === "quiz") {
         ctx = buildQuizContext({ roadmap: rm, progress, scope, sectionKey: curSection });
         if (ctx.topics.length === 0) throw new Error("No topics found for the selected scope.");
-        userPrompt = buildQuizPrompt(ctx, qCount);
+        userPrompt = buildQuizPrompt(ctx, qCount, difficulty);
       } else if (mode === "questionnaire") {
         ctx = buildQuestionnaireContext({ roadmap: rm, progress, scope, sectionKey: curSection });
         if (ctx.topics.length === 0) throw new Error("No topics found for the selected scope.");
@@ -249,6 +250,20 @@ export function AIPanel({ open, onClose, roadmap, progress, notes, resources, to
                           borderRadius: 6, color: qCount === n ? rm?.accent : "#666",
                           cursor: "pointer", fontFamily: "inherit" }}>
                         {n}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div style={{ fontSize: 11, color: "#555", textTransform: "uppercase", letterSpacing: 1, margin: "14px 0 8px" }}>Difficulty</div>
+                  <div style={{ display: "flex", gap: 6 }}>
+                    {[["mixed","🎲 Mixed"],["easy","Easy"],["medium","Medium"],["hard","Hard"]].map(([val, lbl]) => (
+                      <button key={val} onClick={() => setDifficulty(val)}
+                        style={{ flex: 1, padding: "7px 4px", fontSize: 11,
+                          background: difficulty === val ? rm?.color + "22" : "#0f0f13",
+                          border: `1px solid ${difficulty === val ? rm?.color : "#2a2a35"}`,
+                          borderRadius: 6, color: difficulty === val ? rm?.accent : "#666",
+                          cursor: "pointer", fontFamily: "inherit", fontWeight: difficulty === val ? 700 : 400 }}>
+                        {lbl}
                       </button>
                     ))}
                   </div>

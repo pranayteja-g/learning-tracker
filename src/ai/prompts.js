@@ -5,12 +5,22 @@ Your job is to help them test their knowledge, understand concepts, and plan the
 Always be concise, accurate, and encouraging. Respond ONLY with valid JSON when asked for structured output — no markdown fences, no extra text.`;
 
 // ── Quiz prompt ───────────────────────────────────────────────────────────────
-export function buildQuizPrompt(ctx, count) {
+export function buildQuizPrompt(ctx, count, difficulty = "mixed") {
   const topicList = ctx.topics.map(t => `- ${t.topic} (${t.section})`).join("\n");
+
+  const difficultyGuide = {
+    easy:   "Focus on definitions, basic concepts, and straightforward recall questions. A beginner should be able to answer most of these.",
+    medium: "Mix of recall and application. Require understanding of how things work, not just what they are. Assume some familiarity with the topic.",
+    hard:   "Focus on nuance, edge cases, comparison between concepts, and practical application under constraints. Require solid understanding.",
+    mixed:  "Mix all difficulty levels: roughly 30% easy (definitions/recall), 50% medium (understanding/application), 20% hard (nuance/edge cases).",
+  };
+
   return `Generate exactly ${count} multiple choice quiz questions about the following topics from the "${ctx.roadmapName}" learning roadmap.
 
 Topics to cover:
 ${topicList}
+
+Difficulty: ${difficultyGuide[difficulty] || difficultyGuide.mixed}
 
 Rules:
 - Each question must test understanding, not just memorization
@@ -18,6 +28,8 @@ Rules:
 - Exactly one option is correct
 - Keep questions concise and clear
 - Cover different topics, not the same one repeatedly
+- Tag each question with its difficulty and the specific topic it tests
+- For code-related topics: include code snippet questions where appropriate
 
 Respond with ONLY a JSON array, no other text:
 [
@@ -25,7 +37,9 @@ Respond with ONLY a JSON array, no other text:
     "question": "...",
     "options": { "A": "...", "B": "...", "C": "...", "D": "..." },
     "answer": "A",
-    "explanation": "Brief explanation of why this is correct"
+    "explanation": "Brief explanation of why this is correct",
+    "difficulty": "easy | medium | hard",
+    "topic": "the specific topic this question tests"
   }
 ]`;
 }
@@ -43,6 +57,7 @@ Rules:
 - Mix different question styles: "Explain...", "What is the difference between...", "When would you use...", "How does... work"
 - Questions should be answerable in 2-5 sentences
 - Cover different topics
+- Tag each question with the specific topic it tests
 
 Respond with ONLY a JSON array, no other text:
 [
@@ -54,23 +69,60 @@ Respond with ONLY a JSON array, no other text:
 ]`;
 }
 
+// ── Questionnaire performance summary ────────────────────────────────────────
+export function buildQuestionnaireSummaryPrompt(questions, answers) {
+  const qa = questions.map((q, i) => `Q${i+1}: ${q.question}\nUser answer: ${answers[i] || "(no answer)"}\nModel answer: ${q.sampleAnswer}`).join("\n\n");
+  return `A learner just completed a Q&A session. Evaluate their performance and give feedback.
+
+${qa}
+
+Analyse their answers and respond with ONLY valid JSON:
+{
+  "overallScore": "Excellent | Good | Developing | Needs Practice",
+  "scorePercent": 0-100,
+  "summary": "2-3 sentence overall assessment of their understanding",
+  "strongTopics": ["topic 1", "topic 2"],
+  "weakTopics": ["topic 1", "topic 2"],
+  "perQuestion": [
+    {
+      "qIndex": 0,
+      "verdict": "Strong | Good | Partial | Missed",
+      "feedback": "One sentence on what they got right or what was missing"
+    }
+  ],
+  "nextSteps": "2-3 sentences on what they should focus on studying next"
+}`;
+}
+
 // ── Explain prompt ────────────────────────────────────────────────────────────
 export function buildExplainPrompt(ctx) {
   const notesSection = ctx.userNotes
     ? `\n\nThe user already has these notes on this topic:\n"${ctx.userNotes}"\nBuild on their existing understanding.`
     : "";
+
+  const isTechTopic = ctx.roadmapName?.match(/java|python|javascript|react|node|spring|docker|kubernetes|sql|go|rust|c\+\+|swift|kotlin|typescript|angular|vue|django|rails|aws|git/i);
+
   return `Explain the topic "${ctx.topic}" from the "${ctx.roadmapName}" roadmap (section: "${ctx.section}").${notesSection}
 
-Provide a clear, beginner-friendly explanation. Respond with ONLY valid JSON, no other text:
+Provide a clear, practical explanation with real code examples where relevant. Respond with ONLY valid JSON, no other text:
 {
   "summary": "1-2 sentence plain English summary",
   "whatItIs": "What this concept is and why it exists (3-5 sentences)",
   "howItWorks": "How it works under the hood or in practice (3-5 sentences)",
   "whenToUse": "When and why you would use this (2-3 sentences)",
-  "example": "A simple concrete code example or real-world analogy",
+  "codeExample": {
+    "description": "What this example demonstrates",
+    "code": "A real, runnable code example — not pseudocode. Use proper syntax. 5-20 lines.",
+    "language": "java | python | javascript | sql | bash | etc"
+  },
   "commonMistakes": "1-2 common beginner mistakes or misconceptions",
   "keyTakeaway": "One sentence to remember"
-}`;
+}
+
+IMPORTANT for codeExample:
+- Use actual working code, not placeholder comments
+- Show the most common real-world usage pattern
+- For non-code topics (history, science, language, etc.) set code to null and use codeExample.description to give a concrete real-world analogy or example instead`;
 }
 
 // ── Study plan prompt ─────────────────────────────────────────────────────────
@@ -141,14 +193,12 @@ export const ROADMAP_CATEGORIES = [
     color: "#ee9b00",
     promptModifier: `DOMAIN: Human Language Learning
 - Structure around the four core skills: Listening, Speaking, Reading, Writing
-- Include Pronunciation & Phonetics as an early section — sounds and stress patterns are foundational
-- Cover script/writing system if the language uses a non-Latin alphabet (e.g. Devanagari, Cyrillic, Kanji)
-- Vocabulary must be structured by tier: survival vocab → everyday vocab → intermediate → advanced
-- Grammar sections must be ordered by frequency of use, not linguistic complexity
-- Include a Culture & Context section — idioms, customs, regional variation, formal vs informal register
-- Include exam/certification roadmap if one exists (DELF, JLPT, HSK, IELTS, etc.)
-- Section style examples: "Sounds & Pronunciation", "Writing System", "Survival Vocabulary", "Core Grammar", "Everyday Conversations", "Intermediate Grammar", "Reading & Writing", "Culture & Idioms", "Fluency & Advanced"
-- Topic style examples: "Vowel Sounds", "Hiragana Alphabet", "Numbers 1–100", "Present Tense Conjugation", "Formal vs Informal Address", "Common Idioms"`,
+- Include Pronunciation & Phonetics as an early section
+- Cover script/writing system if the language uses a non-Latin alphabet
+- Vocabulary structured by tier: survival vocab → everyday → intermediate → advanced
+- Grammar sections ordered by frequency of use
+- Include a Culture & Context section
+- Section style examples: "Sounds & Pronunciation", "Writing System", "Survival Vocabulary", "Core Grammar", "Everyday Conversations", "Culture & Idioms"`,
   },
   {
     id:    "science",
@@ -156,14 +206,12 @@ export const ROADMAP_CATEGORIES = [
     icon:  "🔬",
     desc:  "Natural sciences & STEM",
     color: "#c4b5fd",
-    promptModifier: `DOMAIN: Natural Science (Biology, Chemistry, Physics, Earth Science, etc.)
-- Cover the scientific method as a foundational section before subject-specific content
-- Include mathematical and formulaic knowledge where relevant (equations, units, conversions)
-- Cover lab skills, experimental design, data interpretation, and safety
-- Connect theory to real-world applications and observable phenomena
-- Include history of key discoveries where they illuminate the concept
-- Section style examples: "Scientific Method", "Foundational Concepts", "Core Theories", "Measurement & Units", "Lab Skills", "Applications", "Advanced Topics"
-- Topic style examples: "Hypothesis Formation", "Conservation of Energy", "DNA Replication", "Mole Calculations", "Experimental Variables"`,
+    promptModifier: `DOMAIN: Natural Science
+- Cover the scientific method as a foundational section
+- Include mathematical and formulaic knowledge where relevant
+- Cover lab skills, experimental design, data interpretation
+- Connect theory to real-world applications
+- Section style examples: "Scientific Method", "Foundational Concepts", "Core Theories", "Measurement & Units", "Lab Skills", "Applications"`,
   },
   {
     id:    "maths",
@@ -172,14 +220,11 @@ export const ROADMAP_CATEGORIES = [
     desc:  "Mathematics & statistics",
     color: "#e05252",
     promptModifier: `DOMAIN: Mathematics
-- Structure strictly by prerequisite chain — every topic must only require knowledge of earlier topics
-- Include both procedural skills (how to calculate) and conceptual understanding (why it works)
-- Cover proof and reasoning skills progressively — introduce mathematical logic early
-- Include worked-example patterns and common problem types for each topic
-- Cover common mistakes and misconceptions explicitly
-- Statistics and probability should be treated as a distinct track if relevant
-- Section style examples: "Number Foundations", "Algebra", "Geometry", "Trigonometry", "Calculus", "Statistics", "Proof & Logic", "Problem Solving"
-- Topic style examples: "Order of Operations", "Quadratic Formula", "Pythagorean Theorem", "Limits", "Standard Deviation", "Proof by Induction"`,
+- Structure strictly by prerequisite chain
+- Include both procedural skills and conceptual understanding
+- Cover proof and reasoning skills progressively
+- Include common problem types and worked-example patterns
+- Section style examples: "Number Foundations", "Algebra", "Geometry", "Trigonometry", "Calculus", "Statistics", "Proof & Logic"`,
   },
   {
     id:    "creative",
@@ -187,14 +232,12 @@ export const ROADMAP_CATEGORIES = [
     icon:  "🎨",
     desc:  "Arts, music, design & craft",
     color: "#f4a261",
-    promptModifier: `DOMAIN: Creative Arts (Visual Art, Music, Design, Writing, Film, Photography, etc.)
+    promptModifier: `DOMAIN: Creative Arts
 - Cover foundational techniques before style and expression
-- Include art history and influential works/movements to build contextual understanding
-- Cover critique and analysis skills — learning to evaluate work (own and others')
-- Include practice-based sections: exercises, projects, portfolio building
-- Cover tools, materials, and software relevant to the discipline
-- Section style examples: "Foundations & Principles", "Core Techniques", "Tools & Materials", "Influential Works", "Style & Expression", "Critique & Analysis", "Projects & Portfolio"
-- Topic style examples: "Colour Theory", "Composition Rules", "Perspective Drawing", "Chord Progressions", "Typography Basics", "User Research"`,
+- Include art history and influential works/movements
+- Cover critique and analysis skills
+- Include practice-based sections: exercises, projects, portfolio
+- Section style examples: "Foundations & Principles", "Core Techniques", "Tools & Materials", "Style & Expression", "Projects & Portfolio"`,
   },
   {
     id:    "general",
@@ -226,35 +269,15 @@ export function buildRoadmapPrompt(topic, extraInstructions, categoryId) {
 ${extras}
 ${category.promptModifier}
 
-UNIVERSAL RULES — apply on top of domain rules above:
+UNIVERSAL RULES:
+- Start from absolute zero basics
+- Be exhaustive — do NOT skip topics that seem too basic
+- Aim for 60-120 total topics across 6-12 sections
+- Each section: at least 5 topics, ideally 8-15
+- Topics: specific, atomic, 1-6 words, title case, no duplicates
+- Order: prerequisites always before concepts that need them
 
-COVERAGE:
-- Start from absolute zero basics — assume the learner knows nothing about this specific topic
-- Be exhaustive — do NOT skip topics that seem too basic or obvious
-- Cover every major concept, skill, and area of knowledge a learner needs
-- Aim for 60-120 total topics spread across sections
-
-SECTIONS:
-- Group topics into 6-12 logical sections ordered from beginner to advanced
-- Section names must be short (2-5 words), clear, and natural for the domain
-- Each section must have at least 5 topics, ideally 8-15
-- Sections must flow logically — prerequisites always before the concepts that need them
-
-TOPICS:
-- Each topic must be a specific, atomic concept — not a vague category
-- Topic names must be concise (1-6 words), consistent in style, title case
-- No duplicate topics across sections
-- No vague topics like "Advanced Concepts", "Other Topics", or "Miscellaneous"
-
-ORDERING:
-- Within each section, order topics from simpler to more complex
-- A learner studying top-to-bottom should never need knowledge from a later section
-
-CONSISTENCY (critical):
-- Always use the canonical, most widely-recognised name for each concept
-- Never use synonyms or alternate names — pick one and always use it
-
-Respond with ONLY this JSON structure, nothing else:
+Respond with ONLY this JSON structure:
 {
   "label": "canonical name for this subject",
   "sections": {
@@ -264,10 +287,10 @@ Respond with ONLY this JSON structure, nothing else:
 }`;
 }
 
-
 // ── Find Resources prompt ─────────────────────────────────────────────────────
-export const RESOURCES_SYSTEM_PROMPT = `You are a research assistant helping learners find the best free online resources for studying specific topics.
-You have access to web search. Use it to find real, working, high-quality free resources.
+export const RESOURCES_SYSTEM_PROMPT = `You are a research assistant helping learners find the best free online resources.
+You have access to web search. Search for each resource and verify it exists before including it.
+CRITICAL: Only include URLs you have confirmed exist from search results. Never guess or construct URLs.
 You MUST respond with ONLY valid JSON — no markdown fences, no explanation, no extra text.`;
 
 export function buildFindResourcesPrompt(topic, roadmapLabel, audience) {
@@ -277,25 +300,27 @@ export function buildFindResourcesPrompt(topic, roadmapLabel, audience) {
   return `Find the best free online resources for learning about: "${topic}" (from a ${roadmapLabel} learning roadmap).
 ${audienceNote}
 
-Search the web for high-quality free resources. Prioritise:
-1. Official documentation or textbooks
-2. Reputable tutorial sites (MDN, Khan Academy, freeCodeCamp, GeeksforGeeks, Coursera free tier, MIT OpenCourseWare, etc.)
-3. High-quality YouTube videos or playlists
-4. Interactive practice tools or sandboxes
+Search the web for these resources. For each one, verify the URL actually exists and loads before including it.
+
+Prioritise:
+1. Official documentation (e.g. docs.oracle.com, developer.mozilla.org, docs.python.org)
+2. Reputable free tutorial sites (MDN, freeCodeCamp, GeeksforGeeks, Baeldung, W3Schools)
+3. High-quality YouTube videos — search for the video, confirm it exists, include the real youtube.com/watch?v= URL
+4. Interactive tools (repl.it, codepen, exercism.io, leetcode)
 
 Rules:
-- Only include resources that are FREE
-- Only include URLs you have verified exist from search results — never invent URLs
-- Include 4-6 resources total, a mix of types (docs, tutorials, videos, interactive)
-- Each resource must have a clear, descriptive title
+- Only FREE resources
+- Only URLs verified from search — never construct or guess URLs
+- 4-6 resources total, mixed types
+- Prefer pages specifically about "${topic}", not generic homepage links
 
-Respond with ONLY this JSON array, nothing else:
+Respond with ONLY this JSON array:
 [
   {
     "title": "Descriptive title of the resource",
-    "url": "https://actual-verified-url.com/...",
+    "url": "https://verified-url.com/specific-page",
     "type": "docs | tutorial | video | interactive | course",
-    "why": "One sentence on why this is great for learning this topic"
+    "why": "One sentence on why this is useful for learning ${topic}"
   }
 ]`;
 }
@@ -319,10 +344,10 @@ export function buildInterviewQuestionsPrompt(ctx) {
 All topics in this roadmap: ${allTopics}
 
 Generate exactly 10 high-value interview questions. Rules:
-- Pick only the most interview-critical topics — what interviewers actually ask
-- Mix question types: 3 conceptual ("Explain X", "What is the difference between X and Y"), 3 practical ("How would you...", "Walk me through..."), 2 problem-solving ("What happens when...", "How would you debug..."), 2 behavioural ("Tell me about a time you used X", "Describe a situation where...")
-- Each question should have a model answer that is concise, confident, and interview-ready (3-6 sentences)
-- Flag the topic and estimated difficulty for each question
+- Pick only the most interview-critical topics
+- Mix: 3 conceptual, 3 practical, 2 problem-solving, 2 behavioural
+- Model answers: concise, confident, interview-ready (3-6 sentences)
+- Flag topic and difficulty for each question
 
 Respond with ONLY a JSON array:
 [
@@ -344,13 +369,13 @@ The candidate answered: "${userAnswer}"
 
 The model answer is: "${modelAnswer}"
 
-Give brief, direct, constructive feedback on their answer. Respond with ONLY valid JSON:
+Give brief, direct, constructive feedback. Respond with ONLY valid JSON:
 {
   "score": 1-5,
   "verdict": "Strong | Good | Needs Work | Off Track",
   "whatWorked": "1-2 sentences on what they got right (skip if score <= 2)",
-  "improve": "1-2 sentences on the most important thing to improve or add",
-  "tip": "One short actionable tip for answering this type of question in interviews"
+  "improve": "1-2 sentences on the most important thing to improve",
+  "tip": "One short actionable tip for this type of interview question"
 }`;
 }
 
@@ -366,17 +391,17 @@ Topics available: ${allTopics.join(", ")}
 Generate exactly 20 flashcards covering the most interview-critical topics. Rules:
 - Front: a short, clear prompt (concept name, "What is X?", "X vs Y?")
 - Back: a crisp 1-3 sentence answer — exactly what you'd say in an interview
-- Tag each card with its topic and section
-- Cover a wide variety of topics, not the same one repeatedly
+- For code topics: include the most commonly used syntax or a one-liner example in the back
+- Cover a wide variety of topics
 - Answers must be direct and confident, not textbook-style
 
 Respond with ONLY a JSON array:
 [
   {
-    "front": "What is a closure in JavaScript?",
-    "back": "A closure is a function that retains access to its outer scope even after the outer function has returned. It lets you create private variables and is commonly used in callbacks and event handlers.",
-    "topic": "Closures",
-    "section": "Functions & Scope"
+    "front": "What is a HashMap in Java?",
+    "back": "A HashMap stores key-value pairs using hashing for O(1) average lookup. Initialise with: Map<String, Integer> map = new HashMap<>(); Key methods: put(k,v), get(k), containsKey(k), remove(k), entrySet().",
+    "topic": "HashMap",
+    "section": "Collections"
   }
 ]`;
 }
@@ -393,17 +418,18 @@ Full roadmap:
 ${allTopics}
 
 Generate a structured cheat sheet a candidate can review 30 minutes before their interview. Rules:
-- Group topics into 3 tiers: "Must Know" (very likely to be asked), "Good to Know" (sometimes asked), "Bonus Points" (impresses interviewers)
-- For each topic, write ONE interview-ready sentence — the core thing to remember
-- Include a "Quick Tips" section with 5 interview strategy tips specific to this technology/subject
-- Include a "Red Flags to Avoid" section with 4 common mistakes candidates make
-- Be concise — this is a last-minute reference, not a study guide
+- Group topics into 3 tiers: "Must Know", "Good to Know", "Bonus Points"
+- For each topic write ONE interview-ready sentence — the core thing to remember
+- For programming topics: include the most important syntax, method signature, or initialisation pattern inline
+- Include a "Quick Tips" section with 5 interview strategy tips
+- Include a "Red Flags to Avoid" section with 4 common candidate mistakes
+- Be concise — this is a last-minute reference
 
 Respond with ONLY valid JSON:
 {
   "title": "${ctx.roadmapName} Interview Cheat Sheet",
   "mustKnow": [
-    { "topic": "...", "oneliner": "The core thing to say about this in an interview" }
+    { "topic": "...", "oneliner": "Core thing to say + key syntax/method if applicable" }
   ],
   "goodToKnow": [
     { "topic": "...", "oneliner": "..." }
@@ -420,19 +446,17 @@ Respond with ONLY valid JSON:
 export function buildTopicExpansionPrompt(topic, sectionName, roadmapLabel) {
   return `A learning roadmap for "${roadmapLabel}" has a topic called "${topic}" inside the section "${sectionName}".
 
-This topic is too broad — expand it into specific, atomic subtopics that guide someone to actually learn it.
+Expand it into specific, atomic subtopics that guide someone to actually learn it.
 
 Rules:
 - Generate 6-12 subtopics
-- Each subtopic must be more specific than the parent topic
-- Order them from foundational to advanced
-- Use title case, concise names (1-6 words)
-- No vague subtopics like "${topic} Basics" or "${topic} Advanced"
-- Each subtopic should be something a learner can study independently
-- Good example for "Django": ["Django Project Structure", "URL Routing", "Views & Templates", "Django ORM", "QuerySets", "Migrations", "Django Admin", "Forms & Validation", "Authentication & Permissions", "REST Framework Basics", "Deployment with Gunicorn"]
-- Bad example: ["Learn Django", "Django Stuff", "Advanced Django"]
+- Each must be more specific than the parent
+- Order from foundational to advanced
+- Title case, concise names (1-6 words)
+- No vague subtopics like "${topic} Basics" or "Advanced ${topic}"
+- Each subtopic should be independently studyable
 
-Respond with ONLY a JSON array of strings, nothing else:
+Respond with ONLY a JSON array of strings:
 ["Subtopic One", "Subtopic Two", "Subtopic Three"]`;
 }
 
@@ -440,20 +464,20 @@ Respond with ONLY a JSON array of strings, nothing else:
 export function buildTopicCheatSheetPrompt(topic, roadmapLabel, sectionName) {
   return `Create a focused interview cheat sheet for the topic "${topic}" from a ${roadmapLabel} roadmap (section: "${sectionName}").
 
-This is a deep-dive cheat sheet for ONE specific topic — not the whole roadmap.
-
-Rules:
-- Cover everything an interviewer might ask specifically about "${topic}"
-- Include key facts, definitions, code patterns, common gotchas
-- Quick Tips should be specific to this topic, not generic interview advice
-- Red Flags should be mistakes candidates make when asked about this specific topic
+This is a deep-dive for ONE specific topic. Rules:
+- Cover everything an interviewer might ask about "${topic}"
+- Include key facts, definitions, and most importantly: common syntax, initialisation patterns, and frequently used methods/operations
+- For collections/data structures: show how to initialise, add, remove, iterate, and the most used methods
+- For algorithms/patterns: show the core implementation pattern
+- Quick Tips: specific to this topic
+- Red Flags: mistakes candidates make about this specific topic
 
 Respond with ONLY valid JSON:
 {
-  "title": "${topic} — Interview Cheat Sheet",
+  "title": "${topic} — Cheat Sheet",
   "oneliner": "One sentence: what ${topic} is in plain English",
   "mustKnow": [
-    { "topic": "specific aspect", "oneliner": "what to say about it" }
+    { "topic": "specific aspect or method", "oneliner": "what it does + syntax example if applicable" }
   ],
   "goodToKnow": [
     { "topic": "...", "oneliner": "..." }
