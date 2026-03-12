@@ -34,7 +34,7 @@ function fmt(n) {
   return String(n);
 }
 
-export function AIPanel({ open, onClose, roadmap, progress, notes, resources, topicMeta, curSection, isMobile, onSaveToNotes }) {
+export function AIPanel({ open, onClose, roadmap, progress, notes, resources, topicMeta, curSection, isMobile, onSaveToNotes, onQuizComplete }) {
   const [aiConfig,     setAIConfig]     = useState(loadAIConfig);
   const [mode,         setMode]         = useState("quiz");
   const [scope,        setScope]        = useState("section");
@@ -365,9 +365,9 @@ export function AIPanel({ open, onClose, roadmap, progress, notes, resources, to
                   </button>
                 </div>
 
-                {result.mode === "quiz"          && <QuizView          questions={result.data} rm={rm} />}
+                {result.mode === "quiz"          && <QuizView          questions={result.data} rm={rm} onQuizComplete={(score, total) => { const topics = result.data.map(q => q.topic).filter(Boolean); onQuizComplete?.(rm?.id, topics, score, total); }} />}
                 {result.mode === "questionnaire" && <QuestionnaireView questions={result.data} rm={rm} />}
-                {result.mode === "explain"       && <ExplainView       data={result.data}      rm={rm} topic={explainTopic} rmKey={rm?.id} onSaveToNotes={onSaveToNotes} />}
+                {result.mode === "explain"       && <ExplainView       data={result.data}      rm={rm} topic={explainTopic} rmKey={rm?.id} sectionKey={curSection} onSaveToNotes={onSaveToNotes} />}
                 {result.mode === "studyplan"     && <StudyPlanView     data={result.data}      rm={rm} />}
               </div>
             )}

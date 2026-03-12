@@ -17,6 +17,7 @@ import { SearchOverlay }         from "./components/ui/SearchOverlay.jsx";
 import { StreakBadge }           from "./components/ui/StreakBadge.jsx";
 import { InstallPrompt }        from "./components/ui/InstallPrompt.jsx";
 import { useStreak }            from "./hooks/useStreak.js";
+import { useQuizResults }       from "./hooks/useQuizResults.js";
 
 export default function App() {
   const { roadmaps, setRoadmaps, progress, setProgress, notes, setNotes,
@@ -36,6 +37,7 @@ export default function App() {
   const [interviewOpen,  setInterviewOpen]  = useState(false);
   const [searchOpen,     setSearchOpen]     = useState(false);
   const { streak, recordActivity, studiedToday } = useStreak();
+  const { recordQuizResult, hasPassedTopic }  = useQuizResults();
   const importRef = useRef(null);
 
   const showFeedback = (ok, msg) => {
@@ -247,7 +249,7 @@ export default function App() {
       {rm.sections[sectionKey]?.map(topic => (
         <TopicCard key={topicName(topic)} topic={topic} rmKey={rmKey} rm={rm}
           progress={progress} notes={notes} resources={resources} topicMeta={topicMeta}
-          onToggle={toggle} onOpenNote={openNote}
+          hasPassedQuiz={hasPassedTopic} onToggle={toggle} onOpenNote={openNote}
           onToggleCollapse={(parentName, subName) => handleToggleCollapse(sectionKey, parentName, subName)} />
       ))}
     </div>
@@ -302,7 +304,7 @@ export default function App() {
                         onSave={handleSaveRoadmap} onClose={() => setEditorModal(null)} />}
       <AIPanel open={aiOpen} onClose={() => setAiOpen(false)} roadmap={rm} progress={progress}
         notes={notes} resources={resources} topicMeta={topicMeta} curSection={curSec} isMobile={isMobile}
-        onSaveToNotes={appendToNote} />
+        onSaveToNotes={appendToNote} onQuizComplete={recordQuizResult} />
       <InterviewPanel open={interviewOpen} onClose={() => setInterviewOpen(false)}
         roadmap={rm} progress={progress} isMobile={isMobile} roadmaps={roadmaps} />
       {/* Floating buttons */}
