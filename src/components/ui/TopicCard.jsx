@@ -3,7 +3,7 @@ import { topicName, isExpanded, isCollapsed, subtopics } from "../../utils/topic
 // ── Single checkable row ───────────────────────────────────────────────────────
 function TopicRow({ name, rmKey, rm, isDone, hasNote, hasMeta, hasResources,
   onToggle, onOpenNote, indent = 0, isParent = false, isOpen = false,
-  onToggleCollapse, subtopicCount = 0, allSubDone = false }) {
+  onToggleCollapse, subtopicCount = 0, allSubDone = false, hasPassed = false }) {
 
   const meta = hasMeta || {};
   const diffColors = { easy: "#52b788", medium: "#ee9b00", hard: "#e05252" };
@@ -85,6 +85,9 @@ function TopicRow({ name, rmKey, rm, isDone, hasNote, hasMeta, hasResources,
             <span style={{ fontSize: 10, color: rm.accent, background: rm.color + "20",
               padding: "2px 6px", borderRadius: 4 }}>note</span>
           )}
+          {hasPassed && !isParent && (
+            <span title="Quiz passed" style={{ fontSize: 13 }}>⭐</span>
+          )}
           <button
             onClick={e => { e.stopPropagation(); onOpenNote(rmKey, name); }}
             style={{ padding: "6px 10px", background: "transparent", border: "1px solid #2a2a35",
@@ -108,7 +111,7 @@ function TopicRow({ name, rmKey, rm, isDone, hasNote, hasMeta, hasResources,
 
 // ── Main TopicCard ─────────────────────────────────────────────────────────────
 export function TopicCard({ topic, rmKey, rm, progress, notes, resources, topicMeta,
-  onToggle, onOpenNote, onToggleCollapse }) {
+  onToggle, onOpenNote, onToggleCollapse, hasPassedQuiz }) {
 
   const name     = topicName(topic);
   const expanded = isExpanded(topic);
@@ -124,7 +127,8 @@ export function TopicCard({ topic, rmKey, rm, progress, notes, resources, topicM
         hasNote={noteVal}
         hasMeta={topicMeta?.[`${rmKey}::${name}`] || {}}
         hasResources={(resources?.[`${rmKey}::${name}`] || []).length > 0}
-        onToggle={onToggle} onOpenNote={onOpenNote} />
+        onToggle={onToggle} onOpenNote={onOpenNote}
+        hasPassed={hasPassedQuiz?.(rmKey, name)} />
     );
   }
 
@@ -163,7 +167,8 @@ export function TopicCard({ topic, rmKey, rm, progress, notes, resources, topicM
                   indent={1} hasNote={noteVal}
                   hasMeta={topicMeta?.[`${rmKey}::${stName}`] || {}}
                   hasResources={(resources?.[`${rmKey}::${stName}`] || []).length > 0}
-                  onToggle={onToggle} onOpenNote={onOpenNote} />
+                  onToggle={onToggle} onOpenNote={onOpenNote}
+                  hasPassed={hasPassedQuiz?.(rmKey, stName)} />
               );
             }
 
@@ -192,7 +197,8 @@ export function TopicCard({ topic, rmKey, rm, progress, notes, resources, topicM
                           indent={2} hasNote={noteVal}
                           hasMeta={topicMeta?.[`${rmKey}::${sstName}`] || {}}
                           hasResources={(resources?.[`${rmKey}::${sstName}`] || []).length > 0}
-                          onToggle={onToggle} onOpenNote={onOpenNote} />
+                          onToggle={onToggle} onOpenNote={onOpenNote}
+                          hasPassed={hasPassedQuiz?.(rmKey, sstName)} />
                       );
                     })}
                   </div>

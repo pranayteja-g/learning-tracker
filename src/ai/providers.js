@@ -37,17 +37,18 @@ export function saveAIConfig(config) {
 
 // ── Call the AI ───────────────────────────────────────────────────────────────
 // Always returns { text, usage: { promptTokens, completionTokens } }
-export async function callAI({ provider, apiKey, systemPrompt, userPrompt, temperature = 0.7 }) {
-  if (provider === "gemini") return callGemini({ apiKey, systemPrompt, userPrompt, temperature });
-  if (provider === "groq")   return callGroq({ apiKey, systemPrompt, userPrompt, temperature });
+export async function callAI({ provider, apiKey, systemPrompt, userPrompt, messages = [], temperature = 0.7 }) {
+  if (provider === "gemini") return callGemini({ apiKey, systemPrompt, userPrompt, messages, temperature });
+  if (provider === "groq")   return callGroq({ apiKey, systemPrompt, userPrompt, messages, temperature });
   throw new Error("Unknown provider: " + provider);
 }
 
-async function callGemini({ apiKey, systemPrompt, userPrompt, temperature = 0.7 }) {
+async function callGemini({ apiKey, systemPrompt, userPrompt, messages = [], temperature = 0.7 }) {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+  const history = messages.map(m => ({ role: m.role === "assistant" ? "model" : "user", parts: [{ text: m.content }] }));
   const body = {
     system_instruction: { parts: [{ text: systemPrompt }] },
-    contents: [{ role: "user", parts: [{ text: userPrompt }] }],
+    contents: [...history, { role: "user", parts: [{ text: userPrompt }] }],
     generationConfig: { temperature, maxOutputTokens: 2048 },
   };
   const res = await fetch(url, {
@@ -71,7 +72,8 @@ async function callGemini({ apiKey, systemPrompt, userPrompt, temperature = 0.7 
   };
 }
 
-async function callGroq({ apiKey, systemPrompt, userPrompt, temperature = 0.7 }) {
+async function callGroq({ apiKey, systemPrompt, userPrompt, messages = [], temperature = 0.7 }) {
+  const history = messages.map(m => ({ role: m.role, content: m.content }));
   const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
     headers: {
@@ -82,6 +84,7 @@ async function callGroq({ apiKey, systemPrompt, userPrompt, temperature = 0.7 })
       model: "llama-3.3-70b-versatile",
       messages: [
         { role: "system", content: systemPrompt },
+        ...history,
         { role: "user",   content: userPrompt },
       ],
       temperature,

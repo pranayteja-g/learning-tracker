@@ -32,6 +32,7 @@ export function NoteModal({ noteModal, roadmaps, notes, resources, topicMeta, on
   const [linkError,   setLinkError]   = useState("");
   const [tab,         setTab]         = useState("notes");
   const [expanded,    setExpanded]    = useState(false);
+  const [editing,     setEditing]     = useState(false);
 
   // AI resource finding state
   const [aiLoading,   setAiLoading]   = useState(false);
@@ -46,7 +47,6 @@ export function NoteModal({ noteModal, roadmaps, notes, resources, topicMeta, on
   const { recordUsage } = useUsage();
   const textareaRef = useRef(null);
 
-  useEffect(() => { if (tab === "notes" && textareaRef.current) textareaRef.current.focus(); }, [tab]);
   // Clear AI results and cheat sheet when switching away from resources tab
   useEffect(() => { if (tab !== "resources") { setAiResults(null); setCheatSheet(null); } }, [tab]);
 
@@ -131,7 +131,7 @@ export function NoteModal({ noteModal, roadmaps, notes, resources, topicMeta, on
     <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)",
       display: "flex", alignItems: "center", justifyContent: "center", zIndex: 200, padding: "8px" }}>
       <div onClick={e => e.stopPropagation()} style={{ background: "#16161b", border: "1px solid #2a2a35",
-        borderRadius: 12, width: "100%", maxWidth: expanded && tab === "notes" ? 780 : 500, boxShadow: "0 20px 60px rgba(0,0,0,0.6)", transition: "max-width 0.2s",
+        borderRadius: 12, width: "100%", maxWidth: expanded && tab === "notes" ? 820 : 620, boxShadow: "0 20px 60px rgba(0,0,0,0.6)", transition: "max-width 0.2s",
         display: "flex", flexDirection: "column", maxHeight: "92vh", boxSizing: "border-box" }}>
 
         {/* Header */}
@@ -167,21 +167,43 @@ export function NoteModal({ noteModal, roadmaps, notes, resources, topicMeta, on
           {/* ── Notes tab ── */}
           {tab === "notes" && (
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              <div style={{ display: "flex", justifyContent: "flex-end" }}>
-                <button onClick={() => setExpanded(v => !v)}
-                  style={{ fontSize: 11, padding: "4px 10px", background: "transparent",
-                    border: "1px solid #2a2a35", borderRadius: 5,
-                    color: expanded ? "#c4b5fd" : "#555", cursor: "pointer", fontFamily: "inherit" }}>
-                  {expanded ? "⊡ Collapse" : "⊞ Expand"}
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: 6 }}>
+                {editing && (
+                  <button onClick={() => setExpanded(v => !v)}
+                    style={{ fontSize: 11, padding: "4px 10px", background: "transparent",
+                      border: "1px solid #2a2a35", borderRadius: 5,
+                      color: expanded ? "#c4b5fd" : "#555", cursor: "pointer", fontFamily: "inherit" }}>
+                    {expanded ? "⊡ Collapse" : "⊞ Expand"}
+                  </button>
+                )}
+                <button onClick={() => { setEditing(v => !v); }}
+                  style={{ fontSize: 11, padding: "4px 12px", background: editing ? "#7b5ea722" : "#1e1e24",
+                    border: `1px solid ${editing ? "#7b5ea7" : "#2a2a35"}`, borderRadius: 5,
+                    color: editing ? "#c4b5fd" : "#888", cursor: "pointer", fontFamily: "inherit", fontWeight: editing ? 600 : 400 }}>
+                  {editing ? "✓ Done" : "✏️ Edit"}
                 </button>
               </div>
-              <textarea ref={textareaRef} value={note} onChange={e => setNote(e.target.value)}
-                placeholder="Add your notes, key concepts, takeaways…"
-                style={{ width: "100%", minHeight: expanded ? 420 : 160,
-                  background: "#0f0f13", border: "1px solid #2a2a35",
-                  borderRadius: 7, padding: "10px 12px", color: "#e8e6e0",
-                  fontSize: expanded ? 15 : 14, fontFamily: "inherit",
-                  resize: "vertical", outline: "none", boxSizing: "border-box", lineHeight: 1.8 }} />
+
+              {editing ? (
+                <textarea ref={textareaRef} value={note} onChange={e => setNote(e.target.value)}
+                  autoFocus
+                  placeholder="Add your notes, key concepts, takeaways…"
+                  style={{ width: "100%", minHeight: expanded ? 420 : 220,
+                    background: "#0f0f13", border: "1px solid #2a2a35",
+                    borderRadius: 7, padding: "12px 14px", color: "#e8e6e0",
+                    fontSize: expanded ? 15 : 14, fontFamily: "inherit",
+                    resize: "vertical", outline: "none", boxSizing: "border-box", lineHeight: 1.8 }} />
+              ) : (
+                <div onClick={() => setEditing(true)}
+                  style={{ width: "100%", minHeight: 220,
+                    background: "#0f0f13", border: "1px solid #1e1e24",
+                    borderRadius: 7, padding: "12px 14px", color: note ? "#e8e6e0" : "#444",
+                    fontSize: 14, fontFamily: "inherit", lineHeight: 1.8,
+                    whiteSpace: "pre-wrap", wordBreak: "break-word",
+                    cursor: "text", boxSizing: "border-box" }}>
+                  {note || "No notes yet. Tap ✏️ Edit to add notes, key concepts, takeaways…"}
+                </div>
+              )}
             </div>
           )}
 
