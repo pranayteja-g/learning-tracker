@@ -1,11 +1,13 @@
 import { useState } from "react";
 
+const DIFF_COLOR = { easy: "#52b788", medium: "#ee9b00", hard: "#e05252" };
+
 export function QuizView({ questions, rm }) {
   const [answers,   setAnswers]   = useState({});
   const [submitted, setSubmitted] = useState(false);
   const [current,   setCurrent]   = useState(0);
 
-  const q = questions[current];
+  const q      = questions[current];
   const totalQ = questions.length;
   const score  = submitted
     ? questions.filter((q, i) => answers[i] === q.answer).length
@@ -23,31 +25,48 @@ export function QuizView({ questions, rm }) {
         : { bg: "#0f0f13", border: "#2a2a35", color: "#888" };
     }
     const correct = questions[qi].answer;
-    if (opt === correct)            return { bg: "#1a2e1a", border: "#52b788", color: "#52b788" };
-    if (opt === answers[qi])        return { bg: "#2e1a1a", border: "#e05252", color: "#e05252" };
+    if (opt === correct)     return { bg: "#1a2e1a", border: "#52b788", color: "#52b788" };
+    if (opt === answers[qi]) return { bg: "#2e1a1a", border: "#e05252", color: "#e05252" };
     return { bg: "#0f0f13", border: "#1e1e24", color: "#555" };
   };
 
   if (submitted) {
+    const pct = Math.round((score / totalQ) * 100);
     return (
       <div style={{ padding: "0 20px 20px" }}>
-        {/* Score */}
+        {/* Score card */}
         <div style={{ background: "#16161b", border: `1px solid ${rm.color}44`, borderRadius: 10,
           padding: "16px", marginBottom: 16, textAlign: "center" }}>
-          <div style={{ fontSize: 32, fontWeight: 700, color: score >= totalQ * 0.7 ? "#52b788" : "#ee9b00" }}>
+          <div style={{ fontSize: 36, fontWeight: 700, color: score >= totalQ * 0.7 ? "#52b788" : "#ee9b00" }}>
             {score}/{totalQ}
           </div>
-          <div style={{ fontSize: 13, color: "#888", marginTop: 4 }}>
+          <div style={{ fontSize: 12, color: "#555", marginTop: 2 }}>{pct}% correct</div>
+          <div style={{ fontSize: 13, color: "#888", marginTop: 6 }}>
             {score === totalQ ? "Perfect! 🎉" : score >= totalQ * 0.7 ? "Great job! 👍" : "Keep studying! 📚"}
           </div>
         </div>
 
-        {/* Review all questions */}
+        {/* Review */}
         {questions.map((q, qi) => {
           const correct = answers[qi] === q.answer;
           return (
             <div key={qi} style={{ background: "#16161b", borderRadius: 10, padding: "14px",
               marginBottom: 10, border: `1px solid ${correct ? "#52b78844" : "#e0525244"}` }}>
+              {/* Question meta */}
+              <div style={{ display: "flex", gap: 6, marginBottom: 8, flexWrap: "wrap" }}>
+                {q.topic && (
+                  <span style={{ fontSize: 10, background: rm.color + "20", color: rm.accent,
+                    padding: "2px 7px", borderRadius: 4 }}>{q.topic}</span>
+                )}
+                {q.difficulty && (
+                  <span style={{ fontSize: 10, background: DIFF_COLOR[q.difficulty] + "20",
+                    color: DIFF_COLOR[q.difficulty], padding: "2px 7px", borderRadius: 4 }}>
+                    {q.difficulty}
+                  </span>
+                )}
+                <span style={{ fontSize: 10, color: correct ? "#52b788" : "#e05252",
+                  marginLeft: "auto" }}>{correct ? "✓ Correct" : "✗ Wrong"}</span>
+              </div>
               <div style={{ fontSize: 13, color: "#ccc", marginBottom: 10, lineHeight: 1.5 }}>
                 <span style={{ color: "#555", marginRight: 6 }}>Q{qi+1}.</span>{q.question}
               </div>
@@ -60,8 +79,8 @@ export function QuizView({ questions, rm }) {
                   </div>
                 );
               })}
-              <div style={{ fontSize: 11, color: "#52b788", marginTop: 8, fontStyle: "italic",
-                background: "#1a2e1a", padding: "6px 10px", borderRadius: 5 }}>
+              <div style={{ fontSize: 11, color: "#52b788", marginTop: 8,
+                background: "#1a2e1a", padding: "6px 10px", borderRadius: 5, lineHeight: 1.5 }}>
                 💡 {q.explanation}
               </div>
             </div>
@@ -92,6 +111,20 @@ export function QuizView({ questions, rm }) {
         </div>
       </div>
 
+      {/* Topic + difficulty badges */}
+      <div style={{ display: "flex", gap: 6, marginBottom: 10, flexWrap: "wrap" }}>
+        {q.topic && (
+          <span style={{ fontSize: 10, background: rm.color + "20", color: rm.accent,
+            padding: "3px 8px", borderRadius: 4 }}>{q.topic}</span>
+        )}
+        {q.difficulty && (
+          <span style={{ fontSize: 10, background: DIFF_COLOR[q.difficulty] + "20",
+            color: DIFF_COLOR[q.difficulty], padding: "3px 8px", borderRadius: 4 }}>
+            {q.difficulty}
+          </span>
+        )}
+      </div>
+
       {/* Question */}
       <div style={{ background: "#16161b", borderRadius: 10, padding: "16px", marginBottom: 14,
         border: `1px solid ${rm.color}33` }}>
@@ -109,8 +142,7 @@ export function QuizView({ questions, rm }) {
               borderRadius: 8, color: selected ? rm.accent : "#888",
               fontSize: 13, cursor: "pointer", fontFamily: "inherit",
               display: "flex", gap: 10, alignItems: "flex-start" }}>
-            <span style={{ fontWeight: 700, flexShrink: 0,
-              color: selected ? rm.color : "#444" }}>{opt}.</span>
+            <span style={{ fontWeight: 700, flexShrink: 0, color: selected ? rm.color : "#444" }}>{opt}.</span>
             <span>{text}</span>
           </button>
         );

@@ -1,31 +1,35 @@
 import { useState } from "react";
 
 export function ExplainView({ data, rm, topic, rmKey, onSaveToNotes }) {
-  const [saved,   setSaved]   = useState(false);
-
-  const sections = [
-    { key: "whatItIs",       label: "What it is",      icon: "📖" },
-    { key: "howItWorks",     label: "How it works",    icon: "⚙️" },
-    { key: "whenToUse",      label: "When to use it",  icon: "🎯" },
-    { key: "example",        label: "Example",         icon: "💻" },
-    { key: "commonMistakes", label: "Common mistakes", icon: "⚠️" },
-    { key: "keyTakeaway",    label: "Key takeaway",    icon: "💡" },
-  ];
+  const [saved, setSaved] = useState(false);
 
   const handleSave = () => {
     if (!onSaveToNotes) return;
-    // Build a clean text representation to append to notes
     const lines = [`## AI Explanation: ${topic}`, ""];
     if (data.summary)        lines.push(`**Summary:** ${data.summary}`, "");
     if (data.whatItIs)       lines.push(`**What it is:** ${data.whatItIs}`, "");
     if (data.howItWorks)     lines.push(`**How it works:** ${data.howItWorks}`, "");
     if (data.whenToUse)      lines.push(`**When to use:** ${data.whenToUse}`, "");
-    if (data.example)        lines.push(`**Example:**\n${data.example}`, "");
+    if (data.codeExample?.code) {
+      lines.push(`**Example (${data.codeExample.language || "code"}):**`);
+      lines.push(`\`\`\`${data.codeExample.language || ""}\n${data.codeExample.code}\n\`\`\``, "");
+    }
     if (data.commonMistakes) lines.push(`**Common mistakes:** ${data.commonMistakes}`, "");
     if (data.keyTakeaway)    lines.push(`**Key takeaway:** ${data.keyTakeaway}`);
     onSaveToNotes(rmKey, topic, lines.join("\n"));
     setSaved(true);
   };
+
+  const sections = [
+    { key: "whatItIs",       label: "What it is",      icon: "📖", mono: false },
+    { key: "howItWorks",     label: "How it works",    icon: "⚙️", mono: false },
+    { key: "whenToUse",      label: "When to use it",  icon: "🎯", mono: false },
+    { key: "commonMistakes", label: "Common mistakes", icon: "⚠️", mono: false },
+    { key: "keyTakeaway",    label: "Key takeaway",    icon: "💡", mono: false },
+  ];
+
+  const hasCode = data.codeExample?.code;
+  const hasAnalogy = data.codeExample?.description && !hasCode;
 
   return (
     <div style={{ padding: "0 20px 20px" }}>
@@ -43,15 +47,46 @@ export function ExplainView({ data, rm, topic, rmKey, onSaveToNotes }) {
             <span>{icon}</span> {label}
           </div>
           <div style={{ background: "#16161b", borderRadius: 8, padding: "12px",
-            border: "1px solid #1e1e24", fontSize: 13, color: "#bbb", lineHeight: 1.7,
-            fontFamily: key === "example" ? "monospace" : "inherit",
-            whiteSpace: key === "example" ? "pre-wrap" : "normal" }}>
+            border: "1px solid #1e1e24", fontSize: 13, color: "#bbb", lineHeight: 1.7 }}>
             {data[key]}
           </div>
         </div>
       ))}
 
-      {/* Save to notes button */}
+      {/* Code example */}
+      {(hasCode || hasAnalogy) && (
+        <div style={{ marginBottom: 12 }}>
+          <div style={{ fontSize: 11, color: "#666", textTransform: "uppercase",
+            letterSpacing: 1, marginBottom: 6, display: "flex", gap: 6, alignItems: "center" }}>
+            <span>💻</span>
+            {hasCode
+              ? `Example${data.codeExample.language ? ` — ${data.codeExample.language}` : ""}`
+              : "Example"}
+          </div>
+          {data.codeExample.description && (
+            <div style={{ fontSize: 12, color: "#666", marginBottom: 8, fontStyle: "italic" }}>
+              {data.codeExample.description}
+            </div>
+          )}
+          {hasCode ? (
+            <div style={{ background: "#0d1117", borderRadius: 8, padding: "14px",
+              border: "1px solid #1e1e24", overflow: "auto" }}>
+              <pre style={{ margin: 0, fontSize: 12, color: "#c9d1d9", lineHeight: 1.7,
+                fontFamily: "'Fira Code', 'Consolas', monospace",
+                whiteSpace: "pre", overflowX: "auto" }}>
+                {data.codeExample.code}
+              </pre>
+            </div>
+          ) : (
+            <div style={{ background: "#16161b", borderRadius: 8, padding: "12px",
+              border: "1px solid #1e1e24", fontSize: 13, color: "#bbb", lineHeight: 1.7 }}>
+              {data.codeExample.description}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Save to notes */}
       {onSaveToNotes && (
         <button onClick={handleSave} disabled={saved}
           style={{ width: "100%", marginTop: 8, padding: "10px",
