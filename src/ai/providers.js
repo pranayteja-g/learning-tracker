@@ -6,6 +6,8 @@ export const PROVIDERS = {
     keyPlaceholder: "AIza...",
     keyUrl: "https://aistudio.google.com/app/apikey",
     keyHint: "Get a free key at aistudio.google.com — no credit card needed",
+    color: "#4285f4",
+    free: true,
   },
   groq: {
     name: "Groq",
@@ -13,6 +15,8 @@ export const PROVIDERS = {
     keyPlaceholder: "gsk_...",
     keyUrl: "https://console.groq.com/keys",
     keyHint: "Get a free key at console.groq.com — no credit card needed",
+    color: "#f55036",
+    free: true,
   },
 };
 

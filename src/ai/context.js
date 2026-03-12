@@ -51,8 +51,7 @@ export function buildStudyPlanContext({ roadmap, progress }) {
   let completed = [], upcoming = [];
 
   for (const [sec, ts] of Object.entries(roadmap.sections)) {
-    const _flat = flatTopicNames(ts);
-    for (const t of ts) {
+    for (const t of flatTopicNames(ts)) {
       if (progress[`${rmId}::${t}`]) completed.push({ topic: t, section: sec });
       else upcoming.push({ topic: t, section: sec });
     }
