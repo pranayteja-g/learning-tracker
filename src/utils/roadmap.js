@@ -1,3 +1,4 @@
+import { flatTopicNames, topicName } from "./topics.js";
 export function downloadJSON(data, filename) {
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
   const url  = URL.createObjectURL(blob);
@@ -10,6 +11,7 @@ export function validateRoadmap(data) {
   if (!data.id || !data.label || !data.sections) return "Missing required fields (id, label, sections)";
   if (typeof data.sections !== "object") return "sections must be an object";
   for (const [sec, topics] of Object.entries(data.sections)) {
+    if (!Array.isArray(topics)) return `Section "${sec}" must be an array`;
     if (!Array.isArray(topics)) return `Section "${sec}" must be an array of topics`;
     if (topics.some(t => typeof t !== "string")) return `All topics in "${sec}" must be strings`;
   }
@@ -38,7 +40,7 @@ export function getNextUp(roadmap, progress, count = 5) {
   if (!roadmap) return [];
   const items = [];
   for (const [sec, ts] of Object.entries(roadmap.sections))
-    for (const t of ts) {
+    for (const t of flatTopicNames(ts)) {
       if (!progress[`${roadmap.id}::${t}`]) items.push({ section: sec, topic: t });
       if (items.length >= count) return items;
     }
