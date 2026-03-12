@@ -2,9 +2,61 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!-- Viewport — prevents mobile zoom, enables PWA layout -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+
+    <!-- PWA manifest -->
+    <link rel="manifest" href="/manifest.json" />
+
+    <!-- Theme colour — matches app background -->
+    <meta name="theme-color" content="#7b5ea7" />
+    <meta name="background-color" content="#0f0f13" />
+
+    <!-- iOS PWA meta tags -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="LearnTrack" />
+    <link rel="apple-touch-icon" href="/icons/icon-192.svg" />
+
+    <!-- Splash screen colour for iOS -->
+    <meta name="msapplication-TileColor" content="#7b5ea7" />
+    <meta name="msapplication-TileImage" content="/icons/icon-192.svg" />
+
+    <!-- App description for SEO / share previews -->
+    <meta name="description" content="Track your progress across any learning roadmap. AI-powered quizzes, flashcards, and interview prep." />
+    <meta name="keywords" content="learning, roadmap, study, progress tracker, AI, interview prep" />
+
+    <!-- Open Graph (for link previews when shared) -->
+    <meta property="og:title" content="Learning Tracker" />
+    <meta property="og:description" content="Track your progress across any learning roadmap. AI-powered quizzes and interview prep." />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="/icons/icon-512.svg" />
+
+    <!-- Prevent telephone number detection on iOS -->
+    <meta name="format-detection" content="telephone=no" />
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="/icons/icon-192.svg" />
+
     <title>Learning Tracker</title>
+
+    <!-- Inline critical CSS: prevent flash of unstyled content, set base colours -->
+    <style>
+      *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+      html, body { height: 100%; background: #0f0f13; color: #e8e6e0; }
+      body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+      #root { height: 100%; }
+      /* Prevent iOS bounce scroll at root level */
+      body { overscroll-behavior: none; }
+      /* Safe area insets for notched phones (iPhone X+) */
+      #root {
+        padding-top: env(safe-area-inset-top);
+        padding-bottom: env(safe-area-inset-bottom);
+        padding-left: env(safe-area-inset-left);
+        padding-right: env(safe-area-inset-right);
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>

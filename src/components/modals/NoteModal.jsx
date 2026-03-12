@@ -129,10 +129,10 @@ export function NoteModal({ noteModal, roadmaps, notes, resources, topicMeta, on
 
   return (
     <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)",
-      display: "flex", alignItems: "center", justifyContent: "center", zIndex: 200, padding: 16 }}>
+      display: "flex", alignItems: "center", justifyContent: "center", zIndex: 200, padding: "8px" }}>
       <div onClick={e => e.stopPropagation()} style={{ background: "#16161b", border: "1px solid #2a2a35",
         borderRadius: 12, width: "100%", maxWidth: expanded && tab === "notes" ? 780 : 500, boxShadow: "0 20px 60px rgba(0,0,0,0.6)", transition: "max-width 0.2s",
-        display: "flex", flexDirection: "column", maxHeight: "92vh" }}>
+        display: "flex", flexDirection: "column", maxHeight: "92vh", boxSizing: "border-box" }}>
 
         {/* Header */}
         <div style={{ padding: "18px 20px 0" }}>

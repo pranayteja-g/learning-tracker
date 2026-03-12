@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="100" fill="#13131a"/>
+  <rect x="60" y="80" width="280" height="340" rx="20" fill="#7b5ea7"/>
+  <rect x="80" y="100" width="240" height="300" rx="12" fill="#1e1e2e"/>
+  <!-- Lines representing topics -->
+  <rect x="110" y="145" width="180" height="12" rx="6" fill="#7b5ea755"/>
+  <rect x="110" y="175" width="140" height="10" rx="5" fill="#4361ee44"/>
+  <rect x="110" y="200" width="160" height="10" rx="5" fill="#4361ee44"/>
+  <rect x="110" y="235" width="180" height="12" rx="6" fill="#7b5ea755"/>
+  <rect x="110" y="265" width="120" height="10" rx="5" fill="#4361ee44"/>
+  <rect x="110" y="290" width="150" height="10" rx="5" fill="#4361ee44"/>
+  <!-- Checkmark circle -->
+  <circle cx="370" cy="340" r="90" fill="#13131a"/>
+  <circle cx="370" cy="340" r="74" fill="#52b788"/>
+  <polyline points="330,340 358,368 415,308" stroke="white" stroke-width="22" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+</svg>
