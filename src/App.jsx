@@ -518,7 +518,8 @@ export default function App() {
             <h1 style={{ margin: 0, fontSize: 19, fontWeight: 700, letterSpacing: "-0.5px", color: "#fff" }}>Learning Tracker</h1>
             <span style={{ fontSize: 11, color: "#555", fontFamily: "monospace" }}>roadmap.sh</span>
           </div>
-          <div style={{ display: "flex", gap: 6 }}>
+          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            <StreakBadge streak={{ ...streak, studiedToday }} isMobile={false} />
             <button onClick={handleExport} style={{ padding: "6px 12px", border: "none", borderRadius: 6, cursor: "pointer", fontFamily: "inherit", fontSize: 12, background: "#1e1e24", color: "#888" }}>⬇ Export</button>
             <button onClick={() => importRef.current?.click()} style={{ padding: "6px 12px", border: "none", borderRadius: 6, cursor: "pointer", fontFamily: "inherit", fontSize: 12, background: "#1e1e24", color: "#888" }}>⬆ Import</button>
             <input ref={importRef} type="file" accept=".json" onChange={handleImportRoadmap} style={{ display: "none" }} />
