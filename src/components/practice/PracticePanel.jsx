@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { callAI, loadAIConfig, saveAIConfig, PROVIDERS } from "../../ai/providers.js";
 import { useUsage } from "../../ai/useUsage.js";
 import { allTopicNames, flatTopicNames } from "../../utils/topics.js";
@@ -67,6 +67,11 @@ export function PracticePanel({ open, onClose, roadmap, roadmaps, progress, note
   const [result,       setResult]       = useState(null);
   const [loading,      setLoading]      = useState(false);
   const [error,        setError]        = useState("");
+
+  // Reset to config screen whenever panel is opened
+  useEffect(() => {
+    if (open) { setResult(null); setError(""); setLoading(false); }
+  }, [open]);
   const [aiConfig,     setAIConfig]     = useState(loadAIConfig);
 
   const { usage, limit, recordUsage, saveLimit, resetUsage, isOverLimit, pct } = useUsage();
@@ -156,9 +161,17 @@ export function PracticePanel({ open, onClose, roadmap, roadmaps, progress, note
   return (
     <>
       <div onClick={onClose} style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.4)", zIndex:90 }} />
-      <div style={{
+      <div style={isMobile ? {
+        position: "fixed", left: 0, right: 0,
+        top: "env(safe-area-inset-top, 0px)",
+        bottom: "56px",
+        background: "#13131a", borderTop: "1px solid #1e1e24",
+        zIndex: 91, display: "flex", flexDirection: "column",
+        boxShadow: "0 -8px 40px rgba(0,0,0,0.5)",
+        borderRadius: "16px 16px 0 0",
+      } : {
         position: "fixed", top: 0, right: 0, bottom: 0,
-        width: isMobile ? "100vw" : "420px",
+        width: "420px",
         background: "#13131a", borderLeft: "1px solid #1e1e24",
         zIndex: 91, display: "flex", flexDirection: "column",
         paddingTop: "env(safe-area-inset-top)",

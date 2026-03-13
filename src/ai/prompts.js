@@ -133,50 +133,60 @@ Provide a clear, practical explanation with real code examples where relevant. R
   "keyTakeaway": "One sentence to remember"
 }
 
-IMPORTANT for codeExample:
-- Use actual working code, not placeholder comments
-- Show the most common real-world usage pattern
-- For non-code topics (history, science, language, etc.) set code to null and use codeExample.description to give a concrete real-world analogy or example instead`;
+CRITICAL for codeExample.code:
+- Code MUST be multi-line — use \\n between every statement and line
+- Never put all code on one line — each statement gets its own line
+- Use proper indentation with spaces
+- Use actual working code, not placeholder comments or pseudocode
+- Show the most common real-world usage pattern (5-20 lines)
+- For non-code topics set code to null and use codeExample.description for a real-world analogy instead`;
 }
 
 // ── Study plan prompt ─────────────────────────────────────────────────────────
 export function buildStudyPlanPrompt(ctx) {
-  const completed = ctx.recentCompleted.map(t => `- ${t.topic}`).join("\n") || "None yet";
-  const upcoming  = ctx.nextUpcoming.map(t => `- ${t.topic} (${t.section})`).join("\n");
-  const weakBlock  = ctx.hasQuizData && ctx.weakTopics?.length
-    ? `\nTopics with LOW quiz scores (prioritise review):\n${ctx.weakTopics.map(t => `- ${t.topic} (${t.score}%)`).join("\n")}`
-    : "";
-  const strongBlock = ctx.hasQuizData && ctx.strongTopics?.length
-    ? `\nTopics already mastered (skip or briefly revisit):\n${ctx.strongTopics.map(t => `- ${t.topic} (${t.score}%)`).join("\n")}`
-    : "";
+  const quizBlock = ctx.hasQuizData ? `
+QUIZ PERFORMANCE (use this to personalise — do not ignore it):
+${ctx.weakTopics?.length   ? `Weak topics (score < 60% — must revisit before moving on):\n${ctx.weakTopics.map(t => `  - ${t.topic}: ${t.score}%`).join("\n")}` : ""}
+${ctx.strongTopics?.length ? `Strong topics (score ≥ 80% — move past quickly):\n${ctx.strongTopics.map(t => `  - ${t.topic}: ${t.score}%`).join("\n")}` : ""}
 
-  return `Create a personalized study plan for a learner studying "${ctx.roadmapName}".
+RULES when quiz data is present:
+- Weak topics MUST appear on Day 1 or Day 2 — do not bury them
+- Do NOT suggest time on strong topics unless everything else is done
+- Name exact topics per day — no vague "review Java basics" days
+- If a weak topic is a prerequisite for upcoming topics, fix it first` : "";
 
-Current progress: ${ctx.completedCount}/${ctx.totalCount} topics (${ctx.progressPct}% complete)
+  return `You are a study coach. Create a sharp, realistic 5-day plan for someone learning "${ctx.roadmapName}".
 
-Recently completed:
-${completed}
+LEARNER SNAPSHOT:
+- Progress: ${ctx.completedCount}/${ctx.totalCount} topics (${ctx.progressPct}% complete)
+- Recently completed: ${ctx.recentCompleted.length ? ctx.recentCompleted.map(t => t.topic).join(", ") : "nothing yet"}
+- Up next in roadmap: ${ctx.nextUpcoming.slice(0, 6).map(t => `${t.topic} (${t.section})`).join(", ")}
+${quizBlock}
 
-Upcoming topics (in order):
-${upcoming}
-${weakBlock}
-${strongBlock}
+PLAN REQUIREMENTS:
+- Each day has ONE clear focus — no "review everything" days
+- Estimate time honestly (most topics = 30–90 min to properly learn)
+- Tips must be specific to this learner, not generic advice
+- Assessment must be honest — name weak spots directly if quiz data shows them
+- Milestone should be specific: what they can build/do/understand after 5 days
 
-${ctx.hasQuizData ? "IMPORTANT: Prioritise weak quiz topics in the plan. Skip or shorten time on mastered topics." : ""}
-
-Respond with ONLY valid JSON:
+Respond with ONLY valid JSON, no other text:
 {
-  "assessment": "2-3 sentence assessment of where they are${ctx.hasQuizData ? ", referencing their quiz performance" : ""}",
-  "weeklyGoal": "A realistic goal for this week",
+  "assessment": "2-3 sentences. Direct and honest. Reference their actual progress % and name weak spots if any.",
+  "weeklyGoal": "One specific measurable goal for the 5 days",
   "dailyPlan": [
-    { "day": "Day 1", "focus": "topic or group", "goal": "what to achieve", "estimatedTime": "X hours" },
+    { "day": "Day 1", "focus": "exact topic name(s)", "goal": "what they can do after this session", "estimatedTime": "X hrs" },
     { "day": "Day 2", "focus": "...", "goal": "...", "estimatedTime": "..." },
     { "day": "Day 3", "focus": "...", "goal": "...", "estimatedTime": "..." },
     { "day": "Day 4", "focus": "...", "goal": "...", "estimatedTime": "..." },
     { "day": "Day 5", "focus": "...", "goal": "...", "estimatedTime": "..." }
   ],
-  "tips": ["tip 1", "tip 2", "tip 3"],
-  "milestone": "What completing this week's plan unlocks"
+  "tips": [
+    "Specific tip based on their weak areas or quiz results",
+    "Specific tip about how to approach the upcoming topics",
+    "Specific tip about retention — what to do after each session"
+  ],
+  "milestone": "What they unlock after this week — specific about what they can build or do"
 }`;
 }
 
