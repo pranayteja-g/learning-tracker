@@ -11,8 +11,7 @@ import { ManageModal }           from "./components/modals/ManageModal.jsx";
 import { RoadmapEditorModal }    from "./components/modals/RoadmapEditorModal.jsx";
 import { WelcomeScreen }         from "./components/screens/WelcomeScreen.jsx";
 import { Dashboard }             from "./components/screens/Dashboard.jsx";
-import { AIPanel }               from "./components/ai/AIPanel.jsx";
-import { InterviewPanel }        from "./components/interview/InterviewPanel.jsx";
+import { PracticePanel }         from "./components/practice/PracticePanel.jsx";
 import { SearchOverlay }         from "./components/ui/SearchOverlay.jsx";
 import { StreakBadge }           from "./components/ui/StreakBadge.jsx";
 import { InstallPrompt }        from "./components/ui/InstallPrompt.jsx";
@@ -33,8 +32,7 @@ export default function App() {
   const [showManage,     setShowManage]     = useState(false);
   const [editorModal,    setEditorModal]    = useState(null);
   const [feedback,       setFeedback]       = useState(null);
-  const [aiOpen,         setAiOpen]         = useState(false);
-  const [interviewOpen,  setInterviewOpen]  = useState(false);
+  const [practiceOpen,   setPracticeOpen]   = useState(false);
   const [searchOpen,     setSearchOpen]     = useState(false);
   const { streak, recordActivity, studiedToday } = useStreak();
   const { recordQuizResult, hasPassedTopic }  = useQuizResults();
@@ -302,38 +300,11 @@ export default function App() {
                         onCreate={() => { setEditorModal({ existing: null }); setShowManage(false); }} />}
       {editorModal !== null && <RoadmapEditorModal existing={editorModal.existing}
                         onSave={handleSaveRoadmap} onClose={() => setEditorModal(null)} />}
-      <AIPanel open={aiOpen} onClose={() => setAiOpen(false)} roadmap={rm} progress={progress}
+      <PracticePanel open={practiceOpen} onClose={() => setPracticeOpen(false)}
+        roadmap={rm} roadmaps={roadmaps} progress={progress}
         notes={notes} resources={resources} topicMeta={topicMeta} curSection={curSec} isMobile={isMobile}
         onSaveToNotes={appendToNote} onQuizComplete={recordQuizResult} />
-      <InterviewPanel open={interviewOpen} onClose={() => setInterviewOpen(false)}
-        roadmap={rm} progress={progress} isMobile={isMobile} roadmaps={roadmaps} />
-      {/* Floating buttons */}
-      {rmKeys.length > 0 && (
-        <>
-          {/* Interview Prep — left side */}
-          <button onClick={() => { setInterviewOpen(o => !o); setAiOpen(false); }}
-            style={{ position: "fixed", bottom: isMobile ? 72 : 24, left: 20, zIndex: 89,
-              width: 52, height: 52, borderRadius: "50%",
-              background: interviewOpen ? "#e07b39" : "linear-gradient(135deg, #e07b39, #ee9b00)",
-              border: "none", boxShadow: "0 4px 20px rgba(224,123,57,0.5)",
-              color: "#fff", fontSize: 22, cursor: "pointer",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              transition: "transform 0.2s", transform: interviewOpen ? "rotate(45deg)" : "rotate(0deg)" }}>
-            {interviewOpen ? "×" : "🎯"}
-          </button>
-          {/* AI Assistant — right side */}
-          <button onClick={() => { setAiOpen(o => !o); setInterviewOpen(false); }}
-            style={{ position: "fixed", bottom: isMobile ? 72 : 24, right: 20, zIndex: 89,
-              width: 52, height: 52, borderRadius: "50%",
-              background: aiOpen ? "#7b5ea7" : "linear-gradient(135deg, #7b5ea7, #4361ee)",
-              border: "none", boxShadow: "0 4px 20px rgba(123,94,167,0.5)",
-              color: "#fff", fontSize: 22, cursor: "pointer",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              transition: "transform 0.2s", transform: aiOpen ? "rotate(45deg)" : "rotate(0deg)" }}>
-            {aiOpen ? "×" : "🤖"}
-          </button>
-        </>
-      )}
+
     </>
   );
 
@@ -347,31 +318,34 @@ export default function App() {
     return (
       <div style={{ fontFamily: "'Georgia', serif", minHeight: "100vh", background: "#0f0f13", color: "#e8e6e0" }}>
         {/* Header */}
-        <div style={{ padding: "12px 16px", borderBottom: "1px solid #1e1e24", display: "flex",
-          alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, background: "#0f0f13", zIndex: 50 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <div style={{ padding: "12px 16px 12px", borderBottom: "1px solid #1e1e24",
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          position: "sticky", top: 0, background: "#0f0f13", zIndex: 50,
+          paddingTop: "calc(12px + env(safe-area-inset-top))" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             {["sections","topics","nextup"].includes(mobileScreen) && (
               <button onClick={() => mobileScreen === "topics" ? setMobileScreen("sections") : setMobileScreen("roadmaps")}
-                style={{ background: "transparent", border: "none", color: "#aaa", fontSize: 22, cursor: "pointer", padding: "0 6px 0 0", lineHeight: 1 }}>←</button>
+                style={{ background: "transparent", border: "none", color: "#888",
+                  fontSize: 20, cursor: "pointer", padding: 0, lineHeight: 1, marginRight: 2 }}>‹</button>
             )}
-            <h1 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: "#fff" }}>{screenTitle[mobileScreen]}</h1>
+            <div>
+              {mobileScreen === "roadmaps" && (
+                <div style={{ fontSize: 11, color: "#555", marginBottom: 1 }}>Learning Tracker</div>
+              )}
+              <h1 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#fff", lineHeight: 1 }}>
+                {screenTitle[mobileScreen]}
+              </h1>
+            </div>
           </div>
-          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
             <StreakBadge streak={{ ...streak, studiedToday }} isMobile={true} />
             <button onClick={() => setSearchOpen(true)}
-              style={{ width: 36, height: 36, display: "flex", alignItems: "center", justifyContent: "center",
-                border: "none", borderRadius: 8, cursor: "pointer", background: "#1e1e24", color: "#888", fontSize: 16 }}>🔍</button>
-            <button onClick={() => setMobileScreen(s => s === "dashboard" ? "roadmaps" : "dashboard")}
-              style={{ width: 36, height: 36, display: "flex", alignItems: "center", justifyContent: "center",
-                border: "none", borderRadius: 8, cursor: "pointer", fontSize: 16,
-                background: mobileScreen === "dashboard" ? "#7b5ea7" : "#1e1e24",
-                color: mobileScreen === "dashboard" ? "#fff" : "#888" }}>📊</button>
-            <button onClick={() => setShowManage(true)}
-              style={{ width: 36, height: 36, display: "flex", alignItems: "center", justifyContent: "center",
-                border: "none", borderRadius: 8, cursor: "pointer", background: "#1e1e24", color: "#888", fontSize: 16 }}>⚙️</button>
-            <input ref={importRef} type="file" accept=".json" onChange={handleImportRoadmap} style={{ display: "none" }} />
+              style={{ width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center",
+                border: "none", borderRadius: 8, cursor: "pointer", background: "#1e1e24",
+                color: "#888", fontSize: 15 }}>🔍</button>
           </div>
         </div>
+        <input ref={importRef} type="file" accept=".json" onChange={handleImportRoadmap} style={{ display: "none" }} />
 
         {mobileScreen === "dashboard" && (
           <Dashboard roadmaps={roadmaps} progress={progress} notes={notes} resources={resources}
@@ -477,30 +451,57 @@ export default function App() {
           </div>
         )}
 
-        {/* Bottom nav */}
+        {/* Bottom nav — 4 fixed tabs */}
         <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: "#13131a",
-          borderTop: "1px solid #1e1e24", display: "flex", zIndex: 50 }}>
-          {Object.values(roadmaps).slice(0, 3).map(val => {
-            const s      = getRoadmapStats(val, progress);
-            const active = val.id === rmKey && mobileScreen !== "dashboard";
+          borderTop: "1px solid #1e1e24", display: "flex", zIndex: 50,
+          paddingBottom: "env(safe-area-inset-bottom)" }}>
+          {/* Learn tab */}
+          {(() => {
+            const active = ["roadmaps","sections","topics","nextup"].includes(mobileScreen);
             return (
-              <button key={val.id} onClick={() => goToRoadmap(val.id)}
-                style={{ flex: 1, padding: "8px 4px 16px", border: "none", background: "transparent",
-                  color: active ? val.color : "#555", cursor: "pointer", fontFamily: "inherit",
-                  borderTop: active ? `2px solid ${val.color}` : "2px solid transparent",
-                  fontSize: 11, minHeight: 56 }}>
-                <div style={{ fontWeight: active ? 700 : 400, fontSize: 12 }}>{val.label.split(" ")[0]}</div>
-                <div style={{ fontSize: 10, marginTop: 2, opacity: 0.8 }}>{s.pct}%</div>
+              <button onClick={() => setMobileScreen(rmKey ? "sections" : "roadmaps")}
+                style={{ flex: 1, padding: "10px 4px 12px", border: "none", background: "transparent",
+                  color: active ? (rm?.color || "#7b5ea7") : "#555", cursor: "pointer", fontFamily: "inherit",
+                  borderTop: active ? `2px solid ${rm?.color || "#7b5ea7"}` : "2px solid transparent" }}>
+                <div style={{ fontSize: 18, marginBottom: 2 }}>📚</div>
+                <div style={{ fontSize: 10, fontWeight: active ? 700 : 400 }}>Learn</div>
               </button>
             );
-          })}
-          {rmKeys.length > 3 && (
-            <button onClick={() => setMobileScreen("roadmaps")}
-              style={{ flex: 1, padding: "10px 4px 14px", border: "none", background: "transparent",
-                color: "#555", cursor: "pointer", fontFamily: "inherit", fontSize: 11, borderTop: "2px solid transparent" }}>
-              <div>More</div><div style={{ fontSize: 10, marginTop: 1 }}>···</div>
-            </button>
-          )}
+          })()}
+          {/* Practice tab */}
+          {(() => {
+            const active = practiceOpen;
+            return (
+              <button onClick={() => { setPracticeOpen(o => !o); }}
+                style={{ flex: 1, padding: "10px 4px 12px", border: "none", background: "transparent",
+                  color: active ? "#c4b5fd" : "#555", cursor: "pointer", fontFamily: "inherit",
+                  borderTop: active ? "2px solid #7b5ea7" : "2px solid transparent" }}>
+                <div style={{ fontSize: 18, marginBottom: 2 }}>🤖</div>
+                <div style={{ fontSize: 10, fontWeight: active ? 700 : 400 }}>Practice</div>
+              </button>
+            );
+          })()}
+          {/* Dashboard tab */}
+          {(() => {
+            const active = mobileScreen === "dashboard";
+            return (
+              <button onClick={() => setMobileScreen(s => s === "dashboard" ? (rmKey ? "sections" : "roadmaps") : "dashboard")}
+                style={{ flex: 1, padding: "10px 4px 12px", border: "none", background: "transparent",
+                  color: active ? "#c4b5fd" : "#555", cursor: "pointer", fontFamily: "inherit",
+                  borderTop: active ? "2px solid #7b5ea7" : "2px solid transparent" }}>
+                <div style={{ fontSize: 18, marginBottom: 2 }}>📊</div>
+                <div style={{ fontSize: 10, fontWeight: active ? 700 : 400 }}>Dashboard</div>
+              </button>
+            );
+          })()}
+          {/* Settings tab */}
+          <button onClick={() => setShowManage(true)}
+            style={{ flex: 1, padding: "10px 4px 12px", border: "none", background: "transparent",
+              color: "#555", cursor: "pointer", fontFamily: "inherit",
+              borderTop: "2px solid transparent" }}>
+            <div style={{ fontSize: 18, marginBottom: 2 }}>⚙️</div>
+            <div style={{ fontSize: 10 }}>Settings</div>
+          </button>
         </div>
 
         <Overlays />
@@ -518,21 +519,28 @@ export default function App() {
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
           <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
             <h1 style={{ margin: 0, fontSize: 19, fontWeight: 700, letterSpacing: "-0.5px", color: "#fff" }}>Learning Tracker</h1>
-            <span style={{ fontSize: 11, color: "#555", fontFamily: "monospace" }}>roadmap.sh</span>
+            <span style={{ fontSize: 11, color: "#555", fontFamily: "monospace" }}>GYPTOR</span>
           </div>
           <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
             <StreakBadge streak={{ ...streak, studiedToday }} isMobile={false} />
             <button onClick={() => setSearchOpen(true)}
               title="Search (⌘K)"
-              style={{ padding: "6px 12px", border: "none", borderRadius: 6, cursor: "pointer",
+              style={{ padding: "7px 14px", border: "none", borderRadius: 7, cursor: "pointer",
                 fontFamily: "inherit", fontSize: 12, background: "#1e1e24", color: "#888" }}>🔍 Search</button>
-            <button onClick={handleExport} style={{ padding: "6px 12px", border: "none", borderRadius: 6, cursor: "pointer", fontFamily: "inherit", fontSize: 12, background: "#1e1e24", color: "#888" }}>⬇ Export</button>
-            <button onClick={() => importRef.current?.click()} style={{ padding: "6px 12px", border: "none", borderRadius: 6, cursor: "pointer", fontFamily: "inherit", fontSize: 12, background: "#1e1e24", color: "#888" }}>⬆ Import</button>
-            <input ref={importRef} type="file" accept=".json" onChange={handleImportRoadmap} style={{ display: "none" }} />
-            <button onClick={() => setShowManage(true)} style={{ padding: "6px 12px", border: "none", borderRadius: 6, cursor: "pointer", fontFamily: "inherit", fontSize: 12, background: "#1e1e24", color: "#888" }}>⚙️ Manage</button>
+            <button onClick={() => setShowManage(true)}
+              style={{ padding: "7px 14px", border: "none", borderRadius: 7, cursor: "pointer",
+                fontFamily: "inherit", fontSize: 12, background: "#1e1e24", color: "#888" }}>⚙️ Settings</button>
             <button onClick={() => setView(v => v === "dashboard" ? "sections" : "dashboard")}
-              style={{ padding: "6px 14px", border: "none", borderRadius: 6, cursor: "pointer", fontFamily: "inherit", fontSize: 12,
-                background: view === "dashboard" ? "#7b5ea7" : "#1e1e24", color: view === "dashboard" ? "#fff" : "#888" }}>📊 Dashboard</button>
+              style={{ padding: "7px 14px", border: "none", borderRadius: 7, cursor: "pointer", fontFamily: "inherit", fontSize: 12,
+                background: view === "dashboard" ? "#1e1e2f" : "#1e1e24",
+                color: view === "dashboard" ? "#c4b5fd" : "#888",
+                borderWidth: 1, borderStyle: "solid",
+                borderColor: view === "dashboard" ? "#7b5ea744" : "transparent" }}>📊 Dashboard</button>
+            <button onClick={() => setPracticeOpen(o => !o)}
+              style={{ padding: "7px 16px", border: "none", borderRadius: 7, cursor: "pointer", fontFamily: "inherit", fontSize: 12, fontWeight: 700,
+                background: practiceOpen ? "#7b5ea7" : "linear-gradient(135deg, #7b5ea7, #4361ee)",
+                color: "#fff" }}>🤖 Practice</button>
+            <input ref={importRef} type="file" accept=".json" onChange={handleImportRoadmap} style={{ display: "none" }} />
           </div>
         </div>
 

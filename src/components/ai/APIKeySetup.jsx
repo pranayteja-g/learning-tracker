@@ -70,12 +70,12 @@ function UsageBar({ usage, limit, pct, onReset }) {
   );
 }
 
-export function APIKeySetup({ config, onSave, usage, limit, pct, onResetUsage, onSaveLimit }) {
+export function APIKeySetup({ config, onSave, usage = {}, limit = {}, pct = 0, onResetUsage, onSaveLimit }) {
   const [provider,   setProvider]   = useState(config.provider || "groq");
   const [keys,       setKeys]       = useState(config.keys || {});
   const [visible,    setVisible]    = useState({});
-  const [limitOn,    setLimitOn]    = useState(limit.enabled);
-  const [limitVal,   setLimitVal]   = useState(limit.dailyTokenLimit);
+  const [limitOn,    setLimitOn]    = useState(limit.enabled ?? false);
+  const [limitVal,   setLimitVal]   = useState(limit.dailyTokenLimit ?? 100000);
   const [customVal,  setCustomVal]  = useState("");
   const [showCustom, setShowCustom] = useState(false);
 
