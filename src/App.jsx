@@ -436,7 +436,7 @@ export default function App() {
           {(() => {
             const active = ["roadmaps","sections","topics","nextup"].includes(mobileScreen);
             return (
-              <button onClick={() => setMobileScreen(rmKey ? "sections" : "roadmaps")}
+              <button onClick={() => setMobileScreen("roadmaps")}
                 style={{ flex: 1, padding: "10px 4px 12px", border: "none", background: "transparent",
                   color: active ? (rm?.color || "#7b5ea7") : "#555", cursor: "pointer", fontFamily: "inherit",
                   borderTop: active ? `2px solid ${rm?.color || "#7b5ea7"}` : "2px solid transparent" }}>
