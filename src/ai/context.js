@@ -46,18 +46,24 @@ export function buildExplainContext({ roadmap, topic, sectionKey, notes, resourc
   };
 }
 
-export function buildStudyPlanContext({ roadmap, progress }) {
+export function buildStudyPlanContext({ roadmap, progress, quizResults = {} }) {
   const rmId = roadmap.id;
-  let completed = [], upcoming = [];
+  let completed = [], upcoming = [], weak = [], strong = [];
 
   for (const [sec, ts] of Object.entries(roadmap.sections)) {
     for (const t of flatTopicNames(ts)) {
-      if (progress[`${rmId}::${t}`]) completed.push({ topic: t, section: sec });
+      const done = progress[`${rmId}::${t}`];
+      const qr   = quizResults[`${rmId}::${t}`];
+      if (done) completed.push({ topic: t, section: sec });
       else upcoming.push({ topic: t, section: sec });
+      if (qr?.attempts > 0) {
+        if (qr.bestScore < 60)  weak.push({ topic: t, section: sec, score: qr.bestScore });
+        if (qr.bestScore >= 80) strong.push({ topic: t, section: sec, score: qr.bestScore });
+      }
     }
   }
 
-  const totalTopics  = completed.length + upcoming.length;
+  const totalTopics = completed.length + upcoming.length;
   const pct = totalTopics ? Math.round((completed.length / totalTopics) * 100) : 0;
 
   return {
@@ -65,7 +71,10 @@ export function buildStudyPlanContext({ roadmap, progress }) {
     completedCount: completed.length,
     totalCount: totalTopics,
     progressPct: pct,
-    recentCompleted: completed.slice(-5),   // last 5 done
-    nextUpcoming: upcoming.slice(0, 15),    // next 15 to do
+    recentCompleted: completed.slice(-5),
+    nextUpcoming: upcoming.slice(0, 15),
+    weakTopics:  weak.slice(0, 8),
+    strongTopics: strong.slice(0, 8),
+    hasQuizData: weak.length > 0 || strong.length > 0,
   };
 }

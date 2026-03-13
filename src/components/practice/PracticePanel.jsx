@@ -52,7 +52,7 @@ function safeJSON(text) {
 function fmt(n) { return n >= 1000 ? (n/1000).toFixed(1).replace(/\.0$/,"")+"k" : String(n); }
 
 export function PracticePanel({ open, onClose, roadmap, roadmaps, progress, notes, resources,
-  topicMeta, curSection, isMobile, onSaveToNotes, onQuizComplete }) {
+  topicMeta, curSection, isMobile, onSaveToNotes, onQuizComplete, quizResults = {} }) {
 
   const [tab,          setTab]          = useState("study");
   const [studyMode,    setStudyMode]    = useState("quiz");
@@ -68,7 +68,7 @@ export function PracticePanel({ open, onClose, roadmap, roadmaps, progress, note
   const [error,        setError]        = useState("");
   const [aiConfig,     setAIConfig]     = useState(loadAIConfig);
 
-  const { usage, limit, recordUsage, isOverLimit, pct } = useUsage();
+  const { usage, limit, recordUsage, saveLimit, resetUsage, isOverLimit, pct } = useUsage();
   const rm      = roadmap;
   const hasKey  = !!aiConfig.keys?.[aiConfig.provider]?.trim();
   const barColor = pct >= 90 ? "#e05252" : pct >= 70 ? "#ee9b00" : "#52b788";
@@ -100,7 +100,7 @@ export function PracticePanel({ open, onClose, roadmap, roadmaps, progress, note
             notes: notes[`${rm.id}::${explainTopic}`], resources: resources[`${rm.id}::${explainTopic}`] });
           userPrompt = buildExplainPrompt(ctx);
         } else if (studyMode === "studyplan") {
-          const ctx = buildStudyPlanContext({ roadmap: rm, progress });
+          const ctx = buildStudyPlanContext({ roadmap: rm, progress, quizResults });
           userPrompt = buildStudyPlanPrompt(ctx);
         }
       } else if (tab === "interview") {
@@ -209,7 +209,9 @@ export function PracticePanel({ open, onClose, roadmap, roadmaps, progress, note
             <div style={{ padding: "16px 18px" }}>
               <APIKeySetup config={aiConfig}
                 onSave={cfg => { saveAIConfig(cfg); setAIConfig(cfg); switchTab("study"); }}
-                onCancel={() => switchTab("study")} />
+                usage={usage} limit={limit} pct={pct}
+                onResetUsage={resetUsage}
+                onSaveLimit={saveLimit} />
             </div>
           )}
 

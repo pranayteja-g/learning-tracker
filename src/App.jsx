@@ -35,7 +35,7 @@ export default function App() {
   const [practiceOpen,   setPracticeOpen]   = useState(false);
   const [searchOpen,     setSearchOpen]     = useState(false);
   const { streak, recordActivity, studiedToday } = useStreak();
-  const { recordQuizResult, hasPassedTopic }  = useQuizResults();
+  const { results: quizResults, recordQuizResult, hasPassedTopic } = useQuizResults();
   const importRef = useRef(null);
 
   const showFeedback = (ok, msg) => {
@@ -296,6 +296,7 @@ export default function App() {
                         resources={resources} topicMeta={topicMeta} onSave={saveNote} onClose={() => setNoteModal(null)} />}
       {showManage  && <ManageModal roadmaps={roadmaps} onClose={() => setShowManage(false)}
                         onImportRoadmap={handleImportRoadmap} onDelete={handleDeleteRoadmap}
+                        onExportBackup={handleExport} onImportBackup={handleImportBackup}
                         onEdit={r => { setEditorModal({ existing: r }); setShowManage(false); }}
                         onCreate={() => { setEditorModal({ existing: null }); setShowManage(false); }} />}
       {editorModal !== null && <RoadmapEditorModal existing={editorModal.existing}
@@ -303,7 +304,8 @@ export default function App() {
       <PracticePanel open={practiceOpen} onClose={() => setPracticeOpen(false)}
         roadmap={rm} roadmaps={roadmaps} progress={progress}
         notes={notes} resources={resources} topicMeta={topicMeta} curSection={curSec} isMobile={isMobile}
-        onSaveToNotes={appendToNote} onQuizComplete={recordQuizResult} />
+        onSaveToNotes={appendToNote} quizResults={quizResults}
+        onQuizComplete={(rmId, topics, score, total) => { recordQuizResult(rmId, topics, score, total); recordActivity(); }} />
 
     </>
   );
@@ -349,7 +351,7 @@ export default function App() {
 
         {mobileScreen === "dashboard" && (
           <Dashboard roadmaps={roadmaps} progress={progress} notes={notes} resources={resources}
-            topicMeta={topicMeta} isMobile={true} onOpenRoadmap={goToRoadmap} />
+            topicMeta={topicMeta} isMobile={true} onOpenRoadmap={goToRoadmap} quizResults={quizResults} />
         )}
 
         {mobileScreen === "roadmaps" && (
@@ -519,7 +521,7 @@ export default function App() {
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
           <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
             <h1 style={{ margin: 0, fontSize: 19, fontWeight: 700, letterSpacing: "-0.5px", color: "#fff" }}>Learning Tracker</h1>
-            <span style={{ fontSize: 11, color: "#555", fontFamily: "monospace" }}>GYPTOR</span>
+            <span style={{ fontSize: 11, color: "#555", fontFamily: "monospace" }}>roadmap.sh</span>
           </div>
           <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
             <StreakBadge streak={{ ...streak, studiedToday }} isMobile={false} />
@@ -564,7 +566,7 @@ export default function App() {
 
       {view === "dashboard" && (
         <Dashboard roadmaps={roadmaps} progress={progress} notes={notes} resources={resources}
-          topicMeta={topicMeta} isMobile={false}
+          topicMeta={topicMeta} isMobile={false} quizResults={quizResults}
           onOpenRoadmap={(key) => { setActiveRoadmap(key); setView("sections"); setActiveSection(null); }} />
       )}
 

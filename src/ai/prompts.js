@@ -143,20 +143,31 @@ IMPORTANT for codeExample:
 export function buildStudyPlanPrompt(ctx) {
   const completed = ctx.recentCompleted.map(t => `- ${t.topic}`).join("\n") || "None yet";
   const upcoming  = ctx.nextUpcoming.map(t => `- ${t.topic} (${t.section})`).join("\n");
+  const weakBlock  = ctx.hasQuizData && ctx.weakTopics?.length
+    ? `\nTopics with LOW quiz scores (prioritise review):\n${ctx.weakTopics.map(t => `- ${t.topic} (${t.score}%)`).join("\n")}`
+    : "";
+  const strongBlock = ctx.hasQuizData && ctx.strongTopics?.length
+    ? `\nTopics already mastered (skip or briefly revisit):\n${ctx.strongTopics.map(t => `- ${t.topic} (${t.score}%)`).join("\n")}`
+    : "";
+
   return `Create a personalized study plan for a learner studying "${ctx.roadmapName}".
 
 Current progress: ${ctx.completedCount}/${ctx.totalCount} topics (${ctx.progressPct}% complete)
 
-Recently completed topics:
+Recently completed:
 ${completed}
 
 Upcoming topics (in order):
 ${upcoming}
+${weakBlock}
+${strongBlock}
 
-Create a realistic study plan. Respond with ONLY valid JSON, no other text:
+${ctx.hasQuizData ? "IMPORTANT: Prioritise weak quiz topics in the plan. Skip or shorten time on mastered topics." : ""}
+
+Respond with ONLY valid JSON:
 {
-  "assessment": "2-3 sentence assessment of where they are and what level they're at",
-  "weeklyGoal": "A realistic goal for this week based on their progress",
+  "assessment": "2-3 sentence assessment of where they are${ctx.hasQuizData ? ", referencing their quiz performance" : ""}",
+  "weeklyGoal": "A realistic goal for this week",
   "dailyPlan": [
     { "day": "Day 1", "focus": "topic or group", "goal": "what to achieve", "estimatedTime": "X hours" },
     { "day": "Day 2", "focus": "...", "goal": "...", "estimatedTime": "..." },
@@ -165,7 +176,7 @@ Create a realistic study plan. Respond with ONLY valid JSON, no other text:
     { "day": "Day 5", "focus": "...", "goal": "...", "estimatedTime": "..." }
   ],
   "tips": ["tip 1", "tip 2", "tip 3"],
-  "milestone": "What completing this week's plan unlocks or sets up for next week"
+  "milestone": "What completing this week's plan unlocks"
 }`;
 }
 
