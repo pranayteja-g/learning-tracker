@@ -15,7 +15,7 @@ function ScoreBar({ score }) {
   );
 }
 
-function TopicPill({ topic, rmLabel, rmColor, rmAccent, bestScore, passed }) {
+function TopicPill({ topic, rmLabel, rmColor, rmAccent, bestScore, passed, stars = 0 }) {
   const scoreColor = bestScore >= 70 ? "#52b788" : bestScore >= 50 ? "#ee9b00" : "#e05252";
   return (
     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center",
@@ -27,8 +27,10 @@ function TopicPill({ topic, rmLabel, rmColor, rmAccent, bestScore, passed }) {
         <div style={{ fontSize: 10, color: rmAccent, marginTop: 1 }}>{rmLabel}</div>
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
-        {passed && <span style={{ fontSize: 10 }}>⭐</span>}
-        <span style={{ fontSize: 12, fontWeight: 700, color: scoreColor }}>{bestScore}%</span>
+        {stars > 0
+          ? <span style={{ fontSize: 11, letterSpacing: -2 }}>{"⭐".repeat(stars)}</span>
+          : passed && <span style={{ fontSize: 10, color: "#555" }}>○</span>}
+        <span style={{ fontSize: 12, fontWeight: 700, color: scoreColor, marginLeft: 4 }}>{bestScore}%</span>
       </div>
     </div>
   );

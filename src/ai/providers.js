@@ -37,19 +37,19 @@ export function saveAIConfig(config) {
 
 // ── Call the AI ───────────────────────────────────────────────────────────────
 // Always returns { text, usage: { promptTokens, completionTokens } }
-export async function callAI({ provider, apiKey, systemPrompt, userPrompt, messages = [], temperature = 0.7 }) {
-  if (provider === "gemini") return callGemini({ apiKey, systemPrompt, userPrompt, messages, temperature });
-  if (provider === "groq")   return callGroq({ apiKey, systemPrompt, userPrompt, messages, temperature });
+export async function callAI({ provider, apiKey, systemPrompt, userPrompt, messages = [], temperature = 0.7, maxTokens = 4096 }) {
+  if (provider === "gemini") return callGemini({ apiKey, systemPrompt, userPrompt, messages, temperature, maxTokens });
+  if (provider === "groq")   return callGroq({ apiKey, systemPrompt, userPrompt, messages, temperature, maxTokens });
   throw new Error("Unknown provider: " + provider);
 }
 
-async function callGemini({ apiKey, systemPrompt, userPrompt, messages = [], temperature = 0.7 }) {
+async function callGemini({ apiKey, systemPrompt, userPrompt, messages = [], temperature = 0.7, maxTokens = 4096 }) {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
   const history = messages.map(m => ({ role: m.role === "assistant" ? "model" : "user", parts: [{ text: m.content }] }));
   const body = {
     system_instruction: { parts: [{ text: systemPrompt }] },
     contents: [...history, { role: "user", parts: [{ text: userPrompt }] }],
-    generationConfig: { temperature, maxOutputTokens: 2048 },
+    generationConfig: { temperature, maxOutputTokens: maxTokens },
   };
   const res = await fetch(url, {
     method: "POST",
@@ -72,7 +72,7 @@ async function callGemini({ apiKey, systemPrompt, userPrompt, messages = [], tem
   };
 }
 
-async function callGroq({ apiKey, systemPrompt, userPrompt, messages = [], temperature = 0.7 }) {
+async function callGroq({ apiKey, systemPrompt, userPrompt, messages = [], temperature = 0.7, maxTokens = 4096 }) {
   const history = messages.map(m => ({ role: m.role, content: m.content }));
   const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
@@ -88,7 +88,7 @@ async function callGroq({ apiKey, systemPrompt, userPrompt, messages = [], tempe
         { role: "user",   content: userPrompt },
       ],
       temperature,
-      max_tokens: 2048,
+      max_tokens: maxTokens,
     }),
   });
   if (!res.ok) {
@@ -96,8 +96,12 @@ async function callGroq({ apiKey, systemPrompt, userPrompt, messages = [], tempe
     throw new Error(err?.error?.message || `Groq error ${res.status}`);
   }
   const data = await res.json();
-  const text = data.choices?.[0]?.message?.content || "";
-  // Groq returns exact token counts — perfectly accurate
+  const choice = data.choices?.[0];
+  const text = choice?.message?.content || "";
+  // Log finish reason to diagnose truncation
+  if (choice?.finish_reason && choice.finish_reason !== "stop") {
+    console.warn("[Groq] finish_reason:", choice.finish_reason, "| completion_tokens:", data.usage?.completion_tokens, "| max_tokens sent:", maxTokens);
+  }
   const u = data.usage || {};
   return {
     text,
