@@ -6,9 +6,11 @@ import {
   SYSTEM_PROMPT, INTERVIEW_SYSTEM_PROMPT,
   buildQuizPrompt, buildQuestionnairePrompt, buildExplainPrompt, buildStudyPlanPrompt,
   buildInterviewQuestionsPrompt, buildFlashcardsPrompt, buildCheatSheetPrompt,
+  buildCodeChallengePrompt,
 } from "../../ai/prompts.js";
 import { buildQuizContext, buildQuestionnaireContext, buildExplainContext, buildStudyPlanContext } from "../../ai/context.js";
 import { QuizView }          from "../ai/QuizView.jsx";
+import { CodeWriteView }     from "../ai/CodeWriteView.jsx";
 import { QuestionnaireView } from "../ai/QuestionnaireView.jsx";
 import { ExplainView }       from "../ai/ExplainView.jsx";
 import { StudyPlanView }     from "../ai/StudyPlanView.jsx";
@@ -108,6 +110,10 @@ export function PracticePanel({ open, onClose, roadmap, roadmaps, progress, note
         } else if (studyMode === "studyplan") {
           const ctx = buildStudyPlanContext({ roadmap: rm, progress, quizResults });
           userPrompt = buildStudyPlanPrompt(ctx);
+        } else if (studyMode === "code") {
+          const ctx = buildQuizContext({ roadmap: rm, progress, scope, sectionKey: curSection });
+          if (!ctx.topics.length) throw new Error("No topics for this scope.");
+          userPrompt = buildCodeChallengePrompt(ctx, qCount, difficulty);
         }
       } else if (tab === "interview") {
         const scope_rms = selRmKeys.length > 0
@@ -413,7 +419,9 @@ export function PracticePanel({ open, onClose, roadmap, roadmaps, progress, note
               </div>
               {result.tab === "study" && result.studyMode === "quiz" &&
                 <QuizView questions={result.data} rm={rm}
-                  onQuizComplete={(score, total) => onQuizComplete?.(rm?.id, result.data.map(q=>q.topic).filter(Boolean), score, total)} />}
+                  onQuizComplete={(score, total) => onQuizComplete?.(rm?.id, result.data.map(q=>q.topic).filter(Boolean), score, total, difficulty)} />}
+              {result.tab === "study" && result.studyMode === "code" &&
+                <CodeWriteView questions={result.data} rm={rm} />}
               {result.tab === "study" && result.studyMode === "questionnaire" && <QuestionnaireView questions={result.data} rm={rm} />}
               {result.tab === "study" && result.studyMode === "explain" &&
                 <ExplainView data={result.data} rm={rm} topic={explainTopic}

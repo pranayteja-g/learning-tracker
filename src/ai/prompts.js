@@ -43,7 +43,9 @@ Other rules:
 - Exactly one option is correct
 - Cover different topics, not the same one repeatedly
 - Tag each question with the specific topic it tests
-- For code-related topics: include code snippet questions where appropriate
+- For code-related topics: at least 40% of questions MUST include a code snippet (reading, tracing, completing, or spotting bugs)
+- Code snippet questions are the most valuable — prefer them over pure definition questions
+- When a question includes code, use a code fence: start with \`\`\`java on its own line, then the code with real newlines, then \`\`\` on its own line — never inline code as plain text
 
 Respond with ONLY a JSON array, no other text:
 [
@@ -188,6 +190,36 @@ Respond with ONLY valid JSON, no other text:
   ],
   "milestone": "What they unlock after this week — specific about what they can build or do"
 }`;
+}
+
+
+// ── Code challenge prompt ─────────────────────────────────────────────────────
+export function buildCodeChallengePrompt(ctx, count, difficulty = "medium") {
+  const topicList = ctx.topics.map(t => `- ${t.topic} (${t.section})`).join("\n");
+
+  return `Generate exactly ${count} coding challenges for a learner studying "${ctx.roadmapName}".
+
+Topics to cover:
+${topicList}
+
+Difficulty: ${difficulty}
+- easy: simple one-function tasks, basic syntax, straightforward logic
+- medium: multi-step logic, combining concepts, real-world mini-tasks  
+- hard: edge cases, optimization, debugging broken code, design decisions
+
+Each challenge must be solvable in 5-20 lines. Do NOT ask them to build full apps.
+
+Respond with ONLY a JSON array, no other text:
+[
+  {
+    "question": "Clear task description. If they need to trace/fix code, include it as a code fence: \`\`\`java\ncode\n\`\`\`",
+    "language": "java | python | javascript | etc",
+    "difficulty": "easy | medium | hard",
+    "topic": "the specific topic this tests",
+    "expectedBehaviour": "What correct code should do/output — be specific",
+    "hints": "One optional hint (or null)"
+  }
+]`;
 }
 
 // ── Roadmap categories ───────────────────────────────────────────────────────

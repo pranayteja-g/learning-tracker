@@ -35,7 +35,7 @@ export default function App() {
   const [practiceOpen,   setPracticeOpen]   = useState(false);
   const [searchOpen,     setSearchOpen]     = useState(false);
   const { streak, recordActivity, studiedToday } = useStreak();
-  const { results: quizResults, recordQuizResult, hasPassedTopic } = useQuizResults();
+  const { results: quizResults, recordQuizResult, hasPassedTopic, getStars } = useQuizResults();
   const importRef = useRef(null);
 
   const showFeedback = (ok, msg) => {
@@ -247,7 +247,7 @@ export default function App() {
       {rm.sections[sectionKey]?.map(topic => (
         <TopicCard key={topicName(topic)} topic={topic} rmKey={rmKey} rm={rm}
           progress={progress} notes={notes} resources={resources} topicMeta={topicMeta}
-          hasPassedQuiz={hasPassedTopic} onToggle={toggle} onOpenNote={openNote}
+          hasPassedQuiz={hasPassedTopic} getStars={getStars} onToggle={toggle} onOpenNote={openNote}
           onToggleCollapse={(parentName, subName) => handleToggleCollapse(sectionKey, parentName, subName)} />
       ))}
     </div>
@@ -500,7 +500,7 @@ export default function App() {
         roadmap={rm} roadmaps={roadmaps} progress={progress}
         notes={notes} resources={resources} topicMeta={topicMeta} curSection={curSec} isMobile={isMobile}
         onSaveToNotes={appendToNote} quizResults={quizResults}
-        onQuizComplete={(rmId, topics, score, total) => { recordQuizResult(rmId, topics, score, total); recordActivity(); }} />
+        onQuizComplete={(rmId, topics, score, total, difficulty) => { recordQuizResult(rmId, topics, score, total, difficulty); recordActivity(); }} />
       </div>
     );
   }
@@ -652,7 +652,7 @@ export default function App() {
         roadmap={rm} roadmaps={roadmaps} progress={progress}
         notes={notes} resources={resources} topicMeta={topicMeta} curSection={curSec} isMobile={isMobile}
         onSaveToNotes={appendToNote} quizResults={quizResults}
-        onQuizComplete={(rmId, topics, score, total) => { recordQuizResult(rmId, topics, score, total); recordActivity(); }} />
+        onQuizComplete={(rmId, topics, score, total, difficulty) => { recordQuizResult(rmId, topics, score, total, difficulty); recordActivity(); }} />
     </div>
   );
 }

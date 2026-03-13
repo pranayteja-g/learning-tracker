@@ -85,8 +85,14 @@ function TopicRow({ name, rmKey, rm, isDone, hasNote, hasMeta, hasResources,
             <span style={{ fontSize: 10, color: rm.accent, background: rm.color + "20",
               padding: "2px 6px", borderRadius: 4 }}>note</span>
           )}
-          {hasPassed && !isParent && (
-            <span title="Quiz passed" style={{ fontSize: 13 }}>⭐</span>
+          {stars > 0 && !isParent && (
+            <span title={`${stars === 3 ? "Mastered" : stars === 2 ? "Advanced" : "Passed"} (${stars}/3 stars)`}
+              style={{ fontSize: 12, letterSpacing: -2 }}>
+              {"⭐".repeat(stars)}
+            </span>
+          )}
+          {hasPassed && stars === 0 && !isParent && (
+            <span title="Attempted" style={{ fontSize: 11, color: "#555" }}>○</span>
           )}
           <button
             onClick={e => { e.stopPropagation(); onOpenNote(rmKey, name); }}
@@ -111,7 +117,7 @@ function TopicRow({ name, rmKey, rm, isDone, hasNote, hasMeta, hasResources,
 
 // ── Main TopicCard ─────────────────────────────────────────────────────────────
 export function TopicCard({ topic, rmKey, rm, progress, notes, resources, topicMeta,
-  onToggle, onOpenNote, onToggleCollapse, hasPassedQuiz }) {
+  onToggle, onOpenNote, onToggleCollapse, hasPassedQuiz, getStars }) {
 
   const name     = topicName(topic);
   const expanded = isExpanded(topic);
@@ -128,7 +134,7 @@ export function TopicCard({ topic, rmKey, rm, progress, notes, resources, topicM
         hasMeta={topicMeta?.[`${rmKey}::${name}`] || {}}
         hasResources={(resources?.[`${rmKey}::${name}`] || []).length > 0}
         onToggle={onToggle} onOpenNote={onOpenNote}
-        hasPassed={hasPassedQuiz?.(rmKey, name)} />
+        hasPassed={hasPassedQuiz?.(rmKey, name)} stars={getStars?.(rmKey, name) || 0} />
     );
   }
 
@@ -168,7 +174,7 @@ export function TopicCard({ topic, rmKey, rm, progress, notes, resources, topicM
                   hasMeta={topicMeta?.[`${rmKey}::${stName}`] || {}}
                   hasResources={(resources?.[`${rmKey}::${stName}`] || []).length > 0}
                   onToggle={onToggle} onOpenNote={onOpenNote}
-                  hasPassed={hasPassedQuiz?.(rmKey, stName)} />
+                  hasPassed={hasPassedQuiz?.(rmKey, stName)} stars={getStars?.(rmKey, stName) || 0} />
               );
             }
 
@@ -198,7 +204,7 @@ export function TopicCard({ topic, rmKey, rm, progress, notes, resources, topicM
                           hasMeta={topicMeta?.[`${rmKey}::${sstName}`] || {}}
                           hasResources={(resources?.[`${rmKey}::${sstName}`] || []).length > 0}
                           onToggle={onToggle} onOpenNote={onOpenNote}
-                          hasPassed={hasPassedQuiz?.(rmKey, sstName)} />
+                          hasPassed={hasPassedQuiz?.(rmKey, sstName)} stars={getStars?.(rmKey, sstName) || 0} />
                       );
                     })}
                   </div>
