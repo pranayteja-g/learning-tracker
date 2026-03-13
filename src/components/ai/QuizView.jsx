@@ -156,29 +156,27 @@ export function QuizView({ questions, rm, onQuizComplete }) {
             fontSize: 13, cursor: current === 0 ? "default" : "pointer", fontFamily: "inherit" }}>
           ← Prev
         </button>
-        {current < totalQ - 1
-          ? <button onClick={() => setCurrent(c => c + 1)}
-              style={{ flex: 1, padding: "9px", background: rm.color + "22",
-                border: `1px solid ${rm.color}44`, borderRadius: 7, color: rm.accent,
-                fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>
-              Next →
-            </button>
-          : <button onClick={() => { setSubmitted(true); onQuizComplete?.(score, totalQ); }}
-              disabled={Object.keys(answers).length < totalQ}
-              style={{ flex: 1, padding: "9px",
-                background: Object.keys(answers).length < totalQ ? "#1e1e24" : rm.color,
-                border: "none", borderRadius: 7,
-                color: Object.keys(answers).length < totalQ ? "#444" : "#fff",
-                fontSize: 13, fontWeight: 600,
-                cursor: Object.keys(answers).length < totalQ ? "default" : "pointer",
-                fontFamily: "inherit" }}>
-              Submit
-            </button>
-        }
+        {current < totalQ - 1 && (
+          <button onClick={() => setCurrent(c => c + 1)}
+            style={{ flex: 1, padding: "9px", background: rm.color + "22",
+              border: `1px solid ${rm.color}44`, borderRadius: 7, color: rm.accent,
+              fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>
+            Next →
+          </button>
+        )}
       </div>
-      {Object.keys(answers).length < totalQ && current === totalQ - 1 && (
-        <div style={{ fontSize: 11, color: "#555", textAlign: "center", marginTop: 8 }}>
-          Answer all questions to submit
+
+      {/* Persistent submit — appears as soon as all answered */}
+      {Object.keys(answers).length === totalQ ? (
+        <button onClick={() => { const s = questions.filter((q,i) => answers[i] === q.answer).length; setSubmitted(true); onQuizComplete?.(s, totalQ); }}
+          style={{ width: "100%", marginTop: 12, padding: "12px", background: rm.color,
+            border: "none", borderRadius: 8, color: "#fff", fontSize: 14,
+            fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+          Submit Quiz ✓
+        </button>
+      ) : (
+        <div style={{ marginTop: 10, fontSize: 11, color: "#555", textAlign: "center" }}>
+          {Object.keys(answers).length}/{totalQ} answered
         </div>
       )}
     </div>
