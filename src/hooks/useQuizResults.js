@@ -3,12 +3,22 @@ import { idbGet, idbSet } from "../storage/db.js";
 
 const KEY = "learning-tracker-quiz-results-v1";
 
+/**
+ * Star logic:
+ * ⭐⭐⭐ = Hard mode, 100% score, achieved 3 separate times
+ * No stars for Easy or Medium — those are practice only.
+ */
+function calcStars(history) {
+  const hardPerfect = (history || []).filter(h => h.difficulty === "hard" && h.score === 100);
+  if (hardPerfect.length >= 3) return 3;
+  return 0;
+}
+
 export function useQuizResults() {
   const [results, setResults] = useState({});
   const [loaded,  setLoaded]  = useState(false);
   const skipSave = useRef(true);
 
-  // Load from IDB on mount
   useEffect(() => {
     idbGet(KEY).then(stored => {
       if (stored) setResults(stored);
@@ -17,34 +27,35 @@ export function useQuizResults() {
     });
   }, []);
 
-  // Persist on change
   useEffect(() => {
     if (!loaded) return;
     idbSet(KEY, results);
   }, [results, loaded]);
 
-  const recordQuizResult = useCallback((rmId, topics, score, total) => {
-    const pct    = Math.round((score / total) * 100);
-    const passed = pct >= 70;
-    const today  = new Date().toISOString().slice(0, 10);
+  const recordQuizResult = useCallback((rmId, topics, score, total, difficulty = "mixed") => {
+    const pct   = Math.round((score / total) * 100);
+    const today = new Date().toISOString().slice(0, 10);
 
     setResults(prev => {
       const next = { ...prev };
       for (const topic of topics) {
         const k   = `${rmId}::${topic}`;
-        const old = prev[k] || { passed: false, bestScore: 0, attempts: 0, lastDate: null, history: [] };
+        const old = prev[k] || { stars: 0, bestScore: 0, attempts: 0, lastDate: null, history: [] };
+        const newHistory = [...(old.history || []).slice(-19), { score: pct, date: today, difficulty }];
         next[k] = {
-          passed:    old.passed || passed,
-          bestScore: Math.max(old.bestScore, pct),
-          attempts:  old.attempts + 1,
+          stars:     calcStars(newHistory),
+          bestScore: Math.max(old.bestScore || 0, pct),
+          attempts:  (old.attempts || 0) + 1,
           lastDate:  today,
-          history:   [...(old.history || []).slice(-9), { score: pct, date: today }],
+          history:   newHistory,
+          // keep legacy passed field for backwards compat
+          passed:    pct >= 70,
         };
       }
       return next;
     });
 
-    return { pct, passed };
+    return { pct, passed: pct >= 70 };
   }, []);
 
   const getTopicResult = useCallback((rmId, topic) => {
@@ -52,8 +63,12 @@ export function useQuizResults() {
   }, [results]);
 
   const hasPassedTopic = useCallback((rmId, topic) => {
-    return !!results[`${rmId}::${topic}`]?.passed;
+    return (results[`${rmId}::${topic}`]?.stars || 0) > 0;
   }, [results]);
 
-  return { results, recordQuizResult, getTopicResult, hasPassedTopic };
+  const getStars = useCallback((rmId, topic) => {
+    return results[`${rmId}::${topic}`]?.stars || 0;
+  }, [results]);
+
+  return { results, recordQuizResult, getTopicResult, hasPassedTopic, getStars };
 }
