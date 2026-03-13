@@ -57,10 +57,17 @@ function safeJSON(text) {
 
   // Try full parse first
   try {
-    const arrMatch = cleaned.match(/\[\s*[\s\S]*\]/);
-    const objMatch = cleaned.match(/\{\s*[\s\S]*\}/);
-    if (arrMatch) cleaned = arrMatch[0];
-    else if (objMatch) cleaned = objMatch[0];
+    // Find the first { or [ to determine response type, then extract accordingly
+    const firstBrace  = cleaned.indexOf("{");
+    const firstBracket = cleaned.indexOf("[");
+    const isArray = firstBracket !== -1 && (firstBrace === -1 || firstBracket < firstBrace);
+    if (isArray) {
+      const match = cleaned.match(/\[[\s\S]*\]/);
+      if (match) cleaned = match[0];
+    } else {
+      const match = cleaned.match(/\{[\s\S]*\}/);
+      if (match) cleaned = match[0];
+    }
     return JSON.parse(cleaned);
   } catch (_) {}
 
