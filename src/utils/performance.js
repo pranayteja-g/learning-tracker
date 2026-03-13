@@ -19,7 +19,6 @@ export function getPerformanceStats(roadmaps, results) {
 
       for (const topic of topics) {
         const r = results[`${rm.id}::${topic}`];
-        secStats.total++;
         rmStats.total++;
 
         if (r && r.attempts > 0) {
