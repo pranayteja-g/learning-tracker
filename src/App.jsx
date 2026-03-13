@@ -242,7 +242,7 @@ export default function App() {
   );
 
   // ── Shared: Topic list ─────────────────────────────────────────────────────
-  const TopicList = ({ sectionKey }) => (
+  const renderTopicList = (sectionKey) => (
     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
       {rm.sections[sectionKey]?.map(topic => (
         <TopicCard key={topicName(topic)} topic={topic} rmKey={rmKey} rm={rm}
@@ -254,7 +254,7 @@ export default function App() {
   );
 
   // ── Shared: Next-up list ───────────────────────────────────────────────────
-  const NextUpList = () => (
+  const renderNextUpList = () => (
     <div>
       {nextUp.length === 0
         ? <div style={{ color: rm.accent, fontSize: 15 }}>🎉 Roadmap complete!</div>
@@ -417,14 +417,14 @@ export default function App() {
                 {flatTopicNames(rm.sections[curSec] || []).every(t => progress[`${rmKey}::${t}`]) ? "Uncheck all" : "Check all"}
               </button>
             </div>
-            <TopicList sectionKey={curSec} />
+            {renderTopicList(curSec)}
           </div>
         )}
 
         {mobileScreen === "nextup" && rm && (
           <div style={{ padding: "16px", paddingBottom: "80px" }}>
             <p style={{ color: "#555", fontSize: 13, margin: "0 0 14px" }}>Your next topics in order</p>
-            <NextUpList />
+            {renderNextUpList()}
           </div>
         )}
 
@@ -608,7 +608,7 @@ export default function App() {
               <>
                 <h2 style={{ margin: "0 0 4px", fontSize: 16, color: "#fff" }}>🎯 Next Up</h2>
                 <p style={{ color: "#555", fontSize: 12, margin: "0 0 18px" }}>Your next topics in order</p>
-                <NextUpList />
+                {renderNextUpList()}
               </>
             )}
             {view === "sections" && (
@@ -626,7 +626,7 @@ export default function App() {
                     {rm.sections[curSec]?.every(t => progress[`${rmKey}::${t}`]) ? "Uncheck all" : "Check all"}
                   </button>
                 </div>
-                <TopicList sectionKey={curSec} />
+                {renderTopicList(curSec)}
               </>
             )}
           </div>

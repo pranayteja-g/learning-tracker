@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { StorageIndicator } from "../ui/StorageIndicator.jsx";
 import { TEMPLATES } from "../../constants/templates.js";
 import { downloadJSON } from "../../utils/roadmap.js";
 import { flatTopicNames } from "../../utils/topics.js";
@@ -119,6 +120,7 @@ export function ManageModal({ roadmaps, onClose, onImportRoadmap, onDelete, onEd
           {/* ── Data tab ── */}
           {tab === "data" && (
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              <StorageIndicator />
               <div style={{ fontSize: 12, color: "#555", lineHeight: 1.6, marginBottom: 4 }}>
                 Export a full backup of all your roadmaps, progress, notes and resources.
                 Import to restore on any device.
