@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { MessageRenderer } from "./MessageRenderer.jsx";
 
 const DIFF_COLOR = { easy: "#52b788", medium: "#ee9b00", hard: "#e05252" };
 
@@ -88,7 +89,7 @@ export function QuizView({ questions, rm, onQuizComplete }) {
                   marginLeft: "auto" }}>{correct ? "✓ Correct" : "✗ Wrong"}</span>
               </div>
               <div style={{ fontSize: 13, color: "#ccc", marginBottom: 10, lineHeight: 1.5 }}>
-                <span style={{ color: "#555", marginRight: 6 }}>Q{qi+1}.</span>{q.question}
+                <span style={{ color: "#555", marginRight: 6 }}>Q{qi+1}.</span><MessageRenderer content={q.question} accentColor={rm.accent} />
               </div>
               {Object.entries(q.options).map(([opt, text]) => {
                 const c = optColors(qi, opt);
@@ -148,7 +149,7 @@ export function QuizView({ questions, rm, onQuizComplete }) {
       {/* Question */}
       <div style={{ background: "#16161b", borderRadius: 10, padding: "16px", marginBottom: 14,
         border: `1px solid ${rm.color}33` }}>
-        <div style={{ fontSize: 14, color: "#e8e6e0", lineHeight: 1.6 }}>{q.question}</div>
+        <div style={{ fontSize: 14, color: "#e8e6e0", lineHeight: 1.6 }}><MessageRenderer content={q.question} accentColor={rm.accent} /></div>
       </div>
 
       {/* Options */}
