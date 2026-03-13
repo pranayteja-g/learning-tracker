@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 
 const DIFF_COLOR = { easy: "#52b788", medium: "#ee9b00", hard: "#e05252" };
 
@@ -7,8 +7,16 @@ export function QuizView({ questions, rm, onQuizComplete }) {
   const [submitted, setSubmitted] = useState(false);
   const [current,   setCurrent]   = useState(0);
 
+  const scoreRef = useRef(null);
   const q      = questions[current];
   const totalQ = questions.length;
+
+  // Scroll score card into view immediately on submit
+  useEffect(() => {
+    if (submitted && scoreRef.current) {
+      scoreRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [submitted]);
   const score  = submitted
     ? questions.filter((q, i) => answers[i] === q.answer).length
     : 0;
@@ -32,18 +40,30 @@ export function QuizView({ questions, rm, onQuizComplete }) {
 
   if (submitted) {
     const pct = Math.round((score / totalQ) * 100);
+    const passed = score >= totalQ * 0.7;
     return (
-      <div style={{ padding: "0 20px 20px" }}>
+      <div ref={scoreRef} style={{ padding: "16px 20px 32px" }}>
         {/* Score card */}
-        <div style={{ background: "#16161b", border: `1px solid ${rm.color}44`, borderRadius: 10,
-          padding: "16px", marginBottom: 16, textAlign: "center" }}>
-          <div style={{ fontSize: 36, fontWeight: 700, color: score >= totalQ * 0.7 ? "#52b788" : "#ee9b00" }}>
-            {score}/{totalQ}
+        <div style={{ background: "#16161b", border: `2px solid ${passed ? "#52b788" : "#ee9b00"}44`,
+          borderRadius: 12, padding: "24px 16px", marginBottom: 20, textAlign: "center" }}>
+          <div style={{ fontSize: 48, marginBottom: 8 }}>
+            {score === totalQ ? "🎉" : passed ? "✅" : "📚"}
           </div>
-          <div style={{ fontSize: 12, color: "#555", marginTop: 2 }}>{pct}% correct</div>
-          <div style={{ fontSize: 13, color: "#888", marginTop: 6 }}>
-            {score === totalQ ? "Perfect! 🎉" : score >= totalQ * 0.7 ? "Great job! 👍" : "Keep studying! 📚"}
+          <div style={{ fontSize: 42, fontWeight: 700, color: passed ? "#52b788" : "#ee9b00", lineHeight: 1 }}>
+            {pct}%
           </div>
+          <div style={{ fontSize: 14, color: "#888", marginTop: 4 }}>
+            {score} of {totalQ} correct
+          </div>
+          <div style={{ fontSize: 15, fontWeight: 600, marginTop: 10,
+            color: passed ? "#52b788" : "#ee9b00" }}>
+            {score === totalQ ? "Perfect score!" : passed ? "Great job! Quiz passed ⭐" : "Keep studying — aim for 70%"}
+          </div>
+          {passed && (
+            <div style={{ fontSize: 11, color: "#52b78888", marginTop: 6 }}>
+              Topic marked as passed in your progress
+            </div>
+          )}
         </div>
 
         {/* Review */}

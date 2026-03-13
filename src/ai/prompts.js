@@ -51,7 +51,7 @@ Respond with ONLY a JSON array, no other text:
     "question": "...",
     "options": { "A": "...", "B": "...", "C": "...", "D": "..." },
     "answer": "A",
-    "explanation": "Brief explanation of why this is correct",
+    "explanation": "1-2 sentences max. State the fact directly. No restating the question, no hedging, no 'however' chains. Example: '(int)8.9 truncates to 8. Java casting drops the decimal, it does not round.'",
     "difficulty": "easy | medium | hard",
     "topic": "the specific topic this question tests"
   }
