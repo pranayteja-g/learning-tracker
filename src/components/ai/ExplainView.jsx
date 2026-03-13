@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { MessageRenderer } from "./MessageRenderer.jsx";
 import { callAI, loadAIConfig } from "../../ai/providers.js";
 import { SYSTEM_PROMPT } from "../../ai/prompts.js";
 
@@ -145,7 +146,7 @@ export function ExplainView({ data, rm, topic, rmKey, sectionKey, onSaveToNotes 
                 <pre style={{ margin: 0, padding: "13px", fontSize: 12, color: "#c9d1d9", lineHeight: 1.7,
                   fontFamily: "'Fira Code','Consolas',monospace",
                   whiteSpace: "pre", minWidth: "max-content" }}>
-                  {data.codeExample.code}
+                  {(data.codeExample.code || "").replace(/\\n/g, "\n")}
                 </pre>
               </div>
             ) : (
@@ -209,10 +210,8 @@ export function ExplainView({ data, rm, topic, rmKey, sectionKey, onSaveToNotes 
                   </div>
                 ) : (
                   <div style={{ background: "#16161b", border: "1px solid #1e1e24",
-                    borderRadius: "12px 12px 12px 4px", padding: "11px 13px",
-                    fontSize: 13, color: "#ccc", lineHeight: 1.7,
-                    whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
-                    {m.content}
+                    borderRadius: "12px 12px 12px 4px", padding: "11px 13px" }}>
+                    <MessageRenderer content={m.content} accentColor={rm.accent} />
                   </div>
                 )}
               </div>
