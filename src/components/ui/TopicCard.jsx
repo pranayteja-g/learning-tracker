@@ -3,7 +3,7 @@ import { topicName, isExpanded, isCollapsed, subtopics } from "../../utils/topic
 // ── Single checkable row ───────────────────────────────────────────────────────
 function TopicRow({ name, rmKey, rm, isDone, hasNote, hasMeta, hasResources,
   onToggle, onOpenNote, indent = 0, isParent = false, isOpen = false,
-  onToggleCollapse, subtopicCount = 0, allSubDone = false, hasPassed = false }) {
+  onToggleCollapse, subtopicCount = 0, allSubDone = false, hasPassed = false, stars = 0 }) {
 
   const meta = hasMeta || {};
   const diffColors = { easy: "#52b788", medium: "#ee9b00", hard: "#e05252" };

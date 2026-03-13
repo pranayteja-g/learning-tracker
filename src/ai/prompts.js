@@ -45,7 +45,7 @@ Other rules:
 - Tag each question with the specific topic it tests
 - For code-related topics: at least 40% of questions MUST include a code snippet (reading, tracing, completing, or spotting bugs)
 - Code snippet questions are the most valuable — prefer them over pure definition questions
-- When a question includes code, use a code fence: start with \`\`\`java on its own line, then the code with real newlines, then \`\`\` on its own line — never inline code as plain text
+- When a question includes code, wrap it in a code fence using triple backticks with the language tag and real newlines — never put code inline as plain text in the question string
 
 Respond with ONLY a JSON array, no other text:
 [
@@ -53,7 +53,7 @@ Respond with ONLY a JSON array, no other text:
     "question": "...",
     "options": { "A": "...", "B": "...", "C": "...", "D": "..." },
     "answer": "A",
-    "explanation": "1-2 sentences max. State the fact directly. No restating the question, no hedging, no 'however' chains. Example: '(int)8.9 truncates to 8. Java casting drops the decimal, it does not round.'",
+    "explanation": "Max 15 words. One fact only. Example: '(int)8.9 truncates to 8 — casting drops decimals.'",
     "difficulty": "easy | medium | hard",
     "topic": "the specific topic this question tests"
   }
@@ -212,7 +212,7 @@ Each challenge must be solvable in 5-20 lines. Do NOT ask them to build full app
 Respond with ONLY a JSON array, no other text:
 [
   {
-    "question": "Clear task description. If they need to trace/fix code, include it as a code fence: \`\`\`java\ncode\n\`\`\`",
+    "question": "Clear task description. If they need to trace/fix code, wrap it in a code fence with triple backticks and the language tag on its own line",
     "language": "java | python | javascript | etc",
     "difficulty": "easy | medium | hard",
     "topic": "the specific topic this tests",

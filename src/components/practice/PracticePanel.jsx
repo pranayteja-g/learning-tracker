@@ -29,6 +29,7 @@ const TABS = [
 
 const STUDY_MODES = [
   { id: "quiz",          label: "Quiz",       icon: "🧠", desc: "Multiple choice" },
+  { id: "code",          label: "Code",       icon: "💻", desc: "Write & evaluate" },
   { id: "questionnaire", label: "Q&A",        icon: "💬", desc: "Open ended" },
   { id: "explain",       label: "Explain",    icon: "📖", desc: "Deep dive + chat" },
   { id: "studyplan",     label: "Study Plan", icon: "📅", desc: "5-day plan" },
@@ -49,8 +50,39 @@ const TIME_OPTIONS = [
 ];
 
 function safeJSON(text) {
-  try { return JSON.parse(text.replace(/```json\n?/g,"").replace(/```\n?/g,"").trim()); }
-  catch { throw new Error("AI returned an unexpected format. Please try again."); }
+  let cleaned = (text || "")
+    .replace(/```json\n?/gi, "")
+    .replace(/```\n?/g, "")
+    .trim();
+
+  // Try full parse first
+  try {
+    const arrMatch = cleaned.match(/\[\s*[\s\S]*\]/);
+    const objMatch = cleaned.match(/\{\s*[\s\S]*\}/);
+    if (arrMatch) cleaned = arrMatch[0];
+    else if (objMatch) cleaned = objMatch[0];
+    return JSON.parse(cleaned);
+  } catch (_) {}
+
+  // Response was truncated — salvage complete objects from a partial JSON array
+  if (cleaned.trimStart().startsWith("[")) {
+    try {
+      const items = [];
+      // Extract each complete {...} object from the array
+      const objRx = /\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/g;
+      let m;
+      while ((m = objRx.exec(cleaned)) !== null) {
+        try { items.push(JSON.parse(m[0])); } catch (_) {}
+      }
+      if (items.length > 0) {
+        console.warn("[safeJSON] Salvaged " + items.length + " items from truncated response");
+        return items;
+      }
+    } catch (_) {}
+  }
+
+  console.error("[safeJSON] Failed to parse AI response:", text?.slice(0, 300));
+  throw new Error("AI returned an unexpected format. Please try again.");
 }
 function fmt(n) { return n >= 1000 ? (n/1000).toFixed(1).replace(/\.0$/,"")+"k" : String(n); }
 
@@ -138,7 +170,11 @@ export function PracticePanel({ open, onClose, roadmap, roadmaps, progress, note
       }
 
       const sys = tab === "interview" ? INTERVIEW_SYSTEM_PROMPT : SYSTEM_PROMPT;
-      const { text, usage: u } = await callAI({ provider, apiKey, systemPrompt: sys, userPrompt });
+      // JSON modes need more tokens: 15 questions × ~200 tokens each = ~3000 minimum
+      const jsonModes = ["quiz", "code", "questionnaire", "interview", "flashcards", "cheatsheet"];
+      const isJsonMode = (tab === "study" && jsonModes.includes(studyMode)) || tab === "interview";
+      const maxTokens = isJsonMode ? Math.max(8192, qCount * 400) : 2048;
+      const { text, usage: u } = await callAI({ provider, apiKey, systemPrompt: sys, userPrompt, maxTokens });
       recordUsage(u);
       setResult({ tab, studyMode, intMode, data: safeJSON(text) });
     } catch (e) {
@@ -430,7 +466,7 @@ export function PracticePanel({ open, onClose, roadmap, roadmaps, progress, note
               {result.tab === "interview" && result.intMode === "interview" && <InterviewModeView questions={result.data} rm={rm} />}
               {result.tab === "interview" && result.intMode === "flashcards" && <FlashcardView cards={result.data} rm={rm} />}
               {result.tab === "interview" && result.intMode === "cheatsheet" && <CheatSheetView data={result.data} rm={rm} />}
-              {result.tab === "interview" && result.intMode === "timed" && <TimedQuizView questions={result.data} rm={rm} totalSecs={timeSecs} />}
+              {result.tab === "interview" && result.intMode === "timed" && <TimedQuizView questions={result.data} rm={rm} timeLimitSeconds={timeSecs} onQuizComplete={(score, total) => onQuizComplete?.(rm?.id, result.data.map(q=>q.topic).filter(Boolean), score, total, "hard")} />}
             </>
           )}
         </div>

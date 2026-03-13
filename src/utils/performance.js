@@ -2,7 +2,7 @@ import { flatTopicNames } from "./topics.js";
 
 /**
  * Derives rich performance stats from raw quiz results.
- * results shape: { "rmId::topic": { passed, bestScore, attempts, lastDate, history[] } }
+ * results shape: { "rmId::topic": { passed, stars, bestScore, attempts, lastDate, history[] } }
  */
 export function getPerformanceStats(roadmaps, results) {
   const allTested   = [];
@@ -26,7 +26,7 @@ export function getPerformanceStats(roadmaps, results) {
           rmStats.attempted++;
           if (r.passed) { secStats.passed++; rmStats.passed++; }
           const entry = { topic, section: sec, rmId: rm.id, rmLabel: rm.label,
-            rmColor: rm.color, rmAccent: rm.accent, ...r };
+            rmColor: rm.color, rmAccent: rm.accent, stars: r.stars || 0, ...r };
           secStats.topics.push(entry);
           allTested.push(entry);
         } else {

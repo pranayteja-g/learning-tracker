@@ -6,7 +6,7 @@ function fmt(secs) {
   return `${m}:${s}`;
 }
 
-export function TimedQuizView({ questions, rm, timeLimitSeconds }) {
+export function TimedQuizView({ questions, rm, timeLimitSeconds, onQuizComplete }) {
   const [answers,   setAnswers]   = useState({});
   const [submitted, setSubmitted] = useState(false);
   const [current,   setCurrent]   = useState(0);
@@ -18,7 +18,7 @@ export function TimedQuizView({ questions, rm, timeLimitSeconds }) {
     if (!started || submitted) return;
     timerRef.current = setInterval(() => {
       setTimeLeft(t => {
-        if (t <= 1) { clearInterval(timerRef.current); setSubmitted(true); return 0; }
+        if (t <= 1) { clearInterval(timerRef.current); setSubmitted(true); const s = questions.filter((q,i) => answers[i] === q.answer).length; onQuizComplete?.(s, questions.length); return 0; }
         return t - 1;
       });
     }, 1000);
@@ -163,7 +163,7 @@ export function TimedQuizView({ questions, rm, timeLimitSeconds }) {
               style={{ flex: 1, padding: "9px", background: rm.color + "22",
                 border: `1px solid ${rm.color}44`, borderRadius: 7, color: rm.accent,
                 fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>Next →</button>
-          : <button onClick={() => { clearInterval(timerRef.current); setSubmitted(true); }}
+          : <button onClick={() => { clearInterval(timerRef.current); setSubmitted(true); const s = questions.filter((q,i) => answers[i] === q.answer).length; onQuizComplete?.(s, questions.length); }}
               style={{ flex: 1, padding: "9px", background: rm.color, border: "none",
                 borderRadius: 7, color: "#fff", fontSize: 13, fontWeight: 600,
                 cursor: "pointer", fontFamily: "inherit" }}>Submit</button>
