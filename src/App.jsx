@@ -283,32 +283,7 @@ export default function App() {
     </div>
   );
 
-  // ── Overlays ───────────────────────────────────────────────────────────────
-  const Overlays = () => (
-    <>
-      <style>{globalStyle}</style>
-      <SearchOverlay open={searchOpen} onClose={() => setSearchOpen(false)}
-        roadmaps={roadmaps} notes={notes} resources={resources}
-        onNavigate={handleSearchNavigate} isMobile={isMobile} />
-      <InstallPrompt />
-      {feedback    && <Toast feedback={feedback} isMobile={isMobile} />}
-      {noteModal   && <NoteModal noteModal={noteModal} roadmaps={roadmaps} notes={notes}
-                        resources={resources} topicMeta={topicMeta} onSave={saveNote} onClose={() => setNoteModal(null)} />}
-      {showManage  && <ManageModal roadmaps={roadmaps} onClose={() => setShowManage(false)}
-                        onImportRoadmap={handleImportRoadmap} onDelete={handleDeleteRoadmap}
-                        onExportBackup={handleExport} onImportBackup={handleImportBackup}
-                        onEdit={r => { setEditorModal({ existing: r }); setShowManage(false); }}
-                        onCreate={() => { setEditorModal({ existing: null }); setShowManage(false); }} />}
-      {editorModal !== null && <RoadmapEditorModal existing={editorModal.existing}
-                        onSave={handleSaveRoadmap} onClose={() => setEditorModal(null)} />}
-      <PracticePanel open={practiceOpen} onClose={() => setPracticeOpen(false)}
-        roadmap={rm} roadmaps={roadmaps} progress={progress}
-        notes={notes} resources={resources} topicMeta={topicMeta} curSection={curSec} isMobile={isMobile}
-        onSaveToNotes={appendToNote} quizResults={quizResults}
-        onQuizComplete={(rmId, topics, score, total) => { recordQuizResult(rmId, topics, score, total); recordActivity(); }} />
-
-    </>
-  );
+  // Overlays inlined directly in JSX to prevent remounting on re-render
 
   // ════════════════════════════════════════════════════════════════════════════
   // MOBILE
@@ -506,7 +481,26 @@ export default function App() {
           </button>
         </div>
 
-        <Overlays />
+              <style>{globalStyle}</style>
+      <SearchOverlay open={searchOpen} onClose={() => setSearchOpen(false)}
+        roadmaps={roadmaps} notes={notes} resources={resources}
+        onNavigate={handleSearchNavigate} isMobile={isMobile} />
+      <InstallPrompt />
+      {feedback    && <Toast feedback={feedback} isMobile={isMobile} />}
+      {noteModal   && <NoteModal noteModal={noteModal} roadmaps={roadmaps} notes={notes}
+                        resources={resources} topicMeta={topicMeta} onSave={saveNote} onClose={() => setNoteModal(null)} />}
+      {showManage  && <ManageModal roadmaps={roadmaps} onClose={() => setShowManage(false)}
+                        onImportRoadmap={handleImportRoadmap} onDelete={handleDeleteRoadmap}
+                        onExportBackup={handleExport} onImportBackup={handleImportBackup}
+                        onEdit={r => { setEditorModal({ existing: r }); setShowManage(false); }}
+                        onCreate={() => { setEditorModal({ existing: null }); setShowManage(false); }} />}
+      {editorModal !== null && <RoadmapEditorModal existing={editorModal.existing}
+                        onSave={handleSaveRoadmap} onClose={() => setEditorModal(null)} />}
+      <PracticePanel open={practiceOpen} onClose={() => setPracticeOpen(false)}
+        roadmap={rm} roadmaps={roadmaps} progress={progress}
+        notes={notes} resources={resources} topicMeta={topicMeta} curSection={curSec} isMobile={isMobile}
+        onSaveToNotes={appendToNote} quizResults={quizResults}
+        onQuizComplete={(rmId, topics, score, total) => { recordQuizResult(rmId, topics, score, total); recordActivity(); }} />
       </div>
     );
   }
@@ -639,7 +633,26 @@ export default function App() {
         </div>
       )}
 
-      <Overlays />
+            <style>{globalStyle}</style>
+      <SearchOverlay open={searchOpen} onClose={() => setSearchOpen(false)}
+        roadmaps={roadmaps} notes={notes} resources={resources}
+        onNavigate={handleSearchNavigate} isMobile={isMobile} />
+      <InstallPrompt />
+      {feedback    && <Toast feedback={feedback} isMobile={isMobile} />}
+      {noteModal   && <NoteModal noteModal={noteModal} roadmaps={roadmaps} notes={notes}
+                        resources={resources} topicMeta={topicMeta} onSave={saveNote} onClose={() => setNoteModal(null)} />}
+      {showManage  && <ManageModal roadmaps={roadmaps} onClose={() => setShowManage(false)}
+                        onImportRoadmap={handleImportRoadmap} onDelete={handleDeleteRoadmap}
+                        onExportBackup={handleExport} onImportBackup={handleImportBackup}
+                        onEdit={r => { setEditorModal({ existing: r }); setShowManage(false); }}
+                        onCreate={() => { setEditorModal({ existing: null }); setShowManage(false); }} />}
+      {editorModal !== null && <RoadmapEditorModal existing={editorModal.existing}
+                        onSave={handleSaveRoadmap} onClose={() => setEditorModal(null)} />}
+      <PracticePanel open={practiceOpen} onClose={() => setPracticeOpen(false)}
+        roadmap={rm} roadmaps={roadmaps} progress={progress}
+        notes={notes} resources={resources} topicMeta={topicMeta} curSection={curSec} isMobile={isMobile}
+        onSaveToNotes={appendToNote} quizResults={quizResults}
+        onQuizComplete={(rmId, topics, score, total) => { recordQuizResult(rmId, topics, score, total); recordActivity(); }} />
     </div>
   );
 }
