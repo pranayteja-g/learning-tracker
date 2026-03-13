@@ -17,6 +17,7 @@ import { FlashcardView }     from "../interview/FlashcardView.jsx";
 import { CheatSheetView }    from "../interview/CheatSheetView.jsx";
 import { TimedQuizView }     from "../interview/TimedQuizView.jsx";
 import { APIKeySetup }       from "../ai/APIKeySetup.jsx";
+import { StorageIndicator }  from "../ui/StorageIndicator.jsx";
 
 const TABS = [
   { id: "study",     label: "Study",     icon: "📖" },
@@ -206,7 +207,8 @@ export function PracticePanel({ open, onClose, roadmap, roadmaps, progress, note
 
           {/* Settings */}
           {tab === "settings" && (
-            <div style={{ padding: "16px 18px" }}>
+            <div style={{ padding: "16px 18px", display: "flex", flexDirection: "column", gap: 14 }}>
+              <StorageIndicator />
               <APIKeySetup config={aiConfig}
                 onSave={cfg => { saveAIConfig(cfg); setAIConfig(cfg); switchTab("study"); }}
                 usage={usage} limit={limit} pct={pct}
