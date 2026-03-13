@@ -198,6 +198,7 @@ export function SearchOverlay({ open, onClose, roadmaps, notes, resources,
       <div style={{
         position: "fixed",
         top: isMobile ? 0 : "10vh",
+        paddingTop: isMobile ? "env(safe-area-inset-top)" : 0,
         left: isMobile ? 0 : "50%",
         right: isMobile ? 0 : "auto",
         bottom: isMobile ? 0 : "auto",

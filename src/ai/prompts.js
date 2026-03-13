@@ -8,27 +8,41 @@ Always be concise, accurate, and encouraging. Respond ONLY with valid JSON when 
 export function buildQuizPrompt(ctx, count, difficulty = "mixed") {
   const topicList = ctx.topics.map(t => `- ${t.topic} (${t.section})`).join("\n");
 
-  const difficultyGuide = {
-    easy:   "Focus on definitions, basic concepts, and straightforward recall questions. A beginner should be able to answer most of these.",
-    medium: "Mix of recall and application. Require understanding of how things work, not just what they are. Assume some familiarity with the topic.",
-    hard:   "Focus on nuance, edge cases, comparison between concepts, and practical application under constraints. Require solid understanding.",
-    mixed:  "Mix all difficulty levels: roughly 30% easy (definitions/recall), 50% medium (understanding/application), 20% hard (nuance/edge cases).",
+  const difficultyInstructions = {
+    easy: `DIFFICULTY REQUIREMENT: ALL ${count} questions MUST be EASY level.
+Easy means: definitions, basic recall, "what is X", straightforward yes/no concepts.
+A complete beginner should get most correct. No tricky wording. No edge cases.
+Every question's "difficulty" field MUST be "easy".`,
+
+    medium: `DIFFICULTY REQUIREMENT: ALL ${count} questions MUST be MEDIUM level.
+Medium means: understanding how things work, why they exist, when to use them.
+Requires genuine comprehension, not just recall. Some application required.
+Every question's "difficulty" field MUST be "medium".`,
+
+    hard: `DIFFICULTY REQUIREMENT: ALL ${count} questions MUST be HARD level.
+Hard means: edge cases, subtle distinctions, tricky gotchas, performance implications, comparing similar concepts.
+Only someone who deeply understands the topic should get these right.
+Every question's "difficulty" field MUST be "hard".`,
+
+    mixed: `DIFFICULTY REQUIREMENT: Mix all levels across the ${count} questions.
+Distribute roughly: ${Math.round(count*0.3)} easy, ${Math.round(count*0.5)} medium, ${Math.round(count*0.2)} hard.
+Tag each question's "difficulty" field accurately as "easy", "medium", or "hard".`,
   };
+
+  const diffBlock = difficultyInstructions[difficulty] || difficultyInstructions.mixed;
 
   return `Generate exactly ${count} multiple choice quiz questions about the following topics from the "${ctx.roadmapName}" learning roadmap.
 
 Topics to cover:
 ${topicList}
 
-Difficulty: ${difficultyGuide[difficulty] || difficultyGuide.mixed}
+${diffBlock}
 
-Rules:
-- Each question must test understanding, not just memorization
+Other rules:
 - Each question has exactly 4 options labeled A, B, C, D
 - Exactly one option is correct
-- Keep questions concise and clear
 - Cover different topics, not the same one repeatedly
-- Tag each question with its difficulty and the specific topic it tests
+- Tag each question with the specific topic it tests
 - For code-related topics: include code snippet questions where appropriate
 
 Respond with ONLY a JSON array, no other text:
