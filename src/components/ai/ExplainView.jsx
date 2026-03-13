@@ -3,12 +3,12 @@ import { callAI, loadAIConfig } from "../../ai/providers.js";
 import { SYSTEM_PROMPT } from "../../ai/prompts.js";
 
 const FOLLOW_UPS = [
-  { label: "💻 Code example",      prompt: "Give me a practical, real-world code example for this topic. Show common usage patterns and explain each part briefly." },
-  { label: "🔄 Explain differently", prompt: "Explain this differently — use a different analogy or approach. Assume I didn't quite get the first explanation." },
-  { label: "🧠 Quiz me",           prompt: "Give me 3 quick questions to test my understanding of this topic. After each question, tell me the answer." },
-  { label: "➡️ What's next",        prompt: "What should I learn next after understanding this topic? What concepts build on it?" },
-  { label: "⚠️ Common mistakes",    prompt: "What are the most common mistakes and misconceptions developers have about this topic? How do I avoid them?" },
-  { label: "🔍 Go deeper",          prompt: "I want to go deeper. Explain the advanced concepts, edge cases, and nuances of this topic." },
+  { label: "💻 Code example",       prompt: "Give me a practical, real-world code example for this topic. Show the most common usage pattern with comments explaining each part." },
+  { label: "🔄 Explain differently", prompt: "Explain this differently — use a completely different analogy or framing. Assume the first explanation didn't click." },
+  { label: "➡️ What's next",         prompt: "Based on this topic, name the 3-5 most important concepts or topics I should learn next, and why each one builds on this. Be specific about topic names I could search for." },
+  { label: "⚠️ Common mistakes",     prompt: "What are the most common mistakes and misconceptions people have about this topic? Give concrete examples of the wrong way vs the right way." },
+  { label: "🔍 Go deeper",           prompt: "I want to go deeper. Explain the advanced concepts, edge cases, performance implications, and subtle nuances of this topic that most beginners miss." },
+  { label: "🆚 Compare",             prompt: "What are the main alternatives to this? Compare them — when would you choose this over the alternatives, and vice versa?" },
 ];
 
 function buildSystemPromptWithContext(topic, roadmapName, section) {
@@ -140,10 +140,11 @@ export function ExplainView({ data, rm, topic, rmKey, sectionKey, onSaveToNotes 
               </div>
             )}
             {hasCode ? (
-              <div style={{ background: "#0d1117", borderRadius: 8, padding: "13px",
-                border: "1px solid #1e1e24", overflow: "auto" }}>
-                <pre style={{ margin: 0, fontSize: 12, color: "#c9d1d9", lineHeight: 1.7,
-                  fontFamily: "'Fira Code','Consolas',monospace", whiteSpace: "pre", overflowX: "auto" }}>
+              <div style={{ background: "#0d1117", borderRadius: 8,
+                border: "1px solid #1e1e24", overflowX: "auto", width: "100%" }}>
+                <pre style={{ margin: 0, padding: "13px", fontSize: 12, color: "#c9d1d9", lineHeight: 1.7,
+                  fontFamily: "'Fira Code','Consolas',monospace",
+                  whiteSpace: "pre", minWidth: "max-content" }}>
                   {data.codeExample.code}
                 </pre>
               </div>
