@@ -163,7 +163,7 @@ export function QuizView({ questions, rm, onQuizComplete }) {
                 fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>
               Next →
             </button>
-          : <button onClick={() => { setSubmitted(true); onQuizComplete?.(score, totalQ); }}
+          : <button onClick={() => { const finalScore = questions.filter((q,i) => answers[i] === q.answer).length; setSubmitted(true); onQuizComplete?.(finalScore, totalQ); }}
               disabled={Object.keys(answers).length < totalQ}
               style={{ flex: 1, padding: "9px",
                 background: Object.keys(answers).length < totalQ ? "#1e1e24" : rm.color,
