@@ -49,12 +49,12 @@
       #root { height: 100%; }
       /* Prevent iOS bounce scroll at root level */
       body { overscroll-behavior: none; }
+      /* Fix iOS Safari 100vh jump — use dvh with vh fallback */
+      :root { --app-height: 100vh; }
+      @supports (height: 100dvh) { :root { --app-height: 100dvh; } }
       /* Safe area insets for notched phones (iPhone X+) */
       #root {
-        padding-top: env(safe-area-inset-top);
-        padding-bottom: env(safe-area-inset-bottom);
-        padding-left: env(safe-area-inset-left);
-        padding-right: env(safe-area-inset-right);
+        /* Safe area handled per-component to avoid double-padding */
       }
     </style>
   </head>

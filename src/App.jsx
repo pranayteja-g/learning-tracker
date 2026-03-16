@@ -293,11 +293,11 @@ export default function App() {
     const screenTitle = { roadmaps: "Learning Tracker", dashboard: "Dashboard", sections: rm?.label, topics: curSec, nextup: "🎯 Next Up" };
 
     return (
-      <div style={{ fontFamily: "'Georgia', serif", minHeight: "100vh", background: "#0f0f13", color: "#e8e6e0" }}>
+      <div style={{ fontFamily: "'Georgia', serif", minHeight: "100dvh", background: "#0f0f13", color: "#e8e6e0", display: "flex", flexDirection: "column" }}>
         {/* Header */}
         <div style={{ padding: "12px 16px 12px", borderBottom: "1px solid #1e1e24",
           display: "flex", alignItems: "center", justifyContent: "space-between",
-          position: "sticky", top: 0, background: "#0f0f13", zIndex: 50,
+          position: "fixed", top: 0, left: 0, right: 0, background: "#0f0f13", zIndex: 50,
           paddingTop: "calc(12px + env(safe-area-inset-top))" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             {["sections","topics","nextup"].includes(mobileScreen) && (
@@ -323,6 +323,9 @@ export default function App() {
           </div>
         </div>
         <input ref={importRef} type="file" accept=".json" onChange={handleImportRoadmap} style={{ display: "none" }} />
+
+        {/* Content area — offset for fixed header + bottom nav */}
+        <div style={{ paddingTop: "calc(56px + env(safe-area-inset-top))", paddingBottom: "calc(56px + env(safe-area-inset-bottom))", minHeight: "100dvh", boxSizing: "border-box" }}>
 
         {mobileScreen === "dashboard" && (
           <Dashboard roadmaps={roadmaps} progress={progress} notes={notes} resources={resources}
@@ -428,6 +431,8 @@ export default function App() {
           </div>
         )}
 
+        </div>{/* end content area */}
+
         {/* Bottom nav — 4 fixed tabs */}
         <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: "#13131a",
           borderTop: "1px solid #1e1e24", display: "flex", zIndex: 50,
@@ -509,7 +514,7 @@ export default function App() {
   // DESKTOP
   // ════════════════════════════════════════════════════════════════════════════
   return (
-    <div style={{ fontFamily: "'Georgia', serif", minHeight: "100vh", background: "#0f0f13", color: "#e8e6e0" }}>
+    <div style={{ fontFamily: "'Georgia', serif", minHeight: "100dvh", background: "#0f0f13", color: "#e8e6e0", display: "flex", flexDirection: "column" }}>
       {/* Top bar */}
       <div style={{ padding: "22px 28px 0", borderBottom: "1px solid #1e1e24" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>

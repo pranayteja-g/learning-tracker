@@ -57,7 +57,7 @@ export function Dashboard({ roadmaps, progress, notes, resources, topicMeta,
 
   return (
     <div style={{ padding: isMobile ? "16px" : "28px", overflowY: "auto",
-      maxHeight: isMobile ? "calc(100vh - 56px)" : "calc(100vh - 88px)",
+      maxHeight: isMobile ? "calc(100dvh - 56px)" : "calc(100vh - 88px)",
       paddingBottom: isMobile ? "90px" : "40px" }}>
 
       {/* ── Overall ── */}
