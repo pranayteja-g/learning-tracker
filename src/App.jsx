@@ -18,7 +18,7 @@ import { InstallPrompt }        from "./components/ui/InstallPrompt.jsx";
 import { useStreak }            from "./hooks/useStreak.js";
 import { useQuizResults }       from "./hooks/useQuizResults.js";
 import { useQuest }               from "./hooks/useQuest.js";
-import { QuestCard }              from "./components/quest/QuestCard.jsx";
+import { QuestBoard }             from "./components/quest/QuestCard.jsx";
 import { QuestModal }             from "./components/quest/QuestModal.jsx";
 import { buildQuestPrompt }       from "./ai/prompts.js";
 import { callAI }                 from "./ai/providers.js";
@@ -39,13 +39,14 @@ export default function App() {
   const [editorModal,    setEditorModal]    = useState(null);
   const [feedback,       setFeedback]       = useState(null);
   const [practiceOpen,   setPracticeOpen]   = useState(false);
-  const [questOpen,      setQuestOpen]      = useState(false);
-  const [questLoading,   setQuestLoading]   = useState(false);
+  const [activeQuestRmId, setActiveQuestRmId] = useState(null);
+  const [loadingQuestRmIds, setLoadingQuestRmIds] = useState([]);
+  const [questBoardOpen,    setQuestBoardOpen]    = useState(false);
   const [searchOpen,     setSearchOpen]     = useState(false);
   const { streak, recordActivity, studiedToday } = useStreak();
   const { results: quizResults, recordQuizResult, hasPassedTopic, getStars } = useQuizResults();
-  const { quest, loaded: questLoaded, startQuest, advancePhase, completeQuest,
-          isOnCooldown, cooldownRemaining, needsNewQuest } = useQuest();
+  const { quests, loaded: questLoaded, startQuest, advancePhase, completeQuest,
+          isOnCooldown, cooldownRemaining, needsNewQuest, getQuest } = useQuest();
   const importRef = useRef(null);
 
   const showFeedback = (ok, msg) => {
@@ -222,34 +223,38 @@ export default function App() {
     );
   };
 
-  const generateQuest = async () => {
-    setQuestLoading(true);
+  const generateQuest = async (rmId) => {
+    const roadmap = roadmaps[rmId];
+    if (!roadmap) return;
+    setLoadingQuestRmIds(prev => [...prev, rmId]);
     try {
       const cfg    = loadAIConfig();
       const apiKey = cfg.keys?.[cfg.provider];
-      if (!apiKey) { setQuestLoading(false); return; }
-      const prompt = buildQuestPrompt({ roadmaps, quizResults, progress });
-      if (!prompt) { setQuestLoading(false); return; }
+      if (!apiKey) return;
+      const prompt = buildQuestPrompt({ roadmap, quizResults, progress });
+      if (!prompt) return;
       const { text } = await callAI({ provider: cfg.provider, apiKey,
         systemPrompt: "You are a study mentor. Assign a quest. Respond ONLY with valid JSON.",
         userPrompt: prompt, maxTokens: 1024 });
       const clean = text.replace(/```json\n?/gi,"").replace(/```\n?/g,"").trim();
-      const firstBrace = clean.indexOf("{");
-      const match = clean.slice(firstBrace);
-      const data = JSON.parse(match.match(/\{[\s\S]*\}/)[0]);
-      startQuest(data);
+      const data = JSON.parse(clean.match(/\{[\s\S]*\}/)[0]);
+      startQuest({ ...data, roadmapId: rmId });
     } catch(e) { console.error("Quest generation failed:", e); }
-    finally { setQuestLoading(false); }
+    finally { setLoadingQuestRmIds(prev => prev.filter(id => id !== rmId)); }
   };
 
-  // Auto-generate quest when app loads and one is needed
+  // Auto-generate quests for roadmaps that need one on load
   useEffect(() => {
-    if (loaded && questLoaded && needsNewQuest && Object.keys(roadmaps).length > 0) {
-      // Only auto-generate if user has some progress to work with
-      const hasProgress = Object.keys(progress).length > 0;
-      if (hasProgress) generateQuest();
-    }
-  }, [loaded, questLoaded, needsNewQuest]);
+    if (!loaded || !questLoaded || !Object.keys(roadmaps).length) return;
+    const hasProgress = Object.keys(progress).length > 0;
+    if (!hasProgress) return;
+    // Generate for each roadmap that needs a quest
+    Object.keys(roadmaps).forEach(rmId => {
+      if (needsNewQuest(rmId) && !loadingQuestRmIds.includes(rmId)) {
+        generateQuest(rmId);
+      }
+    });
+  }, [loaded, questLoaded]);
 
   // ── Global style: prevent iOS zoom on input focus ────────────────────────
   const globalStyle = `
@@ -329,7 +334,7 @@ export default function App() {
   // ════════════════════════════════════════════════════════════════════════════
   if (isMobile) {
     const goToRoadmap = (key) => { setActiveRoadmap(key); setActiveSection(null); setMobileScreen("sections"); };
-    const screenTitle = { roadmaps: "Learning Tracker", dashboard: "Dashboard", sections: rm?.label, topics: curSec, nextup: "🎯 Next Up" };
+    const screenTitle = { roadmaps: "Learning Tracker", quests: "🎯 Quests", dashboard: "Dashboard", sections: rm?.label, topics: curSec, nextup: "🎯 Next Up" };
 
     return (
       <div style={{ fontFamily: "'Georgia', serif", minHeight: "100dvh", background: "#0f0f13", color: "#e8e6e0", display: "flex", flexDirection: "column" }}>
@@ -353,12 +358,21 @@ export default function App() {
               </h1>
             </div>
           </div>
-          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
             <StreakBadge streak={{ ...streak, studiedToday }} isMobile={true} />
             <button onClick={() => setSearchOpen(true)}
               style={{ width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center",
                 border: "none", borderRadius: 8, cursor: "pointer", background: "#1e1e24",
                 color: "#888", fontSize: 15 }}>🔍</button>
+            <button onClick={() => setPracticeOpen(o => !o)}
+              style={{ width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center",
+                border: "none", borderRadius: 8, cursor: "pointer",
+                background: practiceOpen ? "#7b5ea722" : "#1e1e24",
+                color: practiceOpen ? "#c4b5fd" : "#888", fontSize: 15 }}>🤖</button>
+            <button onClick={() => setShowManage(true)}
+              style={{ width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center",
+                border: "none", borderRadius: 8, cursor: "pointer", background: "#1e1e24",
+                color: "#888", fontSize: 15 }}>⚙️</button>
           </div>
         </div>
         <input ref={importRef} type="file" accept=".json" onChange={handleImportRoadmap} style={{ display: "none" }} />
@@ -371,15 +385,21 @@ export default function App() {
             topicMeta={topicMeta} isMobile={true} onOpenRoadmap={goToRoadmap} quizResults={quizResults} />
         )}
 
-        {mobileScreen === "roadmaps" && (
+        {mobileScreen === "quests" && (
           <div style={{ padding: "16px", paddingBottom: "96px" }}>
-            <QuestCard
-              quest={quest} loading={questLoading}
+            <QuestBoard
+              roadmaps={roadmaps} quests={quests}
+              loadingRmIds={loadingQuestRmIds}
               isOnCooldown={isOnCooldown} cooldownRemaining={cooldownRemaining}
               isMobile={true}
-              onBegin={() => setQuestOpen(true)}
+              onBegin={(rmId) => setActiveQuestRmId(rmId)}
               onGenerate={generateQuest}
             />
+          </div>
+        )}
+
+        {mobileScreen === "roadmaps" && (
+          <div style={{ padding: "16px", paddingBottom: "96px" }}>
             {Object.values(roadmaps).map(val => {
               const s = getRoadmapStats(val, progress);
               return (
@@ -477,17 +497,18 @@ export default function App() {
           </div>
         )}
 
-        {questOpen && quest && (
+        {activeQuestRmId && getQuest(activeQuestRmId) && (
           <QuestModal
-            quest={quest} roadmaps={roadmaps} progress={progress}
+            quest={getQuest(activeQuestRmId)} rmId={activeQuestRmId}
+            roadmaps={roadmaps} progress={progress}
             onAdvancePhase={advancePhase}
             onCompleteQuest={completeQuest}
-            onClose={() => setQuestOpen(false)}
+            onClose={() => setActiveQuestRmId(null)}
           />
         )}
         </div>{/* end content area */}
 
-        {/* Bottom nav — 4 fixed tabs */}
+        {/* Bottom nav — 3 tabs */}
         <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: "#13131a",
           borderTop: "1px solid #1e1e24", display: "flex", zIndex: 50,
           paddingBottom: "env(safe-area-inset-bottom)" }}>
@@ -504,16 +525,22 @@ export default function App() {
               </button>
             );
           })()}
-          {/* Practice tab */}
+          {/* Quests tab */}
           {(() => {
-            const active = practiceOpen;
+            const active = mobileScreen === "quests";
+            const hasActive = Object.values(quests).some(q => q?.status === "active");
             return (
-              <button onClick={() => { setPracticeOpen(o => !o); }}
+              <button onClick={() => setMobileScreen("quests")}
                 style={{ flex: 1, padding: "10px 4px 12px", border: "none", background: "transparent",
                   color: active ? "#c4b5fd" : "#555", cursor: "pointer", fontFamily: "inherit",
-                  borderTop: active ? "2px solid #7b5ea7" : "2px solid transparent" }}>
-                <div style={{ fontSize: 18, marginBottom: 2 }}>🤖</div>
-                <div style={{ fontSize: 10, fontWeight: active ? 700 : 400 }}>Practice</div>
+                  borderTop: active ? "2px solid #7b5ea7" : "2px solid transparent",
+                  position: "relative" }}>
+                <div style={{ fontSize: 18, marginBottom: 2 }}>🎯</div>
+                <div style={{ fontSize: 10, fontWeight: active ? 700 : 400 }}>Quests</div>
+                {hasActive && !active && (
+                  <div style={{ position: "absolute", top: 8, right: "calc(50% - 14px)",
+                    width: 7, height: 7, borderRadius: "50%", background: "#7b5ea7" }} />
+                )}
               </button>
             );
           })()}
@@ -521,7 +548,7 @@ export default function App() {
           {(() => {
             const active = mobileScreen === "dashboard";
             return (
-              <button onClick={() => setMobileScreen(s => s === "dashboard" ? (rmKey ? "sections" : "roadmaps") : "dashboard")}
+              <button onClick={() => setMobileScreen("dashboard")}
                 style={{ flex: 1, padding: "10px 4px 12px", border: "none", background: "transparent",
                   color: active ? "#c4b5fd" : "#555", cursor: "pointer", fontFamily: "inherit",
                   borderTop: active ? "2px solid #7b5ea7" : "2px solid transparent" }}>
@@ -530,14 +557,6 @@ export default function App() {
               </button>
             );
           })()}
-          {/* Settings tab */}
-          <button onClick={() => setShowManage(true)}
-            style={{ flex: 1, padding: "10px 4px 12px", border: "none", background: "transparent",
-              color: "#555", cursor: "pointer", fontFamily: "inherit",
-              borderTop: "2px solid transparent" }}>
-            <div style={{ fontSize: 18, marginBottom: 2 }}>⚙️</div>
-            <div style={{ fontSize: 10 }}>Settings</div>
-          </button>
         </div>
 
               <style>{globalStyle}</style>
@@ -663,14 +682,39 @@ export default function App() {
 
           {/* Main content */}
           <div style={{ flex: 1, overflowY: "auto", padding: "22px 26px" }}>
-            {/* Quest card — always visible in desktop main area */}
-            <QuestCard
-              quest={quest} loading={questLoading}
-              isOnCooldown={isOnCooldown} cooldownRemaining={cooldownRemaining}
-              isMobile={false}
-              onBegin={() => setQuestOpen(true)}
-              onGenerate={generateQuest}
-            />
+            {/* Collapsible Quest Board */}
+            <div style={{ marginBottom: 20 }}>
+              <button onClick={() => setQuestBoardOpen(o => !o)}
+                style={{ display: "flex", alignItems: "center", gap: 8, width: "100%",
+                  background: "transparent", border: "none", cursor: "pointer",
+                  padding: "6px 0", fontFamily: "inherit" }}>
+                <span style={{ fontSize: 12, color: "#555", textTransform: "uppercase", letterSpacing: 1 }}>
+                  🎯 Quest Board
+                </span>
+                <div style={{ flex: 1, height: 1, background: "#1e1e24", marginLeft: 8 }} />
+                {Object.values(quests).some(q => q?.status === "active") && (
+                  <span style={{ fontSize: 10, background: "#7b5ea722", color: "#c4b5fd",
+                    border: "1px solid #7b5ea744", borderRadius: 4, padding: "1px 6px" }}>
+                    {Object.values(quests).filter(q => q?.status === "active").length} active
+                  </span>
+                )}
+                <span style={{ fontSize: 12, color: "#444", marginLeft: 6 }}>
+                  {questBoardOpen ? "▲" : "▼"}
+                </span>
+              </button>
+              {questBoardOpen && (
+                <div style={{ marginTop: 12 }}>
+                  <QuestBoard
+                    roadmaps={roadmaps} quests={quests}
+                    loadingRmIds={loadingQuestRmIds}
+                    isOnCooldown={isOnCooldown} cooldownRemaining={cooldownRemaining}
+                    isMobile={false}
+                    onBegin={(rmId) => setActiveQuestRmId(rmId)}
+                    onGenerate={generateQuest}
+                  />
+                </div>
+              )}
+            </div>
             {view === "nextup" && (
               <>
                 <h2 style={{ margin: "0 0 4px", fontSize: 16, color: "#fff" }}>🎯 Next Up</h2>
@@ -720,12 +764,13 @@ export default function App() {
         notes={notes} resources={resources} topicMeta={topicMeta} curSection={curSec} isMobile={isMobile}
         onSaveToNotes={appendToNote} quizResults={quizResults}
         onQuizComplete={(rmId, topics, score, total, difficulty) => { recordQuizResult(rmId, topics, score, total, difficulty); recordActivity(); }} />
-      {questOpen && quest && (
+      {activeQuestRmId && getQuest(activeQuestRmId) && (
         <QuestModal
-          quest={quest} roadmaps={roadmaps} progress={progress}
+          quest={getQuest(activeQuestRmId)} rmId={activeQuestRmId}
+          roadmaps={roadmaps} progress={progress}
           onAdvancePhase={advancePhase}
           onCompleteQuest={completeQuest}
-          onClose={() => setQuestOpen(false)}
+          onClose={() => setActiveQuestRmId(null)}
         />
       )}
     </div>
