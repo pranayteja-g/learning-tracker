@@ -227,9 +227,7 @@ export default function App() {
       const { text } = await callAI({ provider: cfg.provider, apiKey,
         systemPrompt: "You are a study mentor. Assign a quest. Respond ONLY with valid JSON.",
         userPrompt: prompt, maxTokens: 1024 });
-      const clean = text.replace(/```json
-?/gi,"").replace(/```
-?/g,"").trim();
+      const clean = text.replace(/```json\n?/gi,"").replace(/```\n?/g,"").trim();
       const firstBrace = clean.indexOf("{");
       const match = clean.slice(firstBrace);
       const data = JSON.parse(match.match(/\{[\s\S]*\}/)[0]);

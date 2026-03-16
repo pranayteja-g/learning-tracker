@@ -43,9 +43,11 @@ Other rules:
 - Exactly one option is correct
 - Cover different topics, not the same one repeatedly
 - Tag each question with the specific topic it tests
-- For code-related topics: at least 40% of questions MUST include a code snippet (reading, tracing, completing, or spotting bugs)
-- Code snippet questions are the most valuable — prefer them over pure definition questions
-- When a question includes code, wrap it in a code fence using triple backticks with the language tag and real newlines — never put code inline as plain text in the question string
+- IMPORTANT: First assess whether the topics above are code-implementation topics (e.g. syntax, APIs, algorithms, data structures, language features) or conceptual/design topics (e.g. system design, architecture, design patterns, principles, theory, processes)
+- If topics are CODE-IMPLEMENTATION: include 40%+ questions with code snippets (reading, tracing, completing, spotting bugs). Wrap code in a code fence with triple backticks and the language tag.
+- If topics are CONCEPTUAL/DESIGN: do NOT include code snippets. Use scenario-based questions instead (e.g. "In a system with X requirement, which approach would you choose and why?")
+- If topics are MIXED: use code snippets only for the implementation-focused topics, not the conceptual ones
+- Never force code into questions about system design, architecture, principles, or theoretical concepts
 
 Respond with ONLY a JSON array, no other text:
 [

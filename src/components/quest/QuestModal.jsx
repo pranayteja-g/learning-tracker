@@ -4,7 +4,6 @@ import { buildQuizPrompt, buildCodeChallengePrompt } from "../../ai/prompts.js";
 import { buildQuizContext } from "../../ai/context.js";
 import { QuizView }      from "../ai/QuizView.jsx";
 import { CodeWriteView } from "../ai/CodeWriteView.jsx";
-import { MessageRenderer } from "../ai/MessageRenderer.jsx";
 
 const PHASE_NAMES = ["📖 Read", "🧠 MCQ", "💻 Code", "💬 Q&A"];
 
@@ -183,7 +182,8 @@ export function QuestModal({ quest, roadmaps, progress, onAdvancePhase, onComple
   const [loadingPhase, setLoadingPhase] = useState(false);
   const [error,        setError]        = useState("");
 
-  const rm = roadmaps[quest.roadmapId];
+  const rm = roadmaps?.[quest.roadmapId];
+  if (!rm) return null; // roadmap deleted or not loaded yet
 
   useEffect(() => {
     if (quest.phase > 0 && !phaseData) generatePhaseContent();
@@ -221,12 +221,14 @@ export function QuestModal({ quest, roadmaps, progress, onAdvancePhase, onComple
   };
 
   const handlePhaseComplete = (result) => {
-    onAdvancePhase({ ...result, phase: quest.phase });
+    const currentPhase = quest.phase;
+    onAdvancePhase({ ...result, phase: currentPhase });
     setPhaseData(null);
 
-    // After phase 3 (Q&A), evaluate overall pass/fail
-    if (quest.phase === 3) {
-      const allResults = { ...quest.phaseResults, 3: result };
+    // After phase 3 (Q&A), evaluate overall pass/fail using all collected results
+    if (currentPhase === 3) {
+      // Collect all phase results including the current one
+      const allResults = { ...quest.phaseResults, [currentPhase]: result };
       const mcqPassed  = (allResults[1]?.score || 0) >= 80;
       const codePassed = (allResults[2]?.score || 0) >= 70;
       const qaPassed   = result.passed;

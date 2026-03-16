@@ -48,7 +48,7 @@ export function QuestCard({ quest, loading, onBegin, onGenerate, isOnCooldown, c
           </div>
           <div style={{ textAlign: "right" }}>
             <div style={{ fontSize: 12, fontWeight: 700, color: "#e05252", fontVariantNumeric: "tabular-nums" }}>
-              <CooldownTimer ms={cooldownRemaining} />
+              <CooldownTimer key={quest?.cooldownUntil} ms={cooldownRemaining} />
             </div>
             <div style={{ fontSize: 10, color: "#555" }}>until retry</div>
           </div>

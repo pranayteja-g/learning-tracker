@@ -71,7 +71,7 @@ export function useQuest() {
     ? quest.cooldownUntil - Date.now()
     : 0;
 
-  const needsNewQuest = loaded && !quest ||
+  const needsNewQuest = (loaded && !quest) ||
     (loaded && quest?.status === "completed") ||
     (loaded && quest?.status === "failed" && !isOnCooldown);
 
