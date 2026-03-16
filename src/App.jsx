@@ -17,6 +17,12 @@ import { StreakBadge }           from "./components/ui/StreakBadge.jsx";
 import { InstallPrompt }        from "./components/ui/InstallPrompt.jsx";
 import { useStreak }            from "./hooks/useStreak.js";
 import { useQuizResults }       from "./hooks/useQuizResults.js";
+import { useQuest }               from "./hooks/useQuest.js";
+import { QuestCard }              from "./components/quest/QuestCard.jsx";
+import { QuestModal }             from "./components/quest/QuestModal.jsx";
+import { buildQuestPrompt }       from "./ai/prompts.js";
+import { callAI }                 from "./ai/providers.js";
+import { loadAIConfig }           from "./ai/providers.js";
 
 export default function App() {
   const { roadmaps, setRoadmaps, progress, setProgress, notes, setNotes,

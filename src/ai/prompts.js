@@ -226,11 +226,9 @@ Respond with ONLY a JSON array, no other text:
 
 
 // ── Quest prompt ──────────────────────────────────────────────────────────────
-export function buildQuestPrompt({ roadmaps, progress, quizResults }) {
-  // Build a compact snapshot of learner state across all roadmaps
-  const rmSummaries = [];
-
-  // Flatten all topics with proficiency data
+export function buildQuestPrompt({ roadmaps, quizResults, progress }) {
+  // Build a compact snapshot of the learner's state
+  // Recursive flatten for nested topic structures
   const flattenTopics = (items) => {
     const out = [];
     for (const t of (items || [])) {
@@ -240,82 +238,9 @@ export function buildQuestPrompt({ roadmaps, progress, quizResults }) {
     return out;
   };
 
-  const allTopics = [];
-  for (const rm of Object.values(roadmaps)) {
-    for (const [sec, ts] of Object.entries(rm.sections)) {
-      const flatten = flattenTopics;
-      for (const topic of flatten(ts)) {
-        const key = `${rm.id}::${topic}`;
-        const qr  = quizResults[key];
-        const done = !!progress[key];
-        allTopics.push({
-          topic, section: sec,
-          rmId: rm.id, rmLabel: rm.label,
-          done,
-          proficiency: qr?.proficiency || 0,
-          stars: qr?.stars || 0,
-          attempts: qr?.attempts || 0,
-          bestScore: qr?.bestScore || 0,
-        });
-      }
-    }
-  }
-
-  const weak      = allTopics.filter(t => t.attempts > 0 && t.proficiency < 60).slice(0, 10);
-  const untested  = allTopics.filter(t => t.done && t.attempts === 0).slice(0, 10);
-  const struggling = allTopics.filter(t => t.attempts >= 2 && t.stars === 0).slice(0, 8);
-  const total     = allTopics.length;
-  const done      = allTopics.filter(t => t.done).length;
-
-  const weakBlock = weak.length
-    ? `Weak topics (low proficiency):\n${weak.map(t => `  - ${t.topic} (${t.rmLabel} / ${t.section}): ${t.proficiency}% proficiency`).join("\n")}`
-    : "";
-  const untestedBlock = untested.length
-    ? `Completed but never tested:\n${untested.map(t => `  - ${t.topic} (${t.rmLabel} / ${t.section})`).join("\n")}`
-    : "";
-  const strugglingBlock = struggling.length
-    ? `Repeatedly struggling (multiple attempts, 0 stars):\n${struggling.map(t => `  - ${t.topic} (${t.rmLabel}): ${t.attempts} attempts, best ${t.bestScore}%`).join("\n")}`
-    : "";
-
-  return `You are assigning a focused learning quest to help a student improve efficiently.
-
-LEARNER SNAPSHOT:
-- Total topics: ${total} across ${Object.keys(roadmaps).length} roadmap(s)
-- Completed: ${done} (${Math.round((done/total)*100)}%)
-- Roadmaps: ${Object.values(roadmaps).map(r => r.label).join(", ")}
-
-${weakBlock}
-${untestedBlock}
-${strugglingBlock}
-
-QUEST ASSIGNMENT RULES:
-- Pick 2-4 topics that form a logical, coherent group (related concepts that build on each other)
-- Prioritise: (1) struggling topics, (2) weak proficiency, (3) completed but never tested
-- Do NOT pick topics the learner has already mastered (stars >= 2)
-- The topics should come from the same roadmap where possible
-- Give the quest a punchy, motivating title (e.g. "OOP Mastery", "Collections Deep Dive")
-- Write a honest 1-sentence rationale explaining why these topics were chosen
-
-Respond ONLY with valid JSON:
-{
-  "title": "Quest title",
-  "roadmapId": "the roadmap id these topics belong to",
-  "roadmapLabel": "the roadmap label",
-  "topics": ["topic1", "topic2", "topic3"],
-  "section": "the section these belong to (or primary section)",
-  "rationale": "Why these topics were chosen — be specific about the gap",
-  "estimatedTime": "20-30 min",
-  "difficulty": "medium | hard"
-}`;
-}
-
-
-// ── Quest generation prompt ───────────────────────────────────────────────────
-export function buildQuestPrompt({ roadmaps, quizResults, progress }) {
-  // Build a compact snapshot of the learner's state
   const rmSummaries = Object.values(roadmaps).map(rm => {
     const sections = Object.entries(rm.sections).map(([sec, topics]) => {
-      const flat = typeof topics[0] === "string" ? topics : topics.map(t => t?.name || t);
+      const flat = flattenTopics(topics);
       const done = flat.filter(t => progress[`${rm.id}::${t}`]).length;
       const quizzed = flat.filter(t => quizResults[`${rm.id}::${t}`]?.attempts > 0);
       const weak = quizzed.filter(t => (quizResults[`${rm.id}::${t}`]?.proficiency || 0) < 60);
