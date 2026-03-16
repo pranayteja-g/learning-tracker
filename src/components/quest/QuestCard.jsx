@@ -147,15 +147,6 @@ export function QuestBoard({ roadmaps, quests, loadingRmIds = [], onBegin, onGen
 
   return (
     <div style={{ marginBottom: 16 }}>
-      {/* Header */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between",
-        marginBottom: 10 }}>
-        <div style={{ fontSize: 11, color: "#555", textTransform: "uppercase", letterSpacing: 1 }}>
-          🎯 Quest Board
-        </div>
-        <div style={{ fontSize: 10, color: "#444" }}>4-phase mastery test per roadmap</div>
-      </div>
-
       {/* Cards grid */}
       <div style={{
         display: "grid",
