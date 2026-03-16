@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { callAI, loadAIConfig } from "../../ai/providers.js";
 import { MessageRenderer } from "./MessageRenderer.jsx";
 
-export function CodeWriteView({ questions, rm }) {
+export function CodeWriteView({ questions, rm, onComplete }) {
   const [current,   setCurrent]   = useState(0);
   const [answers,   setAnswers]   = useState({});   // idx -> code string
   const [feedback,  setFeedback]  = useState({});   // idx -> {loading, result}
@@ -258,7 +258,7 @@ Respond ONLY with JSON:
 
       {/* Submit all */}
       {questions.every((_, i) => feedback[i]?.result) && (
-        <button onClick={() => setSubmitted(true)}
+        <button onClick={() => { setSubmitted(true); onComplete?.(totalScore); }}
           style={{ width: "100%", marginTop: 10, padding: "12px", background: rm.color,
             border: "none", borderRadius: 8, color: "#fff", fontSize: 14,
             fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>

@@ -209,7 +209,14 @@ export function PracticePanel({ open, onClose, roadmap, roadmaps, progress, note
 
   return (
     <>
-      <div onClick={onClose} style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.4)", zIndex:90 }} />
+      {/* Backdrop — covers full screen including nav, blocking all taps */}
+      <div onClick={onClose} style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.55)", zIndex:90 }} />
+      {/* Nav dim overlay — makes nav look intentionally inactive */}
+      {isMobile && <div style={{ position:"fixed", bottom:0, left:0, right:0,
+        height:"calc(56px + env(safe-area-inset-bottom))",
+        background:"rgba(0,0,0,0.35)",
+        backdropFilter:"blur(1px)", WebkitBackdropFilter:"blur(1px)",
+        zIndex:92, pointerEvents:"none" }} />}
       <div style={isMobile ? {
         position: "fixed", left: 0, right: 0,
         top: "env(safe-area-inset-top, 0px)",
@@ -464,7 +471,8 @@ export function PracticePanel({ open, onClose, roadmap, roadmaps, progress, note
                 <QuizView questions={result.data} rm={rm}
                   onQuizComplete={(score, total) => onQuizComplete?.(rm?.id, result.data.map(q=>q.topic).filter(Boolean), score, total, difficulty)} />}
               {result.tab === "study" && result.studyMode === "code" &&
-                <CodeWriteView questions={result.data} rm={rm} />}
+                <CodeWriteView questions={result.data} rm={rm}
+                  onComplete={(score) => onQuizComplete?.(rm?.id, result.data.map(q=>q.topic).filter(Boolean), score, 100, difficulty)} />}
               {result.tab === "study" && result.studyMode === "questionnaire" && <QuestionnaireView questions={result.data} rm={rm} />}
               {result.tab === "study" && result.studyMode === "explain" &&
                 <ExplainView data={result.data} rm={rm} topic={explainTopic}

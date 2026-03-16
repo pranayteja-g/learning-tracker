@@ -43,9 +43,11 @@ Other rules:
 - Exactly one option is correct
 - Cover different topics, not the same one repeatedly
 - Tag each question with the specific topic it tests
-- For code-related topics: at least 40% of questions MUST include a code snippet (reading, tracing, completing, or spotting bugs)
-- Code snippet questions are the most valuable — prefer them over pure definition questions
-- When a question includes code, wrap it in a code fence using triple backticks with the language tag and real newlines — never put code inline as plain text in the question string
+- IMPORTANT: First assess whether the topics above are code-implementation topics (e.g. syntax, APIs, algorithms, data structures, language features) or conceptual/design topics (e.g. system design, architecture, design patterns, principles, theory, processes)
+- If topics are CODE-IMPLEMENTATION: include 40%+ questions with code snippets (reading, tracing, completing, spotting bugs). Wrap code in a code fence with triple backticks and the language tag.
+- If topics are CONCEPTUAL/DESIGN: do NOT include code snippets. Use scenario-based questions instead (e.g. "In a system with X requirement, which approach would you choose and why?")
+- If topics are MIXED: use code snippets only for the implementation-focused topics, not the conceptual ones
+- Never force code into questions about system design, architecture, principles, or theoretical concepts
 
 Respond with ONLY a JSON array, no other text:
 [
@@ -220,6 +222,70 @@ Respond with ONLY a JSON array, no other text:
     "hints": "One optional hint (or null)"
   }
 ]`;
+}
+
+
+// ── Quest prompt ──────────────────────────────────────────────────────────────
+export function buildQuestPrompt({ roadmaps, quizResults, progress }) {
+  // Build a compact snapshot of the learner's state
+  // Recursive flatten for nested topic structures
+  const flattenTopics = (items) => {
+    const out = [];
+    for (const t of (items || [])) {
+      if (typeof t === "string") out.push(t);
+      else if (t?.name) { out.push(t.name); if (t.subtopics) out.push(...flattenTopics(t.subtopics)); }
+    }
+    return out;
+  };
+
+  const rmSummaries = Object.values(roadmaps).map(rm => {
+    const sections = Object.entries(rm.sections).map(([sec, topics]) => {
+      const flat = flattenTopics(topics);
+      const done = flat.filter(t => progress[`${rm.id}::${t}`]).length;
+      const quizzed = flat.filter(t => quizResults[`${rm.id}::${t}`]?.attempts > 0);
+      const weak = quizzed.filter(t => (quizResults[`${rm.id}::${t}`]?.proficiency || 0) < 60);
+      const unquizzed = flat.filter(t => !quizResults[`${rm.id}::${t}`]);
+      return { sec, total: flat.length, done, weak: weak.map(t => t), unquizzed: unquizzed.slice(0, 5) };
+    }).filter(s => s.done > 0 || s.weak.length > 0);
+    return { id: rm.id, label: rm.label, sections };
+  }).filter(r => r.sections.length > 0);
+
+  if (!rmSummaries.length) return null;
+
+  return `You are a strict but supportive mentor. Assign a focused quest for this learner.
+
+LEARNER STATE:
+${rmSummaries.map(rm => `
+${rm.label}:
+${rm.sections.map(s =>
+  `  ${s.sec}: ${s.done}/${s.total} done` +
+  (s.weak.length ? ` | WEAK: ${s.weak.join(", ")}` : "") +
+  (s.unquizzed.length ? ` | UNTESTED: ${s.unquizzed.join(", ")}` : "")
+).join("\n")}`).join("\n")}
+
+QUEST ASSIGNMENT RULES:
+- Pick 2-4 closely related topics from ONE roadmap section
+- Prioritise: (1) weak topics first, (2) untested done topics, (3) next unlearned topics
+- Topics should form a coherent group (e.g. "OOP Fundamentals", not random mix)
+- Quest must be completable in 20-30 minutes
+- Be a demanding mentor — assign topics that challenge, not topics already mastered
+
+Respond with ONLY valid JSON:
+{
+  "roadmapId": "the rm.id",
+  "roadmapLabel": "display name",
+  "title": "Quest name e.g. 'OOP Fundamentals'",
+  "description": "1-2 sentences — what this quest will test and why it matters",
+  "topics": ["topic1", "topic2", "topic3"],
+  "section": "the section these topics belong to",
+  "reason": "1 sentence — why you assigned these specific topics",
+  "phases": {
+    "read": { "instruction": "What to focus on while reviewing these topics before the test" },
+    "mcq": { "count": 8, "difficulty": "hard" },
+    "code": { "count": 2, "difficulty": "hard" },
+    "qa": { "count": 2, "instruction": "What depth of understanding the Q&A will probe" }
+  }
+}`;
 }
 
 // ── Roadmap categories ───────────────────────────────────────────────────────
