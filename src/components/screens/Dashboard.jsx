@@ -15,8 +15,9 @@ function ScoreBar({ score }) {
   );
 }
 
-function TopicPill({ topic, rmLabel, rmColor, rmAccent, bestScore, passed, stars = 0 }) {
-  const scoreColor = bestScore >= 70 ? "#52b788" : bestScore >= 50 ? "#ee9b00" : "#e05252";
+function TopicPill({ topic, rmLabel, rmColor, rmAccent, bestScore, proficiency = 0, passed, stars = 0 }) {
+  const score = proficiency || bestScore;
+  const scoreColor = score >= 70 ? "#52b788" : score >= 50 ? "#ee9b00" : "#e05252";
   return (
     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center",
       padding: "7px 10px", background: "#0f0f13", borderRadius: 7,
@@ -30,7 +31,7 @@ function TopicPill({ topic, rmLabel, rmColor, rmAccent, bestScore, passed, stars
         {stars > 0
           ? <span style={{ fontSize: 11, letterSpacing: -2 }}>{"⭐".repeat(stars)}</span>
           : passed && <span style={{ fontSize: 10, color: "#555" }}>○</span>}
-        <span style={{ fontSize: 12, fontWeight: 700, color: scoreColor, marginLeft: 4 }}>{bestScore}%</span>
+        <span style={{ fontSize: 12, fontWeight: 700, color: scoreColor, marginLeft: 4 }}>{score}%</span>
       </div>
     </div>
   );
@@ -140,7 +141,7 @@ export function Dashboard({ roadmaps, progress, notes, resources, topicMeta,
                     background: t.passed ? "#52b78818" : "#ee9b0018",
                     border: `1px solid ${t.passed ? "#52b78844" : "#ee9b0044"}`,
                     color: t.passed ? "#52b788" : "#ee9b00" }}>
-                    {t.topic} · {t.bestScore}%
+                    {t.topic} · {t.proficiency || t.bestScore}%
                   </div>
                 ))}
               </div>
@@ -210,8 +211,15 @@ export function Dashboard({ roadmaps, progress, notes, resources, topicMeta,
                   <div style={{ fontSize: 14, fontWeight: 700, color: "#fff" }}>{val.label}</div>
                   <div style={{ fontSize: 12, color: val.accent }}>{s.done}/{s.total} topics</div>
                   {rp?.attempted > 0 && (
-                    <div style={{ fontSize: 11, color: "#555", marginTop: 1 }}>
-                      Quiz: {Math.round((rp.passed/rp.attempted)*100)}% pass rate
+                    <div style={{ fontSize: 11, marginTop: 4 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
+                        <span style={{ color: "#555" }}>Proficiency</span>
+                        <span style={{ color: rp.avgProficiency >= 70 ? "#52b788" : "#ee9b00", fontWeight: 600 }}>{rp.avgProficiency || 0}%</span>
+                      </div>
+                      <div style={{ height: 3, background: "#1e1e24", borderRadius: 2 }}>
+                        <div style={{ height: "100%", width: `${rp.avgProficiency || 0}%`,
+                          background: rp.avgProficiency >= 70 ? "#52b788" : "#ee9b00", borderRadius: 2 }} />
+                      </div>
                     </div>
                   )}
                 </div>

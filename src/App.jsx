@@ -33,9 +33,13 @@ export default function App() {
   const [editorModal,    setEditorModal]    = useState(null);
   const [feedback,       setFeedback]       = useState(null);
   const [practiceOpen,   setPracticeOpen]   = useState(false);
+  const [questOpen,      setQuestOpen]      = useState(false);
+  const [questLoading,   setQuestLoading]   = useState(false);
   const [searchOpen,     setSearchOpen]     = useState(false);
   const { streak, recordActivity, studiedToday } = useStreak();
   const { results: quizResults, recordQuizResult, hasPassedTopic, getStars } = useQuizResults();
+  const { quest, loaded: questLoaded, startQuest, advancePhase, completeQuest,
+          isOnCooldown, cooldownRemaining, needsNewQuest } = useQuest();
   const importRef = useRef(null);
 
   const showFeedback = (ok, msg) => {
@@ -212,6 +216,37 @@ export default function App() {
     );
   };
 
+  const generateQuest = async () => {
+    setQuestLoading(true);
+    try {
+      const cfg    = loadAIConfig();
+      const apiKey = cfg.keys?.[cfg.provider];
+      if (!apiKey) { setQuestLoading(false); return; }
+      const prompt = buildQuestPrompt({ roadmaps, quizResults, progress });
+      if (!prompt) { setQuestLoading(false); return; }
+      const { text } = await callAI({ provider: cfg.provider, apiKey,
+        systemPrompt: "You are a study mentor. Assign a quest. Respond ONLY with valid JSON.",
+        userPrompt: prompt, maxTokens: 1024 });
+      const clean = text.replace(/```json
+?/gi,"").replace(/```
+?/g,"").trim();
+      const firstBrace = clean.indexOf("{");
+      const match = clean.slice(firstBrace);
+      const data = JSON.parse(match.match(/\{[\s\S]*\}/)[0]);
+      startQuest(data);
+    } catch(e) { console.error("Quest generation failed:", e); }
+    finally { setQuestLoading(false); }
+  };
+
+  // Auto-generate quest when app loads and one is needed
+  useEffect(() => {
+    if (loaded && questLoaded && needsNewQuest && Object.keys(roadmaps).length > 0) {
+      // Only auto-generate if user has some progress to work with
+      const hasProgress = Object.keys(progress).length > 0;
+      if (hasProgress) generateQuest();
+    }
+  }, [loaded, questLoaded, needsNewQuest]);
+
   // ── Global style: prevent iOS zoom on input focus ────────────────────────
   const globalStyle = `
     @media screen and (max-width: 768px) {
@@ -334,6 +369,13 @@ export default function App() {
 
         {mobileScreen === "roadmaps" && (
           <div style={{ padding: "16px", paddingBottom: "96px" }}>
+            <QuestCard
+              quest={quest} loading={questLoading}
+              isOnCooldown={isOnCooldown} cooldownRemaining={cooldownRemaining}
+              isMobile={true}
+              onBegin={() => setQuestOpen(true)}
+              onGenerate={generateQuest}
+            />
             {Object.values(roadmaps).map(val => {
               const s = getRoadmapStats(val, progress);
               return (
@@ -431,6 +473,14 @@ export default function App() {
           </div>
         )}
 
+        {questOpen && quest && (
+          <QuestModal
+            quest={quest} roadmaps={roadmaps} progress={progress}
+            onAdvancePhase={advancePhase}
+            onCompleteQuest={completeQuest}
+            onClose={() => setQuestOpen(false)}
+          />
+        )}
         </div>{/* end content area */}
 
         {/* Bottom nav — 4 fixed tabs */}
@@ -609,6 +659,14 @@ export default function App() {
 
           {/* Main content */}
           <div style={{ flex: 1, overflowY: "auto", padding: "22px 26px" }}>
+            {/* Quest card — always visible in desktop main area */}
+            <QuestCard
+              quest={quest} loading={questLoading}
+              isOnCooldown={isOnCooldown} cooldownRemaining={cooldownRemaining}
+              isMobile={false}
+              onBegin={() => setQuestOpen(true)}
+              onGenerate={generateQuest}
+            />
             {view === "nextup" && (
               <>
                 <h2 style={{ margin: "0 0 4px", fontSize: 16, color: "#fff" }}>🎯 Next Up</h2>
@@ -658,6 +716,14 @@ export default function App() {
         notes={notes} resources={resources} topicMeta={topicMeta} curSection={curSec} isMobile={isMobile}
         onSaveToNotes={appendToNote} quizResults={quizResults}
         onQuizComplete={(rmId, topics, score, total, difficulty) => { recordQuizResult(rmId, topics, score, total, difficulty); recordActivity(); }} />
+      {questOpen && quest && (
+        <QuestModal
+          quest={quest} roadmaps={roadmaps} progress={progress}
+          onAdvancePhase={advancePhase}
+          onCompleteQuest={completeQuest}
+          onClose={() => setQuestOpen(false)}
+        />
+      )}
     </div>
   );
 }

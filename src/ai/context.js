@@ -2,12 +2,16 @@ import { flatTopicNames, topicName } from "../utils/topics.js";
 // Builds minimal, scoped context objects for each AI feature.
 // We never send the entire app state — only what's relevant to the request.
 
-export function buildQuizContext({ roadmap, progress, scope, sectionKey }) {
+export function buildQuizContext({ roadmap, progress, scope, sectionKey, topicOverride }) {
   const rmId = roadmap.id;
 
   let topics = [];
 
-  if (scope === "section" && sectionKey) {
+  // Quest mode: use specific topics directly
+  if (topicOverride?.length) {
+    const sec = sectionKey || Object.keys(roadmap.sections)[0];
+    topics = topicOverride.map(t => ({ topic: t, done: !!progress[`${rmId}::${t}`], section: sec }));
+  } else if (scope === "section" && sectionKey) {
     const ts   = roadmap.sections[sectionKey] || [];
     const flat = flatTopicNames(ts);
     topics = flat.map(t => ({ topic: t, done: !!progress[`${rmId}::${t}`], section: sectionKey }));

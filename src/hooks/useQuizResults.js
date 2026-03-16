@@ -4,14 +4,46 @@ import { idbGet, idbSet } from "../storage/db.js";
 const KEY = "learning-tracker-quiz-results-v1";
 
 /**
- * Star logic:
- * ⭐⭐⭐ = Hard mode, 100% score, achieved 3 separate times
- * No stars for Easy or Medium — those are practice only.
+ * Proficiency system:
+ *
+ * Stars (0-3) based on difficulty of passing attempt:
+ *   ⭐       = passed Easy at 70%+
+ *   ⭐⭐     = passed Medium at 70%+
+ *   ⭐⭐⭐   = passed Hard at 70%+
+ *
+ * Once a higher star is earned it can't go down.
+ *
+ * Proficiency score (0-100): weighted average of last 5 attempts
+ *   Hard attempt   × 1.5 weight
+ *   Medium attempt × 1.0 weight
+ *   Easy attempt   × 0.5 weight
+ * Capped at 100. Gives a living score that reflects recency + difficulty.
  */
-function calcStars(history) {
-  const hardPerfect = (history || []).filter(h => h.difficulty === "hard" && h.score === 100);
-  if (hardPerfect.length >= 3) return 3;
-  return 0;
+
+const DIFF_WEIGHT = { hard: 1.5, medium: 1.0, easy: 0.5, mixed: 0.8 };
+
+function calcStars(history, currentStars = 0) {
+  // Stars never go down — only upgrade
+  let best = currentStars;
+  for (const h of (history || [])) {
+    if (h.score < 70) continue;
+    if (h.difficulty === "hard"   && best < 3) best = 3;
+    if (h.difficulty === "medium" && best < 2) best = Math.max(best, 2);
+    if (h.difficulty === "easy"   && best < 1) best = Math.max(best, 1);
+  }
+  return best;
+}
+
+function calcProficiency(history) {
+  const recent = (history || []).slice(-5);
+  if (!recent.length) return 0;
+  let weightedSum = 0, totalWeight = 0;
+  for (const h of recent) {
+    const w = DIFF_WEIGHT[h.difficulty] || 0.8;
+    weightedSum += h.score * w;
+    totalWeight += w;
+  }
+  return Math.min(100, Math.round(weightedSum / totalWeight));
 }
 
 export function useQuizResults() {
@@ -40,16 +72,17 @@ export function useQuizResults() {
       const next = { ...prev };
       for (const topic of topics) {
         const k   = `${rmId}::${topic}`;
-        const old = prev[k] || { stars: 0, bestScore: 0, attempts: 0, lastDate: null, history: [] };
+        const old = prev[k] || { stars: 0, bestScore: 0, proficiency: 0, attempts: 0, lastDate: null, history: [] };
         const newHistory = [...(old.history || []).slice(-19), { score: pct, date: today, difficulty }];
+        const newStars   = calcStars(newHistory, old.stars || 0);
         next[k] = {
-          stars:     calcStars(newHistory),
-          bestScore: Math.max(old.bestScore || 0, pct),
-          attempts:  (old.attempts || 0) + 1,
-          lastDate:  today,
-          history:   newHistory,
-          // keep legacy passed field for backwards compat
-          passed:    pct >= 70,
+          stars:       newStars,
+          bestScore:   Math.max(old.bestScore || 0, pct),
+          proficiency: calcProficiency(newHistory),
+          attempts:    (old.attempts || 0) + 1,
+          lastDate:    today,
+          history:     newHistory,
+          passed:      pct >= 70, // legacy
         };
       }
       return next;
@@ -70,5 +103,9 @@ export function useQuizResults() {
     return results[`${rmId}::${topic}`]?.stars || 0;
   }, [results]);
 
-  return { results, recordQuizResult, getTopicResult, hasPassedTopic, getStars };
+  const getProficiency = useCallback((rmId, topic) => {
+    return results[`${rmId}::${topic}`]?.proficiency || 0;
+  }, [results]);
+
+  return { results, recordQuizResult, getTopicResult, hasPassedTopic, getStars, getProficiency };
 }
