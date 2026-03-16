@@ -5,15 +5,115 @@ import { buildQuizContext } from "../../ai/context.js";
 import { QuizView }      from "../ai/QuizView.jsx";
 import { CodeWriteView } from "../ai/CodeWriteView.jsx";
 
-const PHASE_NAMES = ["📖 Read", "🧠 MCQ", "💻 Code", "💬 Q&A"];
+const ALL_PHASES = [
+  { name: "📖 Read", key: "read",  pass: null, next: "MCQ Quiz"          },
+  { name: "🧠 MCQ",  key: "mcq",   pass: 80,   next: "Code Challenges"   },
+  { name: "💻 Code", key: "code",  pass: 70,   next: "Open Q&A"          },
+  { name: "💬 Q&A",  key: "qa",    pass: 70,   next: null                },
+];
+
+function getActivePhases(quest) {
+  return ALL_PHASES.filter(p => p.key === "read" || p.key === "mcq" || p.key === "qa" || quest.phases?.code != null);
+}
+
+// ── Phase Result Screen ───────────────────────────────────────────────────────
+function PhaseResult({ phase, result, onContinue, onClose, color, accent, activePhases }) {
+  const passed    = result.passed;
+  const phaseInfo = activePhases[phase] || {};
+  const threshold = phaseInfo.pass;
+  const nextPhase = activePhases[phase + 1] ? phaseInfo.next : null;
+
+  return (
+    <div style={{ padding: "24px 20px" }}>
+      {/* Score card */}
+      <div style={{ background: "#16161b", borderRadius: 14,
+        border: `2px solid ${passed ? "#52b78844" : "#e0525244"}`,
+        padding: "28px 20px", textAlign: "center", marginBottom: 20 }}>
+        <div style={{ fontSize: 48, marginBottom: 12 }}>
+          {passed ? (phase === 3 ? "🏆" : "✅") : "❌"}
+        </div>
+        <div style={{ fontSize: 36, fontWeight: 700, lineHeight: 1,
+          color: passed ? "#52b788" : "#e05252" }}>
+          {result.score}%
+        </div>
+        <div style={{ fontSize: 13, color: "#888", marginTop: 6 }}>
+          {phaseInfo.name} · {passed ? "Passed" : "Failed"}
+          {threshold && <span style={{ color: "#444" }}> (required {threshold}%)</span>}
+        </div>
+        <div style={{ fontSize: 14, fontWeight: 600, marginTop: 12,
+          color: passed ? "#52b788" : "#e05252" }}>
+          {passed
+            ? phase === 3 ? "Quest Complete! All phases passed." : `Great work! Phase ${phase + 1} cleared.`
+            : `You needed ${threshold}% to pass this phase.`}
+        </div>
+      </div>
+
+      {passed && nextPhase && (
+        <>
+          {/* Next phase preview */}
+          <div style={{ background: "#16161b", borderRadius: 10, padding: "14px 16px",
+            border: `1px solid ${color}33`, marginBottom: 16 }}>
+            <div style={{ fontSize: 11, color: "#555", textTransform: "uppercase",
+              letterSpacing: 1, marginBottom: 8 }}>Next Phase</div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: "#fff", marginBottom: 4 }}>
+              {activePhases[phase + 1]?.name}
+            </div>
+            <div style={{ fontSize: 12, color: "#888" }}>
+              {phase === 1 && "Write and evaluate code solutions for the quest topics."}
+              {phase === 2 && "Answer open-ended questions — AI will evaluate the depth of your understanding."}
+            </div>
+            {activePhases[phase + 1]?.pass && (
+              <div style={{ fontSize: 11, color: accent, marginTop: 6 }}>
+                Pass threshold: {activePhases[phase + 1]?.pass}%
+              </div>
+            )}
+          </div>
+          <button onClick={onContinue}
+            style={{ width: "100%", padding: "13px", background: color,
+              border: "none", borderRadius: 9, color: "#fff",
+              fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+            Continue to {nextPhase} →
+          </button>
+        </>
+      )}
+
+      {passed && !nextPhase && (
+        <button onClick={onClose}
+          style={{ width: "100%", padding: "13px", background: "#52b788",
+            border: "none", borderRadius: 9, color: "#fff",
+            fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+          🏆 Close & Claim Reward
+        </button>
+      )}
+
+      {!passed && (
+        <>
+          <div style={{ background: "#1a1a1a", borderRadius: 10, padding: "14px 16px",
+            border: "1px solid #2a2a35", marginBottom: 16 }}>
+            <div style={{ fontSize: 12, color: "#888", lineHeight: 1.6 }}>
+              💡 The quest has been failed. Use the cooldown period to review the topics
+              and strengthen your understanding before the next attempt.
+            </div>
+          </div>
+          <button onClick={onClose}
+            style={{ width: "100%", padding: "13px", background: "#1e1e24",
+              border: "1px solid #2a2a35", borderRadius: 9, color: "#888",
+              fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+            Close — Try Again in 4 Hours
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
 
 // ── Q&A Phase ────────────────────────────────────────────────────────────────
 function QAPhase({ quest, rm, onComplete }) {
-  const [questions, setQuestions] = useState(null);
-  const [answers,   setAnswers]   = useState({});
-  const [feedbacks, setFeedbacks] = useState({});
-  const [loading,   setLoading]   = useState(false);
-  const [error,     setError]     = useState("");
+  const [questions,  setQuestions]  = useState(null);
+  const [answers,    setAnswers]    = useState({});
+  const [feedbacks,  setFeedbacks]  = useState({});
+  const [loading,    setLoading]    = useState(false);
+  const [error,      setError]      = useState("");
   const [generating, setGenerating] = useState(true);
 
   useEffect(() => { generateQuestions(); }, []);
@@ -24,7 +124,7 @@ function QAPhase({ quest, rm, onComplete }) {
       const cfg = loadAIConfig();
       const { text } = await callAI({
         provider: cfg.provider, apiKey: cfg.keys?.[cfg.provider],
-        systemPrompt: "You are a technical interview examiner. Generate open-ended questions. Respond ONLY with valid JSON.",
+        systemPrompt: "You are a technical interview examiner. Respond ONLY with valid JSON.",
         userPrompt: `Generate exactly ${quest.phases.qa.count} open-ended questions testing deep understanding of: ${quest.topics.join(", ")} from ${quest.roadmapLabel}.
 
 ${quest.phases.qa.instruction}
@@ -34,7 +134,8 @@ Respond ONLY with JSON array:
         maxTokens: 1024,
       });
       const clean = text.replace(/```json\n?/gi,"").replace(/```\n?/g,"").trim();
-      setQuestions(JSON.parse(clean));
+      const match = clean.match(/\[[\s\S]*\]/);
+      setQuestions(JSON.parse(match ? match[0] : clean));
     } catch(e) { setError(e.message); }
     finally { setGenerating(false); }
   };
@@ -48,17 +149,18 @@ Respond ONLY with JSON array:
       const cfg = loadAIConfig();
       const { text } = await callAI({
         provider: cfg.provider, apiKey: cfg.keys?.[cfg.provider],
-        systemPrompt: "You are a strict technical examiner. Evaluate answers objectively. Respond ONLY with valid JSON.",
+        systemPrompt: "You are a strict technical examiner. Respond ONLY with valid JSON.",
         userPrompt: `Question: ${q.question}
 What to look for: ${q.whatToLookFor}
 Student answer: "${ans}"
 
 Respond ONLY with JSON:
-{ "passed": true|false, "score": 0-100, "feedback": "2-3 sentences: what was good, what was missing", "missingPoints": ["key point missed"] }`,
+{ "passed": true|false, "score": 0-100, "feedback": "2-3 sentences: what was good, what was missing" }`,
         maxTokens: 512,
       });
       const clean = text.replace(/```json\n?/gi,"").replace(/```\n?/g,"").trim();
-      setFeedbacks(f => ({ ...f, [idx]: JSON.parse(clean) }));
+      const match = clean.match(/\{[\s\S]*\}/);
+      setFeedbacks(f => ({ ...f, [idx]: JSON.parse(match ? match[0] : clean) }));
     } catch(e) { setError(e.message); }
     finally { setLoading(false); }
   };
@@ -67,17 +169,13 @@ Respond ONLY with JSON:
   const avgScore = allEvaluated
     ? Math.round(questions.reduce((s, _, i) => s + (feedbacks[i]?.score || 0), 0) / questions.length)
     : 0;
-  const passed = avgScore >= 70;
 
   if (generating) return (
     <div style={{ padding: "40px 20px", textAlign: "center", color: "#555" }}>
       Generating Q&A questions…
     </div>
   );
-
-  if (error) return (
-    <div style={{ padding: "20px", color: "#e05252" }}>{error}</div>
-  );
+  if (error) return <div style={{ padding: "20px", color: "#e05252" }}>{error}</div>;
 
   return (
     <div style={{ padding: "0 20px 20px" }}>
@@ -109,7 +207,8 @@ Respond ONLY with JSON:
             <div style={{ marginTop: 8, padding: "10px", borderRadius: 6,
               background: feedbacks[i].passed ? "#1a2e1a" : "#2e1a1a",
               border: `1px solid ${feedbacks[i].passed ? "#52b78844" : "#e0525244"}` }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: feedbacks[i].passed ? "#52b788" : "#e05252", marginBottom: 4 }}>
+              <div style={{ fontSize: 12, fontWeight: 700,
+                color: feedbacks[i].passed ? "#52b788" : "#e05252", marginBottom: 4 }}>
                 {feedbacks[i].passed ? "✓ Pass" : "✗ Fail"} · {feedbacks[i].score}%
               </div>
               <div style={{ fontSize: 12, color: "#888", lineHeight: 1.5 }}>{feedbacks[i].feedback}</div>
@@ -119,12 +218,12 @@ Respond ONLY with JSON:
       ))}
 
       {allEvaluated && (
-        <button onClick={() => onComplete({ score: avgScore, passed })}
+        <button onClick={() => onComplete({ score: avgScore, passed: avgScore >= 70 })}
           style={{ width: "100%", padding: "12px", marginTop: 4,
-            background: passed ? "#52b788" : "#e05252",
+            background: avgScore >= 70 ? "#52b788" : "#e05252",
             border: "none", borderRadius: 8, color: "#fff",
             fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
-          {passed ? `Submit — Passed (${avgScore}%) ✓` : `Submit — Failed (${avgScore}%)`}
+          {avgScore >= 70 ? `Submit — Passed (${avgScore}%) ✓` : `Submit — Failed (${avgScore}%)`}
         </button>
       )}
     </div>
@@ -179,38 +278,40 @@ function ReadPhase({ quest, onComplete }) {
 // ── Main QuestModal ───────────────────────────────────────────────────────────
 export function QuestModal({ quest, rmId, roadmaps, progress, onAdvancePhase, onCompleteQuest, onClose }) {
   const [phaseData,    setPhaseData]    = useState(null);
+  const [phaseResult,  setPhaseResult]  = useState(null); // show result between phases
   const [loadingPhase, setLoadingPhase] = useState(false);
   const [error,        setError]        = useState("");
 
   const rm = roadmaps?.[quest.roadmapId];
-  if (!rm) return null; // roadmap deleted or not loaded yet
+  if (!rm) return null;
+
+  const activePhases = getActivePhases(quest);
+  const totalPhases  = activePhases.length;
 
   useEffect(() => {
-    if (quest.phase > 0 && !phaseData) generatePhaseContent();
+    if (quest.phase > 0 && !phaseData && !phaseResult) generatePhaseContent();
   }, [quest.phase]);
 
   const generatePhaseContent = async () => {
     setLoadingPhase(true); setError("");
     try {
-      const cfg = loadAIConfig();
+      const cfg    = loadAIConfig();
       const apiKey = cfg.keys?.[cfg.provider];
       if (!apiKey) throw new Error("No API key configured.");
 
-      const ctx = buildQuizContext({ roadmap: rm, progress, scope: "topics",
-        topicOverride: quest.topics });
+      const ctx = buildQuizContext({ roadmap: rm, progress,
+        scope: "topics", topicOverride: quest.topics });
 
-      let userPrompt, text;
-      if (quest.phase === 1) {
-        userPrompt = buildQuizPrompt(ctx, quest.phases.mcq.count, quest.phases.mcq.difficulty);
-      } else if (quest.phase === 2) {
-        userPrompt = buildCodeChallengePrompt(ctx, quest.phases.code.count, quest.phases.code.difficulty);
-      }
+      let userPrompt;
+      const currentPhaseKey = activePhases[quest.phase]?.key;
+      if (currentPhaseKey === "mcq")  userPrompt = buildQuizPrompt(ctx, quest.phases.mcq.count, quest.phases.mcq.difficulty);
+      else if (currentPhaseKey === "code") userPrompt = buildCodeChallengePrompt(ctx, quest.phases.code.count, quest.phases.code.difficulty);
 
       if (userPrompt) {
         const res = await callAI({ provider: cfg.provider, apiKey,
           systemPrompt: "You are a technical quiz generator. Respond ONLY with valid JSON.",
           userPrompt, maxTokens: 8192 });
-        text = res.text;
+        const text = res.text.replace(/```json\n?/gi,"").replace(/```\n?/g,"").trim();
         const firstBrace = text.indexOf("{"), firstBracket = text.indexOf("[");
         const isArray = firstBracket !== -1 && (firstBrace === -1 || firstBracket < firstBrace);
         const match = isArray ? text.match(/\[[\s\S]*\]/) : text.match(/\{[\s\S]*\}/);
@@ -222,18 +323,33 @@ export function QuestModal({ quest, rmId, roadmaps, progress, onAdvancePhase, on
 
   const handlePhaseComplete = (result) => {
     const currentPhase = quest.phase;
-    onAdvancePhase(rmId, { ...result, phase: currentPhase });
+
+    // Show phase result screen
+    setPhaseResult({ phase: currentPhase, result });
     setPhaseData(null);
 
-    // After phase 3 (Q&A), evaluate overall pass/fail using all collected results
-    if (currentPhase === 3) {
-      // Collect all phase results including the current one
-      const allResults = { ...quest.phaseResults, [currentPhase]: result };
-      const mcqPassed  = (allResults[1]?.score || 0) >= 80;
-      const codePassed = (allResults[2]?.score || 0) >= 70;
-      const qaPassed   = result.passed;
-      onCompleteQuest(rmId, mcqPassed && codePassed && qaPassed);
+    // Always record the result
+    onAdvancePhase(rmId, { ...result, phase: currentPhase });
+
+    // If failed, complete the quest as failed immediately
+    if (!result.passed && currentPhase > 0) {
+      onCompleteQuest(rmId, false);
     }
+
+    // If last phase passed, complete as passed
+    if (currentPhase === activePhases.length - 1 && result.passed) {
+      const allResults = { ...quest.phaseResults, [currentPhase]: result };
+      const mcqIdx = activePhases.findIndex(p => p.key === "mcq");
+      const codeIdx = activePhases.findIndex(p => p.key === "code");
+      const mcqPassed  = mcqIdx >= 0 ? (allResults[mcqIdx]?.score || 0) >= 80 : true;
+      const codePassed = codeIdx >= 0 ? (allResults[codeIdx]?.score || 0) >= 70 : true;
+      onCompleteQuest(rmId, mcqPassed && codePassed && result.passed);
+    }
+  };
+
+  const handleContinue = () => {
+    setPhaseResult(null);
+    // Phase was already advanced via onAdvancePhase — content will auto-generate
   };
 
   const phase = quest.phase;
@@ -241,6 +357,7 @@ export function QuestModal({ quest, rmId, roadmaps, progress, onAdvancePhase, on
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 200, display: "flex",
       flexDirection: "column", background: "#0f0f13" }}>
+
       {/* Header */}
       <div style={{ padding: "14px 16px", borderBottom: "1px solid #1e1e24",
         paddingTop: "calc(14px + env(safe-area-inset-top))",
@@ -253,58 +370,80 @@ export function QuestModal({ quest, rmId, roadmaps, progress, onAdvancePhase, on
             <div style={{ fontSize: 14, fontWeight: 700, color: "#fff" }}>🎯 {quest.title}</div>
             <div style={{ fontSize: 11, color: "#555", marginTop: 1 }}>{quest.roadmapLabel}</div>
           </div>
-          {/* Phase progress dots */}
           <div style={{ display: "flex", gap: 5, alignItems: "center" }}>
-            {PHASE_NAMES.map((_, i) => (
-              <div key={i} style={{ width: i === phase ? 20 : 7, height: 7, borderRadius: 4,
-                transition: "width 0.3s",
-                background: i < phase ? "#52b788" : i === phase ? "#7b5ea7" : "#1e1e24" }} />
-            ))}
+            {activePhases.map((_, i) => {
+              const pr = quest.phaseResults?.[i];
+              return (
+                <div key={i} style={{ width: i === phase ? 20 : 7, height: 7, borderRadius: 4,
+                  transition: "width 0.3s",
+                  background: pr ? (pr.passed ? "#52b788" : "#e05252")
+                    : i === phase ? "#7b5ea7" : "#1e1e24" }} />
+              );
+            })}
           </div>
         </div>
-        {/* Phase label */}
         <div style={{ marginTop: 10, display: "flex", gap: 6 }}>
-          {PHASE_NAMES.map((name, i) => (
-            <div key={i} style={{ flex: 1, textAlign: "center",
-              fontSize: 10, color: i === phase ? "#c4b5fd" : i < phase ? "#52b788" : "#333",
-              fontWeight: i === phase ? 700 : 400 }}>
-              {name}
-            </div>
-          ))}
+          {activePhases.map((p, i) => {
+            const pr = quest.phaseResults?.[i];
+            return (
+              <div key={i} style={{ flex: 1, textAlign: "center", fontSize: 10,
+                color: pr ? (pr.passed ? "#52b788" : "#e05252")
+                  : i === phase ? "#c4b5fd" : "#333",
+                fontWeight: i === phase ? 700 : 400 }}>
+                {p.name}
+              </div>
+            );
+          })}
         </div>
       </div>
 
       {/* Content */}
       <div style={{ flex: 1, overflowY: "auto", paddingBottom: "env(safe-area-inset-bottom)" }}>
-        {error && (
-          <div style={{ margin: "16px 20px", padding: "12px", background: "#2e1a1a",
-            borderRadius: 8, color: "#e05252", fontSize: 13 }}>{error}</div>
+
+        {/* Phase result screen */}
+        {phaseResult && (
+          <PhaseResult
+            phase={phaseResult.phase}
+            result={phaseResult.result}
+            color={rm.color} accent={rm.accent}
+            activePhases={activePhases}
+            onContinue={handleContinue}
+            onClose={onClose}
+          />
         )}
 
-        {loadingPhase && (
-          <div style={{ padding: "40px 20px", textAlign: "center", color: "#555" }}>
-            Generating {PHASE_NAMES[phase]} questions…
-          </div>
-        )}
-
-        {!loadingPhase && !error && (
+        {!phaseResult && (
           <>
-            {phase === 0 && (
-              <ReadPhase quest={quest} onComplete={() => handlePhaseComplete({ passed: true, score: 100 })} />
+            {error && (
+              <div style={{ margin: "16px 20px", padding: "12px", background: "#2e1a1a",
+                borderRadius: 8, color: "#e05252", fontSize: 13 }}>{error}</div>
             )}
-            {phase === 1 && phaseData && (
-              <QuizView questions={phaseData} rm={rm}
-                onQuizComplete={(score, total) => handlePhaseComplete({
-                  score: Math.round((score/total)*100),
-                  passed: Math.round((score/total)*100) >= 80,
-                })} />
+            {loadingPhase && (
+              <div style={{ padding: "40px 20px", textAlign: "center", color: "#555" }}>
+                Generating {activePhases[phase]?.name} questions…
+              </div>
             )}
-            {phase === 2 && phaseData && (
-              <CodeWriteView questions={phaseData} rm={rm}
-                onQuizComplete={(score) => handlePhaseComplete({ score, passed: score >= 70 })} />
-            )}
-            {phase === 3 && (
-              <QAPhase quest={quest} rm={rm} onComplete={handlePhaseComplete} />
+            {!loadingPhase && !error && (
+              <>
+                {activePhases[phase]?.key === "read" && (
+                  <ReadPhase quest={quest}
+                    onComplete={() => handlePhaseComplete({ passed: true, score: 100 })} />
+                )}
+                {activePhases[phase]?.key === "mcq" && phaseData && (
+                  <QuizView questions={phaseData} rm={rm}
+                    onQuizComplete={(score, total) => handlePhaseComplete({
+                      score: Math.round((score/total)*100),
+                      passed: Math.round((score/total)*100) >= 80,
+                    })} />
+                )}
+                {activePhases[phase]?.key === "code" && phaseData && (
+                  <CodeWriteView questions={phaseData} rm={rm}
+                    onQuizComplete={(score) => handlePhaseComplete({ score, passed: score >= 70 })} />
+                )}
+                {activePhases[phase]?.key === "qa" && (
+                  <QAPhase quest={quest} rm={rm} onComplete={handlePhaseComplete} />
+                )}
+              </>
             )}
           </>
         )}

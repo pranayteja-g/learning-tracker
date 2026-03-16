@@ -282,10 +282,15 @@ Respond ONLY with valid JSON:
   "phases": {
     "read": { "instruction": "What to focus on when reviewing before the test" },
     "mcq": { "count": 8, "difficulty": "hard" },
-    "code": { "count": 2, "difficulty": "hard" },
+    "code": null,
     "qa": { "count": 2, "instruction": "What depth the Q&A will probe" }
   }
-}`;
+}
+
+IMPORTANT for the "code" phase:
+- Set "code" to { "count": 2, "difficulty": "hard" } ONLY if the topics involve writing/reading actual code (e.g. Java, Python, algorithms, data structures, APIs)
+- Set "code" to null if the topics are conceptual/design (e.g. System Design, Architecture, Patterns, Theory, Processes, DevOps concepts)
+- When in doubt, set to null — a bad code challenge is worse than no code challenge`;
 }
 
 
