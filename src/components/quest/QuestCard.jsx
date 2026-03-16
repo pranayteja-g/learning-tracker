@@ -1,178 +1,189 @@
 import { useState, useEffect } from "react";
 
-function CooldownTimer({ ms }) {
+function CooldownTimer({ ms, cooldownUntil }) {
   const [remaining, setRemaining] = useState(ms);
   useEffect(() => {
+    setRemaining(ms);
     const t = setInterval(() => setRemaining(r => Math.max(0, r - 1000)), 1000);
     return () => clearInterval(t);
-  }, []);
+  }, [cooldownUntil]);
   const h = Math.floor(remaining / 3600000);
   const m = Math.floor((remaining % 3600000) / 60000);
   const s = Math.floor((remaining % 60000) / 1000);
   return <span>{h}h {String(m).padStart(2,"0")}m {String(s).padStart(2,"0")}s</span>;
 }
 
-const PHASE_LABELS = ["📖 Read", "🧠 MCQ", "💻 Code", "💬 Q&A"];
-const PHASE_DESC   = ["Review topics", "Hard quiz", "Code challenges", "Open Q&A"];
+const PHASE_LABELS = ["📖", "🧠", "💻", "💬"];
 
-export function QuestCard({ quest, loading, onBegin, onGenerate, isOnCooldown, cooldownRemaining, isMobile }) {
+// Single roadmap quest card
+export function QuestCard({ rm, quest, loading, onBegin, onGenerate, isOnCooldown, cooldownRemaining }) {
+  const color  = rm?.color  || "#7b5ea7";
+  const accent = rm?.accent || "#c4b5fd";
+
   if (loading) {
     return (
-      <div style={cardStyle(isMobile)}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{ fontSize: 22 }}>🎯</div>
-          <div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: "#fff" }}>Generating your quest…</div>
-            <div style={{ fontSize: 11, color: "#555", marginTop: 2 }}>AI mentor is analysing your progress</div>
-          </div>
-          <div style={{ marginLeft: "auto", display: "flex", gap: 4 }}>
+      <div style={card(color)}>
+        <div style={{ fontSize: 12, color: accent, fontWeight: 700, marginBottom: 6 }}>{rm?.label}</div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ fontSize: 16 }}>🎯</span>
+          <span style={{ fontSize: 12, color: "#555" }}>Generating quest…</span>
+          <div style={{ marginLeft: "auto", display: "flex", gap: 3 }}>
             {[0,1,2].map(i => (
-              <div key={i} style={{ width: 6, height: 6, borderRadius: "50%", background: "#7b5ea7",
-                animation: `pulse 1.2s ${i * 0.2}s infinite` }} />
+              <div key={i} style={{ width: 5, height: 5, borderRadius: "50%",
+                background: color, animation: `bq-pulse 1.2s ${i*0.2}s infinite` }} />
             ))}
           </div>
         </div>
-        <style>{`@keyframes pulse{0%,100%{opacity:.3}50%{opacity:1}}`}</style>
+        <style>{`@keyframes bq-pulse{0%,100%{opacity:.2}50%{opacity:1}}`}</style>
       </div>
     );
   }
 
   if (isOnCooldown) {
     return (
-      <div style={cardStyle(isMobile, "#e0525211", "#e0525233")}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{ fontSize: 22 }}>🔒</div>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: "#e05252" }}>Quest Failed — Cooldown Active</div>
-            <div style={{ fontSize: 11, color: "#888", marginTop: 2 }}>{quest?.title}</div>
-          </div>
-          <div style={{ textAlign: "right" }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: "#e05252", fontVariantNumeric: "tabular-nums" }}>
-              <CooldownTimer key={quest?.cooldownUntil} ms={cooldownRemaining} />
-            </div>
-            <div style={{ fontSize: 10, color: "#555" }}>until retry</div>
-          </div>
+      <div style={card(color, "#e0525218", "#e0525233")}>
+        <div style={{ fontSize: 12, color: accent, fontWeight: 700, marginBottom: 6 }}>{rm?.label}</div>
+        <div style={{ fontSize: 13, fontWeight: 700, color: "#e05252", marginBottom: 4 }}>🔒 {quest?.title}</div>
+        <div style={{ fontSize: 11, color: "#e05252", fontVariantNumeric: "tabular-nums" }}>
+          <CooldownTimer ms={cooldownRemaining} cooldownUntil={quest?.cooldownUntil} />
         </div>
-        <div style={{ marginTop: 10, fontSize: 11, color: "#555", fontStyle: "italic" }}>
-          Use this time to review: {quest?.topics?.join(", ")}
-        </div>
+        <div style={{ fontSize: 10, color: "#555", marginTop: 4 }}>Review: {quest?.topics?.slice(0,2).join(", ")}</div>
       </div>
     );
   }
 
   if (!quest) {
     return (
-      <div style={cardStyle(isMobile)}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{ fontSize: 22 }}>🎯</div>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: "#fff" }}>Daily Quest</div>
-            <div style={{ fontSize: 11, color: "#555", marginTop: 2 }}>Let your AI mentor assign your next challenge</div>
-          </div>
-          <button onClick={onGenerate}
-            style={{ padding: "7px 14px", background: "#7b5ea7", border: "none",
-              borderRadius: 7, color: "#fff", fontSize: 12, fontWeight: 700,
-              cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>
-            Generate Quest
-          </button>
-        </div>
+      <div style={card(color)}>
+        <div style={{ fontSize: 12, color: accent, fontWeight: 700, marginBottom: 8 }}>{rm?.label}</div>
+        <div style={{ fontSize: 12, color: "#555", marginBottom: 12 }}>No quest assigned yet</div>
+        <button onClick={onGenerate}
+          style={{ width: "100%", padding: "8px", background: color + "22",
+            border: `1px solid ${color}44`, borderRadius: 7,
+            color: accent, fontSize: 12, fontWeight: 700,
+            cursor: "pointer", fontFamily: "inherit" }}>
+          🎯 Generate Quest
+        </button>
       </div>
     );
   }
 
   if (quest.status === "completed") {
     return (
-      <div style={cardStyle(isMobile, "#52b78811", "#52b78833")}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{ fontSize: 22 }}>✅</div>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: "#52b788" }}>Quest Completed!</div>
-            <div style={{ fontSize: 11, color: "#888", marginTop: 2 }}>{quest.title}</div>
-          </div>
-          <button onClick={onGenerate}
-            style={{ padding: "7px 14px", background: "#1e1e24", border: "1px solid #2a2a35",
-              borderRadius: 7, color: "#888", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>
-            New Quest
-          </button>
-        </div>
+      <div style={card(color, "#52b78811", "#52b78833")}>
+        <div style={{ fontSize: 12, color: accent, fontWeight: 700, marginBottom: 6 }}>{rm?.label}</div>
+        <div style={{ fontSize: 13, fontWeight: 700, color: "#52b788", marginBottom: 4 }}>✅ {quest.title}</div>
+        <div style={{ fontSize: 11, color: "#555", marginBottom: 10 }}>Quest completed!</div>
+        <button onClick={onGenerate}
+          style={{ width: "100%", padding: "7px", background: "#1e1e24",
+            border: "1px solid #2a2a35", borderRadius: 6,
+            color: "#666", fontSize: 11, cursor: "pointer", fontFamily: "inherit" }}>
+          New Quest →
+        </button>
       </div>
     );
   }
 
   // Active quest
-  const currentPhaseLabel = PHASE_LABELS[quest.phase] || "Complete";
-  const isComplete = quest.phase >= 4;
-
   return (
-    <div style={cardStyle(isMobile, "#7b5ea711", "#7b5ea733")}>
-      {/* Header */}
-      <div style={{ display: "flex", alignItems: "flex-start", gap: 10, marginBottom: 10 }}>
-        <div style={{ fontSize: 22, flexShrink: 0 }}>🎯</div>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: "#fff" }}>{quest.title}</div>
-          <div style={{ fontSize: 11, color: "#888", marginTop: 2 }}>{quest.description}</div>
-        </div>
-      </div>
+    <div style={card(color, color + "11", color + "33")}>
+      <div style={{ fontSize: 12, color: accent, fontWeight: 700, marginBottom: 6 }}>{rm?.label}</div>
+      <div style={{ fontSize: 13, fontWeight: 700, color: "#fff", marginBottom: 4 }}>🎯 {quest.title}</div>
 
       {/* Topics */}
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginBottom: 10 }}>
-        {quest.topics?.map(t => (
-          <span key={t} style={{ fontSize: 10, padding: "2px 8px", borderRadius: 4,
-            background: "#7b5ea722", color: "#c4b5fd", border: "1px solid #7b5ea744" }}>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 10 }}>
+        {quest.topics?.slice(0, 3).map(t => (
+          <span key={t} style={{ fontSize: 10, padding: "1px 6px", borderRadius: 4,
+            background: color + "22", color: accent, border: `1px solid ${color}33` }}>
             {t}
           </span>
         ))}
+        {quest.topics?.length > 3 && (
+          <span style={{ fontSize: 10, color: "#555" }}>+{quest.topics.length - 3}</span>
+        )}
       </div>
 
-      {/* Phase progress */}
-      <div style={{ display: "flex", gap: 4, marginBottom: 12 }}>
-        {PHASE_LABELS.map((label, i) => {
+      {/* Phase dots */}
+      <div style={{ display: "flex", gap: 3, marginBottom: 12, alignItems: "center" }}>
+        {PHASE_LABELS.map((icon, i) => {
           const done    = i < quest.phase;
-          const current = i === quest.phase && !isComplete;
+          const current = i === quest.phase;
           const passed  = quest.phaseResults?.[i]?.passed;
           return (
-            <div key={i} style={{ flex: 1, textAlign: "center" }}>
-              <div style={{ height: 4, borderRadius: 2, marginBottom: 4,
-                background: done ? (passed === false ? "#e05252" : "#52b788")
-                  : current ? "#7b5ea7" : "#1e1e24" }} />
-              <div style={{ fontSize: 9, color: done ? (passed === false ? "#e05252" : "#52b788")
-                : current ? "#c4b5fd" : "#444",
-                textTransform: "uppercase", letterSpacing: 0.5 }}>
-                {label}
+            <div key={i} style={{ display: "flex", alignItems: "center", gap: 2 }}>
+              <div style={{ width: current ? 24 : 18, height: 18, borderRadius: 4,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 10, transition: "all 0.2s",
+                background: done ? (passed === false ? "#e0525233" : "#52b78833")
+                  : current ? color + "44" : "#1e1e24",
+                border: `1px solid ${done ? (passed === false ? "#e05252" : "#52b788")
+                  : current ? color : "#2a2a35"}`,
+                color: done ? (passed === false ? "#e05252" : "#52b788")
+                  : current ? accent : "#444" }}>
+                {icon}
               </div>
+              {i < 3 && <div style={{ width: 6, height: 1, background: done ? "#52b78844" : "#1e1e24" }} />}
             </div>
           );
         })}
       </div>
 
-      {/* Reason */}
-      {quest.reason && (
-        <div style={{ fontSize: 11, color: "#555", fontStyle: "italic", marginBottom: 10 }}>
-          💡 {quest.reason}
-        </div>
-      )}
-
-      {/* CTA */}
-      {!isComplete ? (
-        <button onClick={onBegin}
-          style={{ width: "100%", padding: "10px", background: "#7b5ea7",
-            border: "none", borderRadius: 8, color: "#fff", fontSize: 13,
-            fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
-          {quest.phase === 0 ? "Begin Quest →" : `Continue — ${currentPhaseLabel}`}
-        </button>
-      ) : (
-        <div style={{ textAlign: "center", fontSize: 13, color: "#52b788", fontWeight: 700 }}>
-          All phases complete — submitting…
-        </div>
-      )}
+      <button onClick={onBegin}
+        style={{ width: "100%", padding: "8px", background: color,
+          border: "none", borderRadius: 7, color: "#fff",
+          fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+        {quest.phase === 0 ? "Begin →" : `Continue — Phase ${quest.phase + 1}/4`}
+      </button>
     </div>
   );
 }
 
-function cardStyle(isMobile, bg = "#16161b", border = "#2a2a35") {
+// Quest board — grid of all roadmap quest cards
+export function QuestBoard({ roadmaps, quests, loadingRmIds = [], onBegin, onGenerate,
+  isOnCooldown, cooldownRemaining, isMobile }) {
+
+  const rmList = Object.values(roadmaps);
+  if (!rmList.length) return null;
+
+  return (
+    <div style={{ marginBottom: 16 }}>
+      {/* Header */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between",
+        marginBottom: 10 }}>
+        <div style={{ fontSize: 11, color: "#555", textTransform: "uppercase", letterSpacing: 1 }}>
+          🎯 Quest Board
+        </div>
+        <div style={{ fontSize: 10, color: "#444" }}>4-phase mastery test per roadmap</div>
+      </div>
+
+      {/* Cards grid */}
+      <div style={{
+        display: "grid",
+        gridTemplateColumns: isMobile
+          ? rmList.length === 1 ? "1fr" : "repeat(2, 1fr)"
+          : "repeat(auto-fill, minmax(220px, 1fr))",
+        gap: 10,
+      }}>
+        {rmList.map(rm => (
+          <QuestCard
+            key={rm.id}
+            rm={rm}
+            quest={quests[rm.id] || null}
+            loading={loadingRmIds.includes(rm.id)}
+            isOnCooldown={isOnCooldown(rm.id)}
+            cooldownRemaining={cooldownRemaining(rm.id)}
+            onBegin={() => onBegin(rm.id)}
+            onGenerate={() => onGenerate(rm.id)}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function card(color, bg = "#16161b", border = "#2a2a35") {
   return {
     background: bg, border: `1px solid ${border}`,
-    borderRadius: 12, padding: "14px 16px",
-    marginBottom: 14,
+    borderRadius: 10, padding: "12px 14px",
   };
 }

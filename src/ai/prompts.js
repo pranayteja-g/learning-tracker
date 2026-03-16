@@ -226,9 +226,10 @@ Respond with ONLY a JSON array, no other text:
 
 
 // ── Quest prompt ──────────────────────────────────────────────────────────────
-export function buildQuestPrompt({ roadmaps, quizResults, progress }) {
-  // Build a compact snapshot of the learner's state
-  // Recursive flatten for nested topic structures
+export function buildQuestPrompt({ roadmap, quizResults, progress }) {
+  const rmId = roadmap.id;
+
+  // Flatten nested topics
   const flattenTopics = (items) => {
     const out = [];
     for (const t of (items || [])) {
@@ -238,55 +239,55 @@ export function buildQuestPrompt({ roadmaps, quizResults, progress }) {
     return out;
   };
 
-  const rmSummaries = Object.values(roadmaps).map(rm => {
-    const sections = Object.entries(rm.sections).map(([sec, topics]) => {
-      const flat = flattenTopics(topics);
-      const done = flat.filter(t => progress[`${rm.id}::${t}`]).length;
-      const quizzed = flat.filter(t => quizResults[`${rm.id}::${t}`]?.attempts > 0);
-      const weak = quizzed.filter(t => (quizResults[`${rm.id}::${t}`]?.proficiency || 0) < 60);
-      const unquizzed = flat.filter(t => !quizResults[`${rm.id}::${t}`]);
-      return { sec, total: flat.length, done, weak: weak.map(t => t), unquizzed: unquizzed.slice(0, 5) };
-    }).filter(s => s.done > 0 || s.weak.length > 0);
-    return { id: rm.id, label: rm.label, sections };
-  }).filter(r => r.sections.length > 0);
+  // Build per-section snapshot
+  const sections = Object.entries(roadmap.sections).map(([sec, ts]) => {
+    const topics = flattenTopics(ts);
+    const weak      = topics.filter(t => { const r = quizResults[`${rmId}::${t}`]; return r?.attempts > 0 && (r.proficiency || 0) < 60; });
+    const untested  = topics.filter(t => progress[`${rmId}::${t}`] && !quizResults[`${rmId}::${t}`]);
+    const struggling = topics.filter(t => { const r = quizResults[`${rmId}::${t}`]; return r?.attempts >= 2 && (r.stars || 0) === 0; });
+    const done      = topics.filter(t => progress[`${rmId}::${t}`]).length;
+    return { sec, total: topics.length, done, weak, untested, struggling };
+  }).filter(s => s.done > 0 || s.weak.length > 0 || s.untested.length > 0);
 
-  if (!rmSummaries.length) return null;
+  if (!sections.length) return null;
 
-  return `You are a strict but supportive mentor. Assign a focused quest for this learner.
+  const snapshot = sections.map(s =>
+    `${s.sec} (${s.done}/${s.total} done)` +
+    (s.weak.length      ? `\n  ⚠ Weak: ${s.weak.join(", ")}`           : "") +
+    (s.struggling.length ? `\n  ✗ Struggling: ${s.struggling.join(", ")}` : "") +
+    (s.untested.length  ? `\n  ? Untested: ${s.untested.slice(0,4).join(", ")}` : "")
+  ).join("\n\n");
 
-LEARNER STATE:
-${rmSummaries.map(rm => `
-${rm.label}:
-${rm.sections.map(s =>
-  `  ${s.sec}: ${s.done}/${s.total} done` +
-  (s.weak.length ? ` | WEAK: ${s.weak.join(", ")}` : "") +
-  (s.unquizzed.length ? ` | UNTESTED: ${s.unquizzed.join(", ")}` : "")
-).join("\n")}`).join("\n")}
+  return `You are a demanding study mentor assigning a quest for a learner studying "${roadmap.label}".
 
-QUEST ASSIGNMENT RULES:
-- Pick 2-4 closely related topics from ONE roadmap section
-- Prioritise: (1) weak topics first, (2) untested done topics, (3) next unlearned topics
-- Topics should form a coherent group (e.g. "OOP Fundamentals", not random mix)
-- Quest must be completable in 20-30 minutes
-- Be a demanding mentor — assign topics that challenge, not topics already mastered
+ROADMAP SNAPSHOT:
+${snapshot}
 
-Respond with ONLY valid JSON:
+QUEST RULES:
+- Pick 2-4 topics that form a logical group from ONE section
+- Priority order: (1) struggling topics, (2) weak proficiency, (3) completed but untested
+- Do NOT pick mastered topics (those not mentioned above)
+- Title should be punchy and specific (e.g. "Collections Mastery", "OOP Deep Dive")
+- The phases.mcq.difficulty and phases.code.difficulty should reflect how weak the topics are
+
+Respond ONLY with valid JSON:
 {
-  "roadmapId": "the rm.id",
-  "roadmapLabel": "display name",
-  "title": "Quest name e.g. 'OOP Fundamentals'",
-  "description": "1-2 sentences — what this quest will test and why it matters",
-  "topics": ["topic1", "topic2", "topic3"],
-  "section": "the section these topics belong to",
-  "reason": "1 sentence — why you assigned these specific topics",
+  "roadmapId": "${rmId}",
+  "roadmapLabel": "${roadmap.label}",
+  "title": "Quest title",
+  "description": "1-2 sentences on what this tests and why",
+  "topics": ["topic1", "topic2"],
+  "section": "section name",
+  "reason": "1 sentence — specific gap being addressed",
   "phases": {
-    "read": { "instruction": "What to focus on while reviewing these topics before the test" },
+    "read": { "instruction": "What to focus on when reviewing before the test" },
     "mcq": { "count": 8, "difficulty": "hard" },
     "code": { "count": 2, "difficulty": "hard" },
-    "qa": { "count": 2, "instruction": "What depth of understanding the Q&A will probe" }
+    "qa": { "count": 2, "instruction": "What depth the Q&A will probe" }
   }
 }`;
 }
+
 
 // ── Roadmap categories ───────────────────────────────────────────────────────
 export const ROADMAP_CATEGORIES = [

@@ -177,7 +177,7 @@ function ReadPhase({ quest, onComplete }) {
 }
 
 // ── Main QuestModal ───────────────────────────────────────────────────────────
-export function QuestModal({ quest, roadmaps, progress, onAdvancePhase, onCompleteQuest, onClose }) {
+export function QuestModal({ quest, rmId, roadmaps, progress, onAdvancePhase, onCompleteQuest, onClose }) {
   const [phaseData,    setPhaseData]    = useState(null);
   const [loadingPhase, setLoadingPhase] = useState(false);
   const [error,        setError]        = useState("");
@@ -222,7 +222,7 @@ export function QuestModal({ quest, roadmaps, progress, onAdvancePhase, onComple
 
   const handlePhaseComplete = (result) => {
     const currentPhase = quest.phase;
-    onAdvancePhase({ ...result, phase: currentPhase });
+    onAdvancePhase(rmId, { ...result, phase: currentPhase });
     setPhaseData(null);
 
     // After phase 3 (Q&A), evaluate overall pass/fail using all collected results
@@ -232,7 +232,7 @@ export function QuestModal({ quest, roadmaps, progress, onAdvancePhase, onComple
       const mcqPassed  = (allResults[1]?.score || 0) >= 80;
       const codePassed = (allResults[2]?.score || 0) >= 70;
       const qaPassed   = result.passed;
-      onCompleteQuest(mcqPassed && codePassed && qaPassed);
+      onCompleteQuest(rmId, mcqPassed && codePassed && qaPassed);
     }
   };
 
