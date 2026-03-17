@@ -243,12 +243,9 @@ export default function App() {
     finally { setLoadingQuestRmIds(prev => prev.filter(id => id !== rmId)); }
   };
 
-  // Auto-generate quests for roadmaps that need one on load
+  // Auto-generate quests for all roadmaps that need one on load
   useEffect(() => {
     if (!loaded || !questLoaded || !Object.keys(roadmaps).length) return;
-    const hasProgress = Object.keys(progress).length > 0;
-    if (!hasProgress) return;
-    // Generate for each roadmap that needs a quest
     Object.keys(roadmaps).forEach(rmId => {
       if (needsNewQuest(rmId) && !loadingQuestRmIds.includes(rmId)) {
         generateQuest(rmId);

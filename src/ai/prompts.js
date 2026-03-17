@@ -249,13 +249,26 @@ export function buildQuestPrompt({ roadmap, quizResults, progress }) {
     return { sec, total: topics.length, done, weak, untested, struggling };
   }).filter(s => s.done > 0 || s.weak.length > 0 || s.untested.length > 0);
 
-  if (!sections.length) return null;
+  // If no progress at all, use the first section as a starter quest
+  let effectiveSections = sections;
+  let isStarter = false;
+  if (!sections.length) {
+    const firstSec = Object.entries(roadmap.sections)[0];
+    if (!firstSec) return null;
+    const [sec, ts] = firstSec;
+    const topics = flattenTopics(ts);
+    effectiveSections = [{ sec, total: topics.length, done: 0, weak: [], untested: [], struggling: [],
+      starter: topics.slice(0, 4) }];
+    isStarter = true;
+  }
 
-  const snapshot = sections.map(s =>
-    `${s.sec} (${s.done}/${s.total} done)` +
-    (s.weak.length      ? `\n  ⚠ Weak: ${s.weak.join(", ")}`           : "") +
-    (s.struggling.length ? `\n  ✗ Struggling: ${s.struggling.join(", ")}` : "") +
-    (s.untested.length  ? `\n  ? Untested: ${s.untested.slice(0,4).join(", ")}` : "")
+  const snapshot = effectiveSections.map(s =>
+    isStarter
+      ? `${s.sec} (not started yet)\n  → Starter topics: ${s.starter.join(", ")}`
+      : `${s.sec} (${s.done}/${s.total} done)` +
+        (s.weak.length       ? `\n  ⚠ Weak: ${s.weak.join(", ")}`            : "") +
+        (s.struggling.length ? `\n  ✗ Struggling: ${s.struggling.join(", ")}` : "") +
+        (s.untested.length   ? `\n  ? Untested: ${s.untested.slice(0,4).join(", ")}` : "")
   ).join("\n\n");
 
   return `You are a demanding study mentor assigning a quest for a learner studying "${roadmap.label}".
@@ -265,7 +278,7 @@ ${snapshot}
 
 QUEST RULES:
 - Pick 2-4 topics that form a logical group from ONE section
-- Priority order: (1) struggling topics, (2) weak proficiency, (3) completed but untested
+- Priority order: (1) struggling topics, (2) weak proficiency, (3) completed but untested, (4) if roadmap not started → pick first 2-3 foundational topics as an intro quest
 - Do NOT pick mastered topics (those not mentioned above)
 - Title should be punchy and specific (e.g. "Collections Mastery", "OOP Deep Dive")
 - The phases.mcq.difficulty and phases.code.difficulty should reflect how weak the topics are
@@ -287,10 +300,11 @@ Respond ONLY with valid JSON:
   }
 }
 
-IMPORTANT for the "code" phase:
-- Set "code" to { "count": 2, "difficulty": "hard" } ONLY if the topics involve writing/reading actual code (e.g. Java, Python, algorithms, data structures, APIs)
-- Set "code" to null if the topics are conceptual/design (e.g. System Design, Architecture, Patterns, Theory, Processes, DevOps concepts)
-- When in doubt, set to null — a bad code challenge is worse than no code challenge`;
+CRITICAL for the "code" phase — read carefully:
+- Topics like: variables, loops, functions, classes, algorithms, data structures, APIs, SQL, regex → set "code" to { "count": 2, "difficulty": "hard" }
+- Topics like: system design, scalability, architecture, CAP theorem, load balancing, caching, microservices, design patterns, DevOps, CI/CD, networking, security concepts, agile → set "code" to null
+- The roadmap name is a strong signal: "System Design", "DevOps", "Software Architecture" → always null
+- When in doubt → null. A conceptual topic with a forced code challenge is a broken experience`;
 }
 
 
