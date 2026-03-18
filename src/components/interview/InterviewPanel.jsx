@@ -1,6 +1,9 @@
 import { useState } from "react";
 import { callAI, loadAIConfig, PROVIDERS } from "../../ai/providers.js";
 import { useUsage } from "../../ai/useUsage.js";
+import { safeParseJSON } from "../../utils/jsonParse.js";
+import { formatNumber } from "../../utils/format.js";
+import { TIME_OPTIONS } from "../../constants/config.js";
 import {
   INTERVIEW_SYSTEM_PROMPT,
   buildInterviewQuestionsPrompt,
@@ -18,22 +21,6 @@ const MODES = [
   { id: "cheatsheet", label: "Cheat Sheet",icon: "🗺️", desc: "Last-minute summary"      },
   { id: "timed",      label: "Timed Quiz", icon: "⏱️", desc: "MCQ under time pressure"  },
 ];
-
-const TIME_OPTIONS = [
-  { label: "5 min",  secs: 300  },
-  { label: "10 min", secs: 600  },
-  { label: "15 min", secs: 900  },
-  { label: "20 min", secs: 1200 },
-];
-
-function safeParseJSON(text) {
-  try { return JSON.parse(text.replace(/```json\n?/g,"").replace(/```\n?/g,"").trim()); }
-  catch { throw new Error("AI returned an unexpected format. Please try again."); }
-}
-
-function fmt(n) {
-  return n >= 1000 ? (n/1000).toFixed(1).replace(/\.0$/,"") + "k" : String(n);
-}
 
 export function InterviewPanel({ open, onClose, roadmap, progress, isMobile, roadmaps }) {
   const [mode,      setMode]      = useState("interview");
@@ -283,8 +270,8 @@ export function InterviewPanel({ open, onClose, roadmap, progress, isMobile, roa
 
               {lastUsed && !loading && (
                 <div style={{ textAlign: "center", marginTop: 8, fontSize: 10, color: "#444" }}>
-                  {fmt(lastUsed.promptTokens)} in + {fmt(lastUsed.completionTokens)} out
-                  = <strong style={{ color: "#555" }}>{fmt(lastUsed.promptTokens + lastUsed.completionTokens)} tokens</strong>
+                  {formatNumber(lastUsed.promptTokens)} in + {formatNumber(lastUsed.completionTokens)} out
+                  = <strong style={{ color: "#555" }}>{formatNumber(lastUsed.promptTokens + lastUsed.completionTokens)} tokens</strong>
                 </div>
               )}
             </div>

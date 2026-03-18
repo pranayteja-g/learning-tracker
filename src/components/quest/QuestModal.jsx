@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { callAI, loadAIConfig } from "../../ai/providers.js";
 import { buildQuizPrompt, buildCodeChallengePrompt } from "../../ai/prompts.js";
 import { buildQuizContext } from "../../ai/context.js";
+import { safeParseJSON } from "../../utils/jsonParse.js";
 import { QuizView }      from "../ai/QuizView.jsx";
 import { CodeWriteView } from "../ai/CodeWriteView.jsx";
 
@@ -135,7 +136,7 @@ Respond ONLY with JSON array:
       });
       const clean = text.replace(/```json\n?/gi,"").replace(/```\n?/g,"").trim();
       const match = clean.match(/\[[\s\S]*\]/);
-      setQuestions(JSON.parse(match ? match[0] : clean));
+      setQuestions(safeParseJSON(match ? match[0] : clean));
     } catch(e) { setError(e.message); }
     finally { setGenerating(false); }
   };
@@ -160,7 +161,7 @@ Respond ONLY with JSON:
       });
       const clean = text.replace(/```json\n?/gi,"").replace(/```\n?/g,"").trim();
       const match = clean.match(/\{[\s\S]*\}/);
-      setFeedbacks(f => ({ ...f, [idx]: JSON.parse(match ? match[0] : clean) }));
+      setFeedbacks(f => ({ ...f, [idx]: safeParseJSON(match ? match[0] : clean) }));
     } catch(e) { setError(e.message); }
     finally { setLoading(false); }
   };
@@ -290,7 +291,7 @@ export function QuestModal({ quest, rmId, roadmaps, progress, onAdvancePhase, on
 
   useEffect(() => {
     if (quest.phase > 0 && !phaseData && !phaseResult) generatePhaseContent();
-  }, [quest.phase]);
+  }, [quest.phase, phaseData, phaseResult, rm, progress, quest]);
 
   const generatePhaseContent = async () => {
     setLoadingPhase(true); setError("");
@@ -315,7 +316,7 @@ export function QuestModal({ quest, rmId, roadmaps, progress, onAdvancePhase, on
         const firstBrace = text.indexOf("{"), firstBracket = text.indexOf("[");
         const isArray = firstBracket !== -1 && (firstBrace === -1 || firstBracket < firstBrace);
         const match = isArray ? text.match(/\[[\s\S]*\]/) : text.match(/\{[\s\S]*\}/);
-        setPhaseData(match ? JSON.parse(match[0]) : JSON.parse(text));
+        setPhaseData(match ? safeParseJSON(match[0]) : safeParseJSON(text));
       }
     } catch(e) { setError(e.message); }
     finally { setLoadingPhase(false); }
@@ -438,7 +439,7 @@ export function QuestModal({ quest, rmId, roadmaps, progress, onAdvancePhase, on
                 )}
                 {activePhases[phase]?.key === "code" && phaseData && (
                   <CodeWriteView questions={phaseData} rm={rm}
-                    onQuizComplete={(score) => handlePhaseComplete({ score, passed: score >= 70 })} />
+                    onComplete={(score) => handlePhaseComplete({ score, passed: score >= 70 })} />
                 )}
                 {activePhases[phase]?.key === "qa" && (
                   <QAPhase quest={quest} rm={rm} onComplete={handlePhaseComplete} />

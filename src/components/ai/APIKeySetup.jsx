@@ -1,12 +1,8 @@
 import { useState } from "react";
 import { PROVIDERS } from "../../ai/providers.js";
+import { formatNumber } from "../../utils/format.js";
 
 const LIMIT_PRESETS = [25000, 50000, 100000, 200000];
-
-function fmt(n) {
-  if (n >= 1000) return (n / 1000).toFixed(1).replace(/\.0$/, "") + "k";
-  return String(n);
-}
 
 function UsageBar({ usage, limit, pct, onReset }) {
   const barColor = pct >= 90 ? "#e05252" : pct >= 70 ? "#ee9b00" : "#52b788";
@@ -34,7 +30,7 @@ function UsageBar({ usage, limit, pct, onReset }) {
           { label: "Out tokens", value: usage.completionTokens || 0,  unit: "" },
         ].map(({ label, value, unit }) => (
           <div key={label} style={{ background: "#16161b", borderRadius: 7, padding: "8px 10px" }}>
-            <div style={{ fontSize: 15, fontWeight: 700, color: "#e8e6e0" }}>{fmt(value)}{unit}</div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: "#e8e6e0" }}>{formatNumber(value)}{unit}</div>
             <div style={{ fontSize: 10, color: "#555", marginTop: 1 }}>{label}</div>
           </div>
         ))}
@@ -45,8 +41,8 @@ function UsageBar({ usage, limit, pct, onReset }) {
         <>
           <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 5 }}>
             <span style={{ fontSize: 11, color: "#666" }}>
-              Total: <strong style={{ color: barColor }}>{fmt(usage.totalTokens || 0)}</strong>
-              <span style={{ color: "#444" }}> / {fmt(limit.dailyTokenLimit)}</span>
+              Total: <strong style={{ color: barColor }}>{formatNumber(usage.totalTokens || 0)}</strong>
+              <span style={{ color: "#444" }}> / {formatNumber(limit.dailyTokenLimit)}</span>
             </span>
             <span style={{ fontSize: 11, color: barColor, fontWeight: 700 }}>{pct}%</span>
           </div>
@@ -63,7 +59,7 @@ function UsageBar({ usage, limit, pct, onReset }) {
       )}
       {!limit.enabled && (
         <div style={{ fontSize: 11, color: "#444", textAlign: "center", marginTop: 4 }}>
-          Total: {fmt(usage.totalTokens || 0)} tokens used · no limit set
+          Total: {formatNumber(usage.totalTokens || 0)} tokens used · no limit set
         </div>
       )}
     </div>
@@ -129,7 +125,7 @@ export function APIKeySetup({ config, onSave, usage = {}, limit = {}, pct = 0, o
                     borderRadius: 6, border: `1px solid ${!showCustom && limitVal === v ? "#7b5ea7" : "#2a2a35"}`,
                     background: !showCustom && limitVal === v ? "#7b5ea722" : "#16161b",
                     color: !showCustom && limitVal === v ? "#c4b5fd" : "#666" }}>
-                  {fmt(v)}
+                  {formatNumber(v)}
                 </button>
               ))}
               <button onClick={() => setShowCustom(v => !v)}
@@ -153,7 +149,7 @@ export function APIKeySetup({ config, onSave, usage = {}, limit = {}, pct = 0, o
               style={{ width: "100%", padding: "8px", background: "#7b5ea722",
                 border: "1px solid #7b5ea744", borderRadius: 6, color: "#c4b5fd",
                 fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>
-              Save limit ({fmt(showCustom ? parseInt(customVal || 0) : limitVal)} tokens/day)
+              Save limit ({formatNumber(showCustom ? parseInt(customVal || 0) : limitVal)} tokens/day)
             </button>
           </>
         )}

@@ -3,6 +3,7 @@ import { useAppStorage }         from "./storage/hooks.js";
 import { useIsMobile }           from "./hooks/useIsMobile.js";
 import { validateRoadmap, downloadJSON, getRoadmapStats, getNextUp } from "./utils/roadmap.js";
 import { flatTopicNames, allTopicNames, topicName, isExpanded } from "./utils/topics.js";
+import { safeParseJSON } from "./utils/jsonParse.js";
 import { Toast }                 from "./components/ui/Toast.jsx";
 import { TopicCard }             from "./components/ui/TopicCard.jsx";
 import { RadialProgress }        from "./components/ui/RadialProgress.jsx";
@@ -23,6 +24,7 @@ import { QuestModal }             from "./components/quest/QuestModal.jsx";
 import { buildQuestPrompt }       from "./ai/prompts.js";
 import { callAI }                 from "./ai/providers.js";
 import { loadAIConfig }           from "./ai/providers.js";
+import { AITimeoutTester }        from "./components/debug/AITimeoutTester.jsx";
 
 export default function App() {
   const { roadmaps, setRoadmaps, progress, setProgress, notes, setNotes,
@@ -236,8 +238,7 @@ export default function App() {
       const { text } = await callAI({ provider: cfg.provider, apiKey,
         systemPrompt: "You are a study mentor. Assign a quest. Respond ONLY with valid JSON.",
         userPrompt: prompt, maxTokens: 1024 });
-      const clean = text.replace(/```json\n?/gi,"").replace(/```\n?/g,"").trim();
-      const data = JSON.parse(clean.match(/\{[\s\S]*\}/)[0]);
+      const data = safeParseJSON(text);
       startQuest({ ...data, roadmapId: rmId });
     } catch(e) { console.error("Quest generation failed:", e); }
     finally { setLoadingQuestRmIds(prev => prev.filter(id => id !== rmId)); }
@@ -769,6 +770,9 @@ export default function App() {
           onCompleteQuest={completeQuest}
           onClose={() => setActiveQuestRmId(null)}
         />
+      )}
+      {process.env.NODE_ENV === "development" && (
+        <AITimeoutTester />
       )}
     </div>
   );

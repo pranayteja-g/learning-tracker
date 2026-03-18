@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { callAI, loadAIConfig } from "../../ai/providers.js";
+import { safeParseJSON } from "../../utils/jsonParse.js";
 import { MessageRenderer } from "./MessageRenderer.jsx";
 
 export function CodeWriteView({ questions, rm, onComplete }) {
@@ -50,7 +51,7 @@ Respond ONLY with JSON:
       });
 
       const clean  = text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
-      const result = JSON.parse(clean);
+      const result = safeParseJSON(clean);
       setFeedback(f => ({ ...f, [idx]: { loading: false, result } }));
     } catch (e) {
       setFeedback(f => ({ ...f, [idx]: { loading: false, error: e.message } }));
