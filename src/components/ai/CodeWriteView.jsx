@@ -122,12 +122,14 @@ Respond ONLY with JSON:
           );
         })}
 
-        <button onClick={() => { setAnswers({}); setFeedback({}); setSubmitted(false); setCurrent(0); }}
-          style={{ width: "100%", padding: "10px", marginTop: 4, background: rm.color,
-            border: "none", borderRadius: 8, color: "#fff", fontSize: 13,
-            fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
-          Try Again
-        </button>
+        {totalScore < 70 && (
+          <button onClick={() => { setAnswers({}); setFeedback({}); setSubmitted(false); setCurrent(0); }}
+            style={{ width: "100%", padding: "10px", marginTop: 4, background: "#1e1e24",
+              border: "1px solid #2a2a35", borderRadius: 8, color: "#888", fontSize: 13,
+              fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+            ↺ Try Again
+          </button>
+        )}
       </div>
     );
   }
