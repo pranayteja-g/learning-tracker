@@ -47,7 +47,53 @@ export function AITimeoutTester() {
     }
   };
 
-  // Test 2: Slow network (should timeout and retry)
+  // Test 2: Input validation (should fail gracefully)
+  const testInputValidation = async () => {
+    addLog("test", "Starting: Input Validation Tests");
+    try {
+      addLog("info", "Testing: Empty API key...");
+      await callAI({
+        provider: "groq",
+        apiKey: "",
+        systemPrompt: "Test",
+        userPrompt: "Test",
+      });
+      addLog("error", "Should have rejected empty API key!");
+    } catch (error) {
+      addLog("success", `✓ Correctly rejected empty API key: ${error.message}`);
+    }
+
+    try {
+      addLog("info", "Testing: Empty user prompt...");
+      const config = loadAIConfig();
+      await callAI({
+        provider: config.provider,
+        apiKey: config.keys[config.provider],
+        systemPrompt: "Test",
+        userPrompt: "   ", // Just whitespace
+      });
+      addLog("error", "Should have rejected empty prompt!");
+    } catch (error) {
+      addLog("success", `✓ Correctly rejected empty prompt: ${error.message}`);
+    }
+
+    try {
+      addLog("info", "Testing: Invalid temperature...");
+      const config = loadAIConfig();
+      await callAI({
+        provider: config.provider,
+        apiKey: config.keys[config.provider],
+        systemPrompt: "Test",
+        userPrompt: "Test",
+        temperature: 5, // Out of range
+      });
+      addLog("error", "Should have rejected invalid temperature!");
+    } catch (error) {
+      addLog("success", `✓ Correctly rejected invalid temperature: ${error.message}`);
+    }
+  };
+
+  // Test 3: Slow network (should timeout and retry)
   const testSlowNetwork = async () => {
     addLog("test", "Starting: Slow Network (simulated with throttling)");
     addLog("info", "DevTools Network tab: Use 'Slow 4G' throttle (not all browsers show '3G')");
@@ -198,6 +244,7 @@ export function AITimeoutTester() {
           {/* Controls */}
           <div style={{ padding: 12, background: "#16161b", borderBottom: "1px solid #1e1e24", display: "flex", gap: 8, flexWrap: "wrap" }}>
             <button onClick={testNormalRequest} style={buttonStyle}>✓ Normal Request</button>
+            <button onClick={testInputValidation} style={buttonStyle}>🛡️ Input Validation</button>
             <button onClick={testSlowNetwork} style={buttonStyle}>🐌 Slow Network Info</button>
             <button onClick={testWebSearch} style={buttonStyle}>🔍 Web Search</button>
             <button onClick={testMultipleRequests} style={buttonStyle}>📊 Multiple Requests</button>
