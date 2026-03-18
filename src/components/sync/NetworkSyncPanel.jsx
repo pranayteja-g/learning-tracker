@@ -20,12 +20,33 @@ export function NetworkSyncPanel({ onClose, useSync }) {
     disconnect,
     unpairDevice,
     clearPairingCode,
+    syncManager,
   } = syncState;
 
   const [showConnectModal, setShowConnectModal] = useState(false);
   const [showPairingCode, setShowPairingCode] = useState(false);
+  const [showServerConnect, setShowServerConnect] = useState(false);
+  const [serverUrl, setServerUrl] = useState("ws://192.168.31.183:3001");
+
+  const handleConnectToServer = async (e) => {
+    e.preventDefault();
+    try {
+      // Just connect to server, don't pair yet
+      if (syncManager) {
+        await syncManager.connect(serverUrl);
+        setShowServerConnect(false);
+      }
+    } catch (e) {
+      console.error("Failed to connect to server:", e);
+    }
+  };
 
   const handleGenerateCode = () => {
+    if (!isConnected) {
+      alert("Please connect to sync server first");
+      setShowServerConnect(true);
+      return;
+    }
     generateNewPairingCode();
     setShowPairingCode(true);
   };
@@ -55,9 +76,34 @@ export function NetworkSyncPanel({ onClose, useSync }) {
         <h3>Connection Status</h3>
         <div className="status">
           <div className={`status-indicator ${isConnected ? "connected" : "disconnected"}`}>
-            {isConnected ? "🟢 Connected" : "⚪ Not connected"}
+            {isConnected ? "🟢 Connected to Server" : "⚪ Not connected to server"}
           </div>
           {connectionError && <div className="error">{connectionError}</div>}
+          {!isConnected && (
+            <>
+              <p className="help-text">
+                Enter the sync server URL from your main device to connect.
+              </p>
+              <button 
+                className="btn-primary" 
+                onClick={() => setShowServerConnect(!showServerConnect)}
+              >
+                {showServerConnect ? "Cancel" : "Connect to Sync Server"}
+              </button>
+              {showServerConnect && (
+                <form onSubmit={handleConnectToServer} className="server-connect-form">
+                  <input
+                    type="text"
+                    placeholder="ws://192.168.31.183:3001"
+                    value={serverUrl}
+                    onChange={(e) => setServerUrl(e.target.value)}
+                    required
+                  />
+                  <button type="submit">Connect</button>
+                </form>
+              )}
+            </>
+          )}
           {isConnected && (
             <button className="btn-secondary" onClick={disconnect}>
               Disconnect
@@ -78,26 +124,30 @@ export function NetworkSyncPanel({ onClose, useSync }) {
       )}
 
       {/* Connect to Device */}
-      <section className="sync-section">
-        <h3>Connect to Another Device</h3>
-        <p className="help-text">
-          To sync with another device, enter its connection details below.
-        </p>
-        <button className="btn-primary" onClick={() => setShowConnectModal(true)}>
-          + Connect to Device
-        </button>
-      </section>
+      {isConnected && (
+        <section className="sync-section">
+          <h3>Connect to Another Device</h3>
+          <p className="help-text">
+            To sync with another device, enter its connection details below.
+          </p>
+          <button className="btn-primary" onClick={() => setShowConnectModal(true)}>
+            + Connect to Device
+          </button>
+        </section>
+      )}
 
       {/* Generate Pairing Code */}
-      <section className="sync-section">
-        <h3>Share Pairing Code</h3>
-        <p className="help-text">
-          Generate a code to share with another device on the same network.
-        </p>
-        <button className="btn-primary" onClick={handleGenerateCode}>
-          Generate Code
-        </button>
-      </section>
+      {isConnected && (
+        <section className="sync-section">
+          <h3>Share Pairing Code</h3>
+          <p className="help-text">
+            Generate a code to share with another device on the same network.
+          </p>
+          <button className="btn-primary" onClick={handleGenerateCode}>
+            Generate Code
+          </button>
+        </section>
+      )}
 
       {/* Paired Devices */}
       {pairedDevices && pairedDevices.length > 0 && (
