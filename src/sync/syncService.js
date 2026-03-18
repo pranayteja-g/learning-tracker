@@ -23,10 +23,14 @@ export class SyncManager {
     this.serverUrl = options.serverUrl; // e.g., "ws://192.168.1.100:3001"
     this.messageHandlers = new Map();
     this.isConnected = false;
+    this.isPaired = false;
     this.reconnectAttempts = 0;
     this.maxReconnectAttempts = 5;
     this.reconnectDelay = 2000;
     this.listeners = new Set();
+    this.pairingPromise = null;
+    this.pairingResolve = null;
+    this.isAutoConnect = false;
   }
 
   // Register a callback to be notified of state changes
@@ -43,13 +47,14 @@ export class SyncManager {
   /**
    * Connect to sync server
    */
-  async connect(serverUrl) {
+  async connect(serverUrl, isAutoConnect = false) {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       console.log("Already connected");
       return;
     }
 
     this.serverUrl = serverUrl;
+    this.isAutoConnect = isAutoConnect;
 
     return new Promise((resolve, reject) => {
       try {
@@ -80,13 +85,16 @@ export class SyncManager {
         };
 
         this.ws.onerror = (error) => {
-          console.error("Sync error:", error);
-          this.notifyListeners({ type: "error", message: error.message });
+          console.error("Sync WebSocket error:", error);
+          // Only notify listeners about errors if it's a manual connection attempt
+          if (!this.isAutoConnect) {
+            this.notifyListeners({ type: "error", message: "WebSocket connection failed" });
+          }
           reject(error);
         };
 
         this.ws.onclose = () => {
-          console.log("Sync disconnected");
+          console.log("Sync disconnected (readyState:", this.ws?.readyState, ")");
           this.isConnected = false;
           this.notifyListeners({ type: "disconnected" });
           this._attemptReconnect();
@@ -94,6 +102,24 @@ export class SyncManager {
       } catch (e) {
         reject(e);
       }
+    });
+  }
+
+  /**
+   * Wait for pairing confirmation from server
+   */
+  waitForPairingConfirmation(timeoutMs = 10000) {
+    return new Promise((resolve, reject) => {
+      this.pairingResolve = resolve;
+      
+      const timeout = setTimeout(() => {
+        this.pairingResolve = null;
+        console.warn("Pairing confirmation timeout - server may not have received pairing request");
+        reject(new Error("Pairing confirmation timeout (10s)"));
+      }, timeoutMs);
+
+      // Store timeout ID for cleanup
+      this._pairingTimeout = timeout;
     });
   }
 
@@ -153,6 +179,29 @@ export class SyncManager {
   _handleMessage(message) {
     const { type, deviceId, payload } = message;
 
+    // Handle pairing confirmation
+    if (type === "pairing_confirmed") {
+      console.log("✅ Pairing confirmed by server with code:", payload.code);
+      this.isPaired = true;
+      if (this._pairingTimeout) {
+        clearTimeout(this._pairingTimeout);
+        this._pairingTimeout = null;
+      }
+      if (this.pairingResolve) {
+        this.pairingResolve(payload);
+        this.pairingResolve = null;
+      } else {
+        console.warn("Pairing confirmed but no resolver waiting");
+      }
+      return;
+    }
+
+    // Handle welcome from server
+    if (type === "welcome") {
+      console.log("👋 Welcome message from server, device connected");
+      return;
+    }
+
     // Call any registered handlers for this message type
     const handler = this.messageHandlers.get(type);
     if (handler) {
@@ -193,7 +242,7 @@ export class SyncManager {
 
     setTimeout(() => {
       if (this.serverUrl && !this.isConnected) {
-        this.connect(this.serverUrl).catch((e) => {
+        this.connect(this.serverUrl, true).catch((e) => {
           console.log("Reconnect attempt failed:", e);
         });
       }

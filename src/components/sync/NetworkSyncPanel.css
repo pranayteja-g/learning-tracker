@@ -363,6 +363,45 @@
   font-size: 12px;
   color: var(--text-secondary, #666);
   line-height: 1.4;
+  margin: 0 0 12px 0;
+}
+
+/* Server Connect Form */
+.server-connect-form {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.server-connect-form input {
+  flex: 1;
+  padding: 10px 12px;
+  border: 1px solid var(--border-color, #ddd);
+  border-radius: 6px;
+  font-size: 13px;
+  font-family: monospace;
+}
+
+.server-connect-form input:focus {
+  outline: none;
+  border-color: var(--color-primary, #2196f3);
+  box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.1);
+}
+
+.server-connect-form button {
+  padding: 10px 16px;
+  background-color: var(--color-primary, #2196f3);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.server-connect-form button:hover {
+  background-color: var(--color-primary-hover, #1976d2);
 }
 
 .error-box {

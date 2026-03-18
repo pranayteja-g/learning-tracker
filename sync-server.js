@@ -13,11 +13,14 @@ import os from "os";
 
 const DEFAULT_PORT = 3001;
 const port = parseInt(process.argv[2]) || DEFAULT_PORT;
+const HEARTBEAT_INTERVAL = 30000; // Send heartbeat every 30 seconds
 
 // In-memory store of connected devices and their sync codes
 const devices = new Map(); // deviceId -> { id, name, ws, syncCode, connectedAt }
 const syncCodes = new Map(); // syncCode -> deviceId
+const waitingDevices = new Map(); // pairingCode -> { deviceId, name, timestamp }
 const sharedState = new Map(); // key -> { value, updatedBy, timestamp }
+let heartbeatInterval = null;
 
 // Create HTTP server
 const server = http.createServer((req, res) => {
@@ -44,8 +47,23 @@ const server = http.createServer((req, res) => {
 // Create WebSocket server
 const wss = new WebSocketServer({ server });
 
+// Start heartbeat timer to keep connections alive
+if (heartbeatInterval) clearInterval(heartbeatInterval);
+heartbeatInterval = setInterval(() => {
+  devices.forEach((device) => {
+    if (device.ws.readyState === 1) { // OPEN
+      device.ws.ping();
+    }
+  });
+}, HEARTBEAT_INTERVAL);
+
 wss.on("connection", (ws) => {
   console.log(`[${new Date().toLocaleTimeString()}] New connection`);
+  
+  // Handle pong responses (keep-alive acknowledgment)
+  ws.on("pong", () => {
+    // Connection is alive, no action needed
+  });
 
   let deviceId = null;
   let syncCode = null;
@@ -67,6 +85,15 @@ wss.on("connection", (ws) => {
     if (deviceId) {
       devices.delete(deviceId);
       if (syncCode) syncCodes.delete(syncCode);
+      
+      // Clean up waiting pairing codes for this device
+      for (const [code, waiting] of waitingDevices.entries()) {
+        if (waiting.deviceId === deviceId) {
+          console.log(`[${new Date().toLocaleTimeString()}] 🗑️ Cleaned up pairing code ${code} for disconnected device`);
+          waitingDevices.delete(code);
+        }
+      }
+      
       console.log(`[${new Date().toLocaleTimeString()}] ${deviceId} disconnected`);
       broadcastToAll({
         type: "device_disconnected",
@@ -119,24 +146,78 @@ function handleMessage(ws, message, onDeviceConnected) {
     });
   }
 
+  // Handle device advertising a pairing code (waiting for another device)
+  else if (type === "advertise_pairing") {
+    const pairingCode = payload.pairingCode;
+    const deviceName = payload.deviceName || "Unknown";
+    
+    waitingDevices.set(pairingCode, {
+      deviceId,
+      name: deviceName,
+      timestamp: Date.now(),
+    });
+    
+    console.log(`[${new Date().toLocaleTimeString()}] 📢 ${deviceName} (${deviceId.slice(0, 12)}) waiting for pairing code: ${pairingCode}`);
+  }
+
   // Handle pairing request
   else if (type === "pairing_request") {
     const pairingCode = payload.pairingCode;
-    if (devices.has(deviceId)) {
-      const device = devices.get(deviceId);
-      device.syncCode = pairingCode;
-      syncCodes.set(pairingCode, deviceId);
-
-      console.log(`[${new Date().toLocaleTimeString()}] 🔗 Pairing code registered: ${pairingCode}`);
-
-      ws.send(
-        JSON.stringify({
-          type: "pairing_confirmed",
-          code: pairingCode,
-        })
-      );
-
-      onDeviceConnected(deviceId, pairingCode);
+    const requestingDeviceId = deviceId;
+    const requestingDeviceName = payload.deviceName || "Unknown Device";
+    
+    console.log(`[${new Date().toLocaleTimeString()}] 🔗 Pairing request from ${requestingDeviceName} with code: ${pairingCode}`);
+    
+    // Check if another device is waiting for this code
+    if (waitingDevices.has(pairingCode)) {
+      const waitingDevice = waitingDevices.get(pairingCode);
+      const waitingDeviceId = waitingDevice.deviceId;
+      
+      console.log(`[${new Date().toLocaleTimeString()}] ✅ Code match! ${waitingDevice.name} + ${requestingDeviceName}`);
+      
+      // Confirm to the requesting device
+      const confirmMsg = JSON.stringify({
+        type: "pairing_confirmed",
+        payload: { code: pairingCode },
+        timestamp: Date.now(),
+      });
+      
+      console.log(`[${new Date().toLocaleTimeString()}] 📤 Confirming to requester...`);
+      ws.send(confirmMsg);
+      
+      // Notify the waiting device that pairing succeeded
+      if (devices.has(waitingDeviceId)) {
+        const waiterWs = devices.get(waitingDeviceId).ws;
+        if (waiterWs && waiterWs.readyState === 1) {
+          const waiterConfirmMsg = JSON.stringify({
+            type: "pairing_confirmed",
+            payload: { code: pairingCode, pairedWith: requestingDeviceName },
+            timestamp: Date.now(),
+          });
+          console.log(`[${new Date().toLocaleTimeString()}] 📤 Confirming to waiter...`);
+          waiterWs.send(waiterConfirmMsg);
+        }
+      }
+      
+      // Clean up
+      waitingDevices.delete(pairingCode);
+      
+      // Update both devices' sync codes
+      if (devices.has(requestingDeviceId)) {
+        devices.get(requestingDeviceId).syncCode = pairingCode;
+      }
+      if (devices.has(waitingDeviceId)) {
+        devices.get(waitingDeviceId).syncCode = pairingCode;
+      }
+      syncCodes.set(pairingCode, [waitingDeviceId, requestingDeviceId]);
+      
+      onDeviceConnected(requestingDeviceId, pairingCode);
+    } else {
+      console.log(`[${new Date().toLocaleTimeString()}] ❌ No device waiting for code ${pairingCode}`);
+      ws.send(JSON.stringify({
+        type: "pairing_error",
+        payload: { message: "No device waiting for this pairing code" },
+      }));
     }
   }
 
