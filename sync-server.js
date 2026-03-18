@@ -7,8 +7,9 @@
  * Usage: node sync-server.js [--port 3001]
  */
 
-const WebSocket = require("ws");
-const http = require("http");
+import { WebSocketServer } from "ws";
+import http from "http";
+import os from "os";
 
 const DEFAULT_PORT = 3001;
 const port = parseInt(process.argv[2]) || DEFAULT_PORT;
@@ -41,7 +42,7 @@ const server = http.createServer((req, res) => {
 });
 
 // Create WebSocket server
-const wss = new WebSocket.Server({ server });
+const wss = new WebSocketServer({ server });
 
 wss.on("connection", (ws) => {
   console.log(`[${new Date().toLocaleTimeString()}] New connection`);
@@ -228,7 +229,7 @@ function handleFullStateSync(fromDeviceId, payload) {
  */
 function broadcastToAll(message) {
   devices.forEach((device) => {
-    if (device.ws.readyState === WebSocket.OPEN) {
+    if (device.ws.readyState === 1) {
       device.ws.send(JSON.stringify(message));
     }
   });
@@ -239,7 +240,7 @@ function broadcastToAll(message) {
  */
 function broadcastToAllExcept(exceptDeviceId, message) {
   devices.forEach((device, id) => {
-    if (id !== exceptDeviceId && device.ws.readyState === WebSocket.OPEN) {
+    if (id !== exceptDeviceId && device.ws.readyState === 1) {
       device.ws.send(JSON.stringify(message));
     }
   });
@@ -256,7 +257,6 @@ server.listen(port, () => {
  * Get local IP address
  */
 function getLocalIP() {
-  const os = require("os");
   const interfaces = os.networkInterfaces();
   for (const name of Object.keys(interfaces)) {
     for (const iface of interfaces[name]) {
