@@ -1,10 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-
-function fmt(secs) {
-  const m = Math.floor(secs / 60).toString().padStart(2, "0");
-  const s = (secs % 60).toString().padStart(2, "0");
-  return `${m}:${s}`;
-}
+import { formatTime } from "../../utils/format.js";
 
 export function TimedQuizView({ questions, rm, timeLimitSeconds, onQuizComplete }) {
   const [answers,   setAnswers]   = useState({});
@@ -36,7 +31,7 @@ export function TimedQuizView({ questions, rm, timeLimitSeconds, onQuizComplete 
       <div style={{ fontSize: 32, marginBottom: 16 }}>⏱️</div>
       <div style={{ fontSize: 15, fontWeight: 700, color: "#fff", marginBottom: 8 }}>Timed Quiz</div>
       <div style={{ fontSize: 13, color: "#888", marginBottom: 6 }}>
-        {totalQ} questions · {fmt(timeLimitSeconds)} time limit
+        {totalQ} questions · {formatTime(timeLimitSeconds)} time limit
       </div>
       <div style={{ fontSize: 12, color: "#555", marginBottom: 24, lineHeight: 1.6 }}>
         Timer starts when you click Begin. Unanswered questions count as wrong.
@@ -120,7 +115,7 @@ export function TimedQuizView({ questions, rm, timeLimitSeconds, onQuizComplete 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
         <div style={{ fontSize: 12, color: "#555" }}>Q {current+1}/{totalQ}</div>
         <div style={{ fontSize: 16, fontWeight: 700, color: timerColor,
-          fontVariantNumeric: "tabular-nums" }}>⏱ {fmt(timeLeft)}</div>
+          fontVariantNumeric: "tabular-nums" }}>⏱ {formatTime(timeLeft)}</div>
       </div>
       <div style={{ background: "#1e1e24", borderRadius: 4, height: 6, marginBottom: 16, overflow: "hidden" }}>
         <div style={{ height: "100%", width: `${pct}%`, background: timerColor,
