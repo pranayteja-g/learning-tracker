@@ -99,21 +99,29 @@ export function useSync() {
 
       try {
         setConnectionError(null);
+        console.log("🔗 Connecting to server:", serverUrl);
 
         // Connect to sync server
         await syncManagerRef.current.connect(serverUrl);
+        console.log("✓ WebSocket connected, sending pairing request...");
 
         // Set up pairing confirmation waiter
-        const pairingPromise = syncManagerRef.current.waitForPairingConfirmation(5000);
+        const pairingPromise = syncManagerRef.current.waitForPairingConfirmation(10000);
 
         // Send pairing request
-        syncManagerRef.current.send("pairing_request", {
+        const sentSuccessfully = syncManagerRef.current.send("pairing_request", {
           pairingCode,
           deviceName: syncConfig?.deviceName || "Unknown Device",
         });
+        
+        if (!sentSuccessfully) {
+          throw new Error("Failed to send pairing request to server");
+        }
+        console.log("📤 Pairing request sent with code:", pairingCode);
 
-        // Wait for server to confirm pairing (timeout after 5 seconds)
+        // Wait for server to confirm pairing (timeout after 10 seconds)
         await pairingPromise;
+        console.log("✅ Connection successful!");
 
         // Add to paired devices
         const newPairedDevice = {
@@ -136,7 +144,7 @@ export function useSync() {
       } catch (e) {
         const errorMsg = `Connection failed: ${e.message}`;
         setConnectionError(errorMsg);
-        console.error(errorMsg, e);
+        console.error("❌ Sync error:", errorMsg, e);
         return false;
       }
     },

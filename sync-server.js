@@ -127,16 +127,22 @@ function handleMessage(ws, message, onDeviceConnected) {
       device.syncCode = pairingCode;
       syncCodes.set(pairingCode, deviceId);
 
-      console.log(`[${new Date().toLocaleTimeString()}] 🔗 Pairing code registered: ${pairingCode}`);
+      console.log(`[${new Date().toLocaleTimeString()}] 🔗 Pairing code ${pairingCode} registered for ${device.name}`);
 
-      ws.send(
-        JSON.stringify({
-          type: "pairing_confirmed",
-          code: pairingCode,
-        })
-      );
+      // Send confirmation back to device
+      const confirmMsg = JSON.stringify({
+        type: "pairing_confirmed",
+        code: pairingCode,
+        timestamp: Date.now(),
+      });
+      
+      console.log(`[${new Date().toLocaleTimeString()}] 📤 Sending confirmation to ${deviceId.slice(0, 12)}...`);
+      ws.send(confirmMsg);
+      console.log(`[${new Date().toLocaleTimeString()}] ✓ Pairing confirmed sent`);
 
       onDeviceConnected(deviceId, pairingCode);
+    } else {
+      console.warn(`[${new Date().toLocaleTimeString()}] ⚠️ Pairing request from unknown device: ${deviceId}`);
     }
   }
 

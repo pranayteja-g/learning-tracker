@@ -103,13 +103,14 @@ export class SyncManager {
   /**
    * Wait for pairing confirmation from server
    */
-  waitForPairingConfirmation(timeoutMs = 5000) {
+  waitForPairingConfirmation(timeoutMs = 10000) {
     return new Promise((resolve, reject) => {
       this.pairingResolve = resolve;
       
       const timeout = setTimeout(() => {
         this.pairingResolve = null;
-        reject(new Error("Pairing confirmation timeout"));
+        console.warn("Pairing confirmation timeout - server may not have received pairing request");
+        reject(new Error("Pairing confirmation timeout (10s)"));
       }, timeoutMs);
 
       // Store timeout ID for cleanup
@@ -175,7 +176,7 @@ export class SyncManager {
 
     // Handle pairing confirmation
     if (type === "pairing_confirmed") {
-      console.log("✓ Pairing confirmed by server");
+      console.log("✅ Pairing confirmed by server with code:", payload.code);
       this.isPaired = true;
       if (this._pairingTimeout) {
         clearTimeout(this._pairingTimeout);
@@ -184,7 +185,15 @@ export class SyncManager {
       if (this.pairingResolve) {
         this.pairingResolve(payload);
         this.pairingResolve = null;
+      } else {
+        console.warn("Pairing confirmed but no resolver waiting");
       }
+      return;
+    }
+
+    // Handle welcome from server
+    if (type === "welcome") {
+      console.log("👋 Welcome message from server, device connected");
       return;
     }
 
