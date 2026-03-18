@@ -23,10 +23,13 @@ export class SyncManager {
     this.serverUrl = options.serverUrl; // e.g., "ws://192.168.1.100:3001"
     this.messageHandlers = new Map();
     this.isConnected = false;
+    this.isPaired = false;
     this.reconnectAttempts = 0;
     this.maxReconnectAttempts = 5;
     this.reconnectDelay = 2000;
     this.listeners = new Set();
+    this.pairingPromise = null;
+    this.pairingResolve = null;
   }
 
   // Register a callback to be notified of state changes
@@ -98,6 +101,23 @@ export class SyncManager {
   }
 
   /**
+   * Wait for pairing confirmation from server
+   */
+  waitForPairingConfirmation(timeoutMs = 5000) {
+    return new Promise((resolve, reject) => {
+      this.pairingResolve = resolve;
+      
+      const timeout = setTimeout(() => {
+        this.pairingResolve = null;
+        reject(new Error("Pairing confirmation timeout"));
+      }, timeoutMs);
+
+      // Store timeout ID for cleanup
+      this._pairingTimeout = timeout;
+    });
+  }
+
+  /**
    * Disconnect from server
    */
   disconnect() {
@@ -152,6 +172,21 @@ export class SyncManager {
    */
   _handleMessage(message) {
     const { type, deviceId, payload } = message;
+
+    // Handle pairing confirmation
+    if (type === "pairing_confirmed") {
+      console.log("✓ Pairing confirmed by server");
+      this.isPaired = true;
+      if (this._pairingTimeout) {
+        clearTimeout(this._pairingTimeout);
+        this._pairingTimeout = null;
+      }
+      if (this.pairingResolve) {
+        this.pairingResolve(payload);
+        this.pairingResolve = null;
+      }
+      return;
+    }
 
     // Call any registered handlers for this message type
     const handler = this.messageHandlers.get(type);

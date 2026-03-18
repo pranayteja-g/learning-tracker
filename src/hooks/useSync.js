@@ -103,11 +103,17 @@ export function useSync() {
         // Connect to sync server
         await syncManagerRef.current.connect(serverUrl);
 
+        // Set up pairing confirmation waiter
+        const pairingPromise = syncManagerRef.current.waitForPairingConfirmation(5000);
+
         // Send pairing request
         syncManagerRef.current.send("pairing_request", {
           pairingCode,
           deviceName: syncConfig?.deviceName || "Unknown Device",
         });
+
+        // Wait for server to confirm pairing (timeout after 5 seconds)
+        await pairingPromise;
 
         // Add to paired devices
         const newPairedDevice = {
@@ -130,7 +136,7 @@ export function useSync() {
       } catch (e) {
         const errorMsg = `Connection failed: ${e.message}`;
         setConnectionError(errorMsg);
-        console.error(errorMsg);
+        console.error(errorMsg, e);
         return false;
       }
     },
