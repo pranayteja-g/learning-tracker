@@ -80,13 +80,27 @@ export function useSync() {
   }, [syncConfig]);
 
   /**
-   * Generate a new pairing code for this device
+   * Generate a new pairing code for this device and advertise it to server
    */
   const generateNewPairingCode = useCallback(() => {
     const code = generatePairingCode();
     setCurrentPairingCode(code);
+    
+    // Tell server this device is waiting for this pairing code
+    if (syncManagerRef.current && syncConfig) {
+      const connected = syncManagerRef.current.send("advertise_pairing", {
+        pairingCode: code,
+        deviceName: syncConfig.deviceName || "Unknown Device",
+      });
+      if (connected) {
+        console.log("📢 Advertising pairing code to server:", code);
+      } else {
+        console.warn("Not connected to server when advertising pairing code");
+      }
+    }
+    
     return code;
-  }, []);
+  }, [syncConfig]);
 
   /**
    * Connect to a remote device via server URL and pairing code
