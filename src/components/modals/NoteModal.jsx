@@ -5,12 +5,9 @@ import { RESOURCES_SYSTEM_PROMPT, buildFindResourcesPrompt, buildTopicCheatSheet
 import { useUsage } from "../../ai/useUsage.js";
 import { safeParseJSON } from "../../utils/jsonParse.js";
 import { CheatSheetView } from "../interview/CheatSheetView.jsx";
+import { TOPIC_DIFFICULTIES, TIME_ESTIMATE_OPTIONS, RESOURCE_TYPES } from "../../constants/config.js";
 
-const DIFFICULTIES = ["easy", "medium", "hard"];
-const TIME_OPTIONS = ["< 1 hour", "1–2 hours", "2–5 hours", "5–10 hours", "10+ hours"];
-
-const TYPE_ICONS = { docs: "📄", tutorial: "📝", video: "🎬", interactive: "🎮", course: "🎓" };
-const TYPE_COLORS = { docs: "#7b8cde", tutorial: "#52b788", video: "#e05252", interactive: "#ee9b00", course: "#c4b5fd" };
+const DIFFICULTIES = TOPIC_DIFFICULTIES;
 
 export function NoteModal({ noteModal, roadmaps, notes, resources, topicMeta, onSave, onClose }) {
   const { roadmap: rmKey, topic } = noteModal;
@@ -293,8 +290,8 @@ export function NoteModal({ noteModal, roadmaps, notes, resources, topicMeta, on
 
                   {aiResults.map((r, i) => {
                     const alreadyAdded = !!links.find(l => l.url === r.url);
-                    const typeColor    = TYPE_COLORS[r.type] || "#666";
-                    const typeIcon     = TYPE_ICONS[r.type]  || "🔗";
+                    const typeColor    = RESOURCE_TYPES[r.type]?.color || "#666";
+                    const typeIcon     = RESOURCE_TYPES[r.type]?.icon  || "🔗";
                     return (
                       <div key={i} style={{ padding: "12px 14px",
                         borderBottom: i < aiResults.length - 1 ? "1px solid #1e1e24" : "none",
@@ -407,7 +404,7 @@ export function NoteModal({ noteModal, roadmaps, notes, resources, topicMeta, on
               <div>
                 <div style={{ fontSize: 12, color: "#888", marginBottom: 10 }}>Estimated time</div>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                  {TIME_OPTIONS.map(t => {
+                  {TIME_ESTIMATE_OPTIONS.map(t => {
                     const active = timeEst === t;
                     return (
                       <button key={t} onClick={() => setTimeEst(active ? "" : t)}

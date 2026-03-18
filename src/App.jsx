@@ -24,6 +24,7 @@ import { QuestModal }             from "./components/quest/QuestModal.jsx";
 import { buildQuestPrompt }       from "./ai/prompts.js";
 import { callAI }                 from "./ai/providers.js";
 import { loadAIConfig }           from "./ai/providers.js";
+import { AITimeoutTester }        from "./components/debug/AITimeoutTester.jsx";
 
 export default function App() {
   const { roadmaps, setRoadmaps, progress, setProgress, notes, setNotes,
@@ -769,6 +770,9 @@ export default function App() {
           onCompleteQuest={completeQuest}
           onClose={() => setActiveQuestRmId(null)}
         />
+      )}
+      {process.env.NODE_ENV === "development" && (
+        <AITimeoutTester />
       )}
     </div>
   );

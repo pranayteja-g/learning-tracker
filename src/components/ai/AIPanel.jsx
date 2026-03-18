@@ -5,6 +5,7 @@ import { buildQuizContext, buildQuestionnaireContext, buildExplainContext, build
 import { flatTopicNames, allTopicNames, topicName } from "../../utils/topics.js";
 import { SYSTEM_PROMPT, buildQuizPrompt, buildQuestionnairePrompt, buildExplainPrompt, buildStudyPlanPrompt } from "../../ai/prompts.js";
 import { safeParseJSON } from "../../utils/jsonParse.js";
+import { formatNumber } from "../../utils/format.js";
 import { APIKeySetup }       from "./APIKeySetup.jsx";
 import { QuizView }          from "./QuizView.jsx";
 import { QuestionnaireView } from "./QuestionnaireView.jsx";
@@ -20,11 +21,6 @@ const MODES = [
 
 const SCOPES   = ["section", "roadmap", "completed"];
 const Q_COUNTS = [5, 10, 15];
-
-function fmt(n) {
-  if (n >= 1000) return (n / 1000).toFixed(1).replace(/\.0$/, "") + "k";
-  return String(n);
-}
 
 export function AIPanel({ open, onClose, roadmap, progress, notes, resources, topicMeta, curSection, isMobile, onSaveToNotes, onQuizComplete }) {
   const [aiConfig,     setAIConfig]     = useState(loadAIConfig);
@@ -55,7 +51,7 @@ export function AIPanel({ open, onClose, roadmap, progress, notes, resources, to
   const handleGenerate = async () => {
     if (!rm || !hasKey) return;
     if (isOverLimit) {
-      setError(`Daily token limit of ${fmt(limit.dailyTokenLimit)} reached. Resets at midnight UTC, or raise your limit in Settings.`);
+      setError(`Daily token limit of ${formatNumber(limit.dailyTokenLimit)} reached. Resets at midnight UTC, or raise your limit in Settings.`);
       return;
     }
 
@@ -158,7 +154,7 @@ export function AIPanel({ open, onClose, roadmap, progress, notes, resources, to
               <div style={{ height: "100%", width: `${pct}%`, background: barColor, borderRadius: 3, transition: "width 0.4s" }} />
             </div>
             <div style={{ fontSize: 10, color: barColor, flexShrink: 0, fontVariantNumeric: "tabular-nums" }}>
-              {fmt(usage.totalTokens || 0)} / {fmt(limit.dailyTokenLimit)}
+              {formatNumber(usage.totalTokens || 0)} / {formatNumber(limit.dailyTokenLimit)}
             </div>
           </div>
         )}
@@ -314,8 +310,8 @@ export function AIPanel({ open, onClose, roadmap, progress, notes, resources, to
               {/* Last call token count */}
               {lastUsed && !loading && (
                 <div style={{ textAlign: "center", marginTop: 8, fontSize: 10, color: "#444" }}>
-                  Last call: {fmt(lastUsed.promptTokens)} in + {fmt(lastUsed.completionTokens)} out
-                  {" "}= <strong style={{ color: "#555" }}>{fmt(lastUsed.promptTokens + lastUsed.completionTokens)} tokens</strong>
+                  Last call: {formatNumber(lastUsed.promptTokens)} in + {formatNumber(lastUsed.completionTokens)} out
+                  {" "}= <strong style={{ color: "#555" }}>{formatNumber(lastUsed.promptTokens + lastUsed.completionTokens)} tokens</strong>
                   {" "}· via {PROVIDERS[aiConfig.provider]?.name}
                 </div>
               )}

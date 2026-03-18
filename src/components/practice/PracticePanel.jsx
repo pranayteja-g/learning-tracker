@@ -3,6 +3,8 @@ import { callAI, loadAIConfig, saveAIConfig, PROVIDERS } from "../../ai/provider
 import { useUsage } from "../../ai/useUsage.js";
 import { allTopicNames, flatTopicNames } from "../../utils/topics.js";
 import { safeParseJSON } from "../../utils/jsonParse.js";
+import { formatNumber } from "../../utils/format.js";
+import { TIME_OPTIONS } from "../../constants/config.js";
 import {
   SYSTEM_PROMPT, INTERVIEW_SYSTEM_PROMPT,
   buildQuizPrompt, buildQuestionnairePrompt, buildExplainPrompt, buildStudyPlanPrompt,
@@ -45,12 +47,6 @@ const INTERVIEW_MODES = [
 
 const SCOPES   = ["section", "roadmap", "completed"];
 const Q_COUNTS = [5, 10, 15];
-const TIME_OPTIONS = [
-  { label: "5 min", secs: 300 }, { label: "10 min", secs: 600 },
-  { label: "15 min", secs: 900 }, { label: "20 min", secs: 1200 },
-];
-
-function fmt(n) { return n >= 1000 ? (n/1000).toFixed(1).replace(/\.0$/,"")+"k" : String(n); }
 
 export function PracticePanel({ open, onClose, roadmap, roadmaps, progress, notes, resources,
   topicMeta, curSection, isMobile, onSaveToNotes, onQuizComplete, quizResults = {} }) {
@@ -208,7 +204,7 @@ export function PracticePanel({ open, onClose, roadmap, roadmaps, progress, note
                   <div style={{ width: 50, height: 3, background: "#1e1e24", borderRadius: 2, overflow: "hidden" }}>
                     <div style={{ height: "100%", width: `${pct}%`, background: barColor, borderRadius: 2 }} />
                   </div>
-                  <span style={{ fontSize: 10, color: "#444" }}>{fmt(usage.totalTokens||0)}</span>
+                  <span style={{ fontSize: 10, color: "#444" }}>{formatNumber(usage.totalTokens||0)}</span>
                 </div>
               )}
               <button onClick={onClose}
