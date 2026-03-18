@@ -129,10 +129,10 @@ function handleMessage(ws, message, onDeviceConnected) {
 
       console.log(`[${new Date().toLocaleTimeString()}] 🔗 Pairing code ${pairingCode} registered for ${device.name}`);
 
-      // Send confirmation back to device
+      // Send confirmation back to device - use proper message format
       const confirmMsg = JSON.stringify({
         type: "pairing_confirmed",
-        code: pairingCode,
+        payload: { code: pairingCode },
         timestamp: Date.now(),
       });
       
