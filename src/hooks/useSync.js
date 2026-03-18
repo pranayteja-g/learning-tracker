@@ -76,12 +76,12 @@ export function useSync() {
           // Try to detect the server - first check if we're on localhost (dev)
           if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
             console.log("📡 Attempting to connect to local sync server...");
-            await syncManagerRef.current.connect("ws://localhost:3001");
+            await syncManagerRef.current.connect("ws://localhost:3001", true);
           } else {
             // For other hosts, try to connect to same host on port 3001
             const serverUrl = `ws://${window.location.hostname}:3001`;
             console.log("📡 Attempting to connect to sync server at:", serverUrl);
-            await syncManagerRef.current.connect(serverUrl);
+            await syncManagerRef.current.connect(serverUrl, true);
           }
         } catch (e) {
           // Connection failed, but that's okay - user can manually connect

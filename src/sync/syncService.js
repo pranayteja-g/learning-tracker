@@ -30,6 +30,7 @@ export class SyncManager {
     this.listeners = new Set();
     this.pairingPromise = null;
     this.pairingResolve = null;
+    this.isAutoConnect = false;
   }
 
   // Register a callback to be notified of state changes
@@ -46,13 +47,14 @@ export class SyncManager {
   /**
    * Connect to sync server
    */
-  async connect(serverUrl) {
+  async connect(serverUrl, isAutoConnect = false) {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       console.log("Already connected");
       return;
     }
 
     this.serverUrl = serverUrl;
+    this.isAutoConnect = isAutoConnect;
 
     return new Promise((resolve, reject) => {
       try {
@@ -84,7 +86,10 @@ export class SyncManager {
 
         this.ws.onerror = (error) => {
           console.error("Sync WebSocket error:", error);
-          this.notifyListeners({ type: "error", message: "WebSocket error: " + (error?.message || "Unknown error") });
+          // Only notify listeners about errors if it's a manual connection attempt
+          if (!this.isAutoConnect) {
+            this.notifyListeners({ type: "error", message: "WebSocket connection failed" });
+          }
           reject(error);
         };
 
@@ -237,7 +242,7 @@ export class SyncManager {
 
     setTimeout(() => {
       if (this.serverUrl && !this.isConnected) {
-        this.connect(this.serverUrl).catch((e) => {
+        this.connect(this.serverUrl, true).catch((e) => {
           console.log("Reconnect attempt failed:", e);
         });
       }
