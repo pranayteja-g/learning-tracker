@@ -1,4 +1,5 @@
 import { AI_SETTINGS } from "../constants/config.js";
+import { validateAICall, validateSearchCall, validateMessages } from "../utils/validation.js";
 
 // ── Timeout & Retry Utilities ──────────────────────────────────────────────
 /**
@@ -85,6 +86,20 @@ export function saveAIConfig(config) {
 // ── Call the AI ───────────────────────────────────────────────────────────────
 // Always returns { text, usage: { promptTokens, completionTokens } }
 export async function callAI({ provider, apiKey, systemPrompt, userPrompt, messages = [], temperature = 0.7, maxTokens = 4096 }) {
+  // Validate inputs before making API call
+  const validation = validateAICall({ provider, apiKey, systemPrompt, userPrompt, temperature, maxTokens });
+  if (!validation.isValid) {
+    throw new Error(`Input validation failed: ${validation.error}`);
+  }
+
+  // Validate messages if provided
+  if (messages.length > 0) {
+    const msgValidation = validateMessages(messages);
+    if (!msgValidation.isValid) {
+      throw new Error(`Message validation failed: ${msgValidation.error}`);
+    }
+  }
+
   if (provider === "gemini") return callGemini({ apiKey, systemPrompt, userPrompt, messages, temperature, maxTokens });
   if (provider === "groq")   return callGroq({ apiKey, systemPrompt, userPrompt, messages, temperature, maxTokens });
   throw new Error("Unknown provider: " + provider);
@@ -172,6 +187,12 @@ async function callGroq({ apiKey, systemPrompt, userPrompt, messages = [], tempe
 // Used for Find Resources — forces the model to search before answering.
 // Returns { text, usage } same as callAI.
 export async function callAIWithSearch({ provider, apiKey, systemPrompt, userPrompt }) {
+  // Validate inputs before making API call
+  const validation = validateSearchCall({ provider, apiKey, systemPrompt, userPrompt });
+  if (!validation.isValid) {
+    throw new Error(`Input validation failed: ${validation.error}`);
+  }
+
   if (provider === "gemini") return callGeminiWithSearch({ apiKey, systemPrompt, userPrompt });
   if (provider === "groq")   return callGroqWithSearch({ apiKey, systemPrompt, userPrompt });
   throw new Error("Unknown provider: " + provider);
