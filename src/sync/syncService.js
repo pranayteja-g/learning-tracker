@@ -83,13 +83,13 @@ export class SyncManager {
         };
 
         this.ws.onerror = (error) => {
-          console.error("Sync error:", error);
-          this.notifyListeners({ type: "error", message: error.message });
+          console.error("Sync WebSocket error:", error);
+          this.notifyListeners({ type: "error", message: "WebSocket error: " + (error?.message || "Unknown error") });
           reject(error);
         };
 
         this.ws.onclose = () => {
-          console.log("Sync disconnected");
+          console.log("Sync disconnected (readyState:", this.ws?.readyState, ")");
           this.isConnected = false;
           this.notifyListeners({ type: "disconnected" });
           this._attemptReconnect();

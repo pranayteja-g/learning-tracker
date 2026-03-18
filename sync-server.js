@@ -13,11 +13,13 @@ import os from "os";
 
 const DEFAULT_PORT = 3001;
 const port = parseInt(process.argv[2]) || DEFAULT_PORT;
+const HEARTBEAT_INTERVAL = 30000; // Send heartbeat every 30 seconds
 
 // In-memory store of connected devices and their sync codes
 const devices = new Map(); // deviceId -> { id, name, ws, syncCode, connectedAt }
 const syncCodes = new Map(); // syncCode -> deviceId
 const sharedState = new Map(); // key -> { value, updatedBy, timestamp }
+let heartbeatInterval = null;
 
 // Create HTTP server
 const server = http.createServer((req, res) => {
@@ -44,8 +46,23 @@ const server = http.createServer((req, res) => {
 // Create WebSocket server
 const wss = new WebSocketServer({ server });
 
+// Start heartbeat timer to keep connections alive
+if (heartbeatInterval) clearInterval(heartbeatInterval);
+heartbeatInterval = setInterval(() => {
+  devices.forEach((device) => {
+    if (device.ws.readyState === 1) { // OPEN
+      device.ws.ping();
+    }
+  });
+}, HEARTBEAT_INTERVAL);
+
 wss.on("connection", (ws) => {
   console.log(`[${new Date().toLocaleTimeString()}] New connection`);
+  
+  // Handle pong responses (keep-alive acknowledgment)
+  ws.on("pong", () => {
+    // Connection is alive, no action needed
+  });
 
   let deviceId = null;
   let syncCode = null;
