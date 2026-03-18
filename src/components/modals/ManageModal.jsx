@@ -4,15 +4,18 @@ import { TEMPLATES } from "../../constants/templates.js";
 import { downloadJSON } from "../../utils/roadmap.js";
 import { flatTopicNames } from "../../utils/topics.js";
 import { loadAIConfig, saveAIConfig, PROVIDERS } from "../../ai/providers.js";
+import { useSync } from "../../hooks/useSync.js";
+import { NetworkSyncPanel } from "../sync/NetworkSyncPanel.jsx";
 
 export function ManageModal({ roadmaps, onClose, onImportRoadmap, onDelete, onEdit, onCreate,
   onExportBackup, onImportBackup }) {
 
   const fileRef    = useRef(null);
   const backupRef  = useRef(null);
-  const [tab, setTab] = useState("roadmaps"); // "roadmaps" | "settings"
+  const [tab, setTab] = useState("roadmaps"); // "roadmaps" | "data" | "settings" | "sync"
   const [aiConfig, setAIConfig] = useState(loadAIConfig);
   const [showKey,  setShowKey]  = useState({});
+  const syncState = useSync();
 
   const handleSaveAI = () => {
     saveAIConfig(aiConfig);
@@ -47,6 +50,7 @@ export function ManageModal({ roadmaps, onClose, onImportRoadmap, onDelete, onEd
           <div style={{ display: "flex", gap: 4, marginBottom: 0 }}>
             <button style={tabStyle("roadmaps")} onClick={() => setTab("roadmaps")}>🗺️ Roadmaps</button>
             <button style={tabStyle("data")}     onClick={() => setTab("data")}>💾 Data</button>
+            <button style={tabStyle("sync")}     onClick={() => setTab("sync")}>🔗 Sync</button>
             <button style={tabStyle("settings")} onClick={() => setTab("settings")}>🤖 AI</button>
           </div>
         </div>
@@ -141,6 +145,16 @@ export function ManageModal({ roadmaps, onClose, onImportRoadmap, onDelete, onEd
                 borderRadius: 8, lineHeight: 1.6 }}>
                 ⚠️ Importing a backup will merge with your current data, not replace it.
               </div>
+            </div>
+          )}
+
+          {/* ── Network Sync tab ── */}
+          {tab === "sync" && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              <NetworkSyncPanel 
+                onClose={() => setTab("data")} 
+                useSync={() => syncState}
+              />
             </div>
           )}
 
