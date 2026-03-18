@@ -2,6 +2,7 @@ import { useState } from "react";
 import { callAI, loadAIConfig } from "../../ai/providers.js";
 import { INTERVIEW_SYSTEM_PROMPT, buildInterviewFeedbackPrompt } from "../../ai/prompts.js";
 import { useUsage } from "../../ai/useUsage.js";
+import { safeParseJSON } from "../../utils/jsonParse.js";
 
 const TYPE_STYLES = {
   conceptual:      { color: "#7b8cde", label: "Conceptual"      },
@@ -11,11 +12,6 @@ const TYPE_STYLES = {
 };
 const DIFF_COLORS = { easy: "#52b788", medium: "#ee9b00", hard: "#e05252" };
 const SCORE_COLORS = [null, "#e05252", "#ee9b00", "#ee9b00", "#52b788", "#52b788"];
-
-function safeParseJSON(text) {
-  try { return JSON.parse(text.replace(/```json\n?/g,"").replace(/```\n?/g,"").trim()); }
-  catch { throw new Error("Couldn't parse feedback. Try again."); }
-}
 
 export function InterviewModeView({ questions, rm }) {
   const [idx,       setIdx]       = useState(0);

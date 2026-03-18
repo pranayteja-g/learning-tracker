@@ -4,6 +4,7 @@ import { useUsage } from "../../ai/useUsage.js";
 import { buildQuizContext, buildQuestionnaireContext, buildExplainContext, buildStudyPlanContext } from "../../ai/context.js";
 import { flatTopicNames, allTopicNames, topicName } from "../../utils/topics.js";
 import { SYSTEM_PROMPT, buildQuizPrompt, buildQuestionnairePrompt, buildExplainPrompt, buildStudyPlanPrompt } from "../../ai/prompts.js";
+import { safeParseJSON } from "../../utils/jsonParse.js";
 import { APIKeySetup }       from "./APIKeySetup.jsx";
 import { QuizView }          from "./QuizView.jsx";
 import { QuestionnaireView } from "./QuestionnaireView.jsx";
@@ -19,15 +20,6 @@ const MODES = [
 
 const SCOPES   = ["section", "roadmap", "completed"];
 const Q_COUNTS = [5, 10, 15];
-
-function safeParseJSON(text) {
-  try {
-    const cleaned = text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
-    return JSON.parse(cleaned);
-  } catch {
-    throw new Error("AI returned an unexpected format. Please try again.");
-  }
-}
 
 function fmt(n) {
   if (n >= 1000) return (n / 1000).toFixed(1).replace(/\.0$/, "") + "k";

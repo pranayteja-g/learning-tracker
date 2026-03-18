@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { callAI, loadAIConfig } from "../../ai/providers.js";
 import { SYSTEM_PROMPT, buildQuestionnaireSummaryPrompt } from "../../ai/prompts.js";
+import { safeParseJSON } from "../../utils/jsonParse.js";
 
 export function QuestionnaireView({ questions, rm }) {
   const [answers,    setAnswers]    = useState({});
@@ -23,8 +24,7 @@ export function QuestionnaireView({ questions, rm }) {
       if (!apiKey) throw new Error("No API key configured.");
       const prompt = buildQuestionnaireSummaryPrompt(questions, Object.keys(questions).map((_, i) => answers[i] || ""));
       const { text } = await callAI({ provider: cfg.provider, apiKey, systemPrompt: SYSTEM_PROMPT, userPrompt: prompt });
-      const cleaned  = text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
-      setSummary(JSON.parse(cleaned));
+      setSummary(safeParseJSON(text));
       setView("summary");
     } catch (e) {
       setSumError(e.message || "Failed to get feedback.");

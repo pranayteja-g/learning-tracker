@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { callAI, loadAIConfig, saveAIConfig, PROVIDERS } from "../../ai/providers.js";
 import { useUsage } from "../../ai/useUsage.js";
 import { allTopicNames, flatTopicNames } from "../../utils/topics.js";
+import { safeParseJSON } from "../../utils/jsonParse.js";
 import {
   SYSTEM_PROMPT, INTERVIEW_SYSTEM_PROMPT,
   buildQuizPrompt, buildQuestionnairePrompt, buildExplainPrompt, buildStudyPlanPrompt,
@@ -49,48 +50,6 @@ const TIME_OPTIONS = [
   { label: "15 min", secs: 900 }, { label: "20 min", secs: 1200 },
 ];
 
-function safeJSON(text) {
-  let cleaned = (text || "")
-    .replace(/```json\n?/gi, "")
-    .replace(/```\n?/g, "")
-    .trim();
-
-  // Try full parse first
-  try {
-    // Find the first { or [ to determine response type, then extract accordingly
-    const firstBrace  = cleaned.indexOf("{");
-    const firstBracket = cleaned.indexOf("[");
-    const isArray = firstBracket !== -1 && (firstBrace === -1 || firstBracket < firstBrace);
-    if (isArray) {
-      const match = cleaned.match(/\[[\s\S]*\]/);
-      if (match) cleaned = match[0];
-    } else {
-      const match = cleaned.match(/\{[\s\S]*\}/);
-      if (match) cleaned = match[0];
-    }
-    return JSON.parse(cleaned);
-  } catch (_) {}
-
-  // Response was truncated — salvage complete objects from a partial JSON array
-  if (cleaned.trimStart().startsWith("[")) {
-    try {
-      const items = [];
-      // Extract each complete {...} object from the array
-      const objRx = /\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/g;
-      let m;
-      while ((m = objRx.exec(cleaned)) !== null) {
-        try { items.push(JSON.parse(m[0])); } catch (_) {}
-      }
-      if (items.length > 0) {
-        console.warn("[safeJSON] Salvaged " + items.length + " items from truncated response");
-        return items;
-      }
-    } catch (_) {}
-  }
-
-  console.error("[safeJSON] Failed to parse AI response:", text?.slice(0, 300));
-  throw new Error("AI returned an unexpected format. Please try again.");
-}
 function fmt(n) { return n >= 1000 ? (n/1000).toFixed(1).replace(/\.0$/,"")+"k" : String(n); }
 
 export function PracticePanel({ open, onClose, roadmap, roadmaps, progress, notes, resources,
@@ -183,7 +142,7 @@ export function PracticePanel({ open, onClose, roadmap, roadmaps, progress, note
       const maxTokens = isJsonMode ? Math.max(8192, qCount * 400) : 2048;
       const { text, usage: u } = await callAI({ provider, apiKey, systemPrompt: sys, userPrompt, maxTokens });
       recordUsage(u);
-      setResult({ tab, studyMode, intMode, data: safeJSON(text) });
+      setResult({ tab, studyMode, intMode, data: safeParseJSON(text) });
     } catch (e) {
       setError(e.message || "Something went wrong.");
     } finally {
