@@ -3,6 +3,7 @@ import { isValidUrl } from "../../utils/roadmap.js";
 import { callAIWithSearch, loadAIConfig } from "../../ai/providers.js";
 import { RESOURCES_SYSTEM_PROMPT, buildFindResourcesPrompt, buildTopicCheatSheetPrompt, INTERVIEW_SYSTEM_PROMPT } from "../../ai/prompts.js";
 import { useUsage } from "../../ai/useUsage.js";
+import { safeParseJSON } from "../../utils/jsonParse.js";
 import { CheatSheetView } from "../interview/CheatSheetView.jsx";
 
 const DIFFICULTIES = ["easy", "medium", "hard"];
@@ -10,14 +11,6 @@ const TIME_OPTIONS = ["< 1 hour", "1–2 hours", "2–5 hours", "5–10 hours", 
 
 const TYPE_ICONS = { docs: "📄", tutorial: "📝", video: "🎬", interactive: "🎮", course: "🎓" };
 const TYPE_COLORS = { docs: "#7b8cde", tutorial: "#52b788", video: "#e05252", interactive: "#ee9b00", course: "#c4b5fd" };
-
-function safeParseJSON(text) {
-  try {
-    return JSON.parse(text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim());
-  } catch {
-    throw new Error("Couldn't parse AI response. Please try again.");
-  }
-}
 
 export function NoteModal({ noteModal, roadmaps, notes, resources, topicMeta, onSave, onClose }) {
   const { roadmap: rmKey, topic } = noteModal;

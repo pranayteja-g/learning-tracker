@@ -4,16 +4,9 @@ import { slugify } from "../../utils/roadmap.js";
 import { callAI, loadAIConfig, PROVIDERS } from "../../ai/providers.js";
 import { ROADMAP_SYSTEM_PROMPT, buildRoadmapPrompt, ROADMAP_CATEGORIES, buildTopicExpansionPrompt } from "../../ai/prompts.js";
 import { topicName, isExpanded, expandTopic, expandSubtopic } from "../../utils/topics.js";
+import { safeParseJSON } from "../../utils/jsonParse.js";
 
 function isValidHex(str) { return /^#[0-9a-fA-F]{6}$/.test(str); }
-
-function safeParseJSON(text) {
-  try {
-    return JSON.parse(text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim());
-  } catch {
-    throw new Error("AI returned an unexpected format. Please try again.");
-  }
-}
 
 // ── AI Generation Panel ───────────────────────────────────────────────────────
 function AIGeneratePanel({ onGenerated, defaultColor, defaultAccent }) {
