@@ -1,214 +1,376 @@
 /**
- * Network Sync Service
- * Manages device pairing and state synchronization over WebSocket
+ * Peer Sync Service
+ * Manages manual WebRTC offer/answer exchange and data-channel messaging.
  */
 
-// Generate a random 6-digit pairing code
-export function generatePairingCode() {
-  return Math.floor(100000 + Math.random() * 900000).toString();
-}
+const RTC_CONFIG = {
+  iceServers: [
+    { urls: "stun:stun.l.google.com:19302" },
+    { urls: "stun:global.stun.twilio.com:3478" },
+  ],
+};
 
-// Generate a unique device ID
+const SIGNAL_VERSION = 1;
+const CHUNK_SIZE = 12000;
+
 export function generateDeviceId() {
-  return `device-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  return `device-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
 }
 
-/**
- * Sync Manager - handles WebSocket connections and state sync
- */
-export class SyncManager {
-  constructor(options = {}) {
-    this.ws = null;
-    this.deviceId = options.deviceId || generateDeviceId();
-    this.serverUrl = options.serverUrl; // e.g., "ws://192.168.1.100:3001"
-    this.messageHandlers = new Map();
-    this.isConnected = false;
-    this.isPaired = false;
-    this.reconnectAttempts = 0;
-    this.maxReconnectAttempts = 5;
-    this.reconnectDelay = 2000;
-    this.listeners = new Set();
-    this.pairingPromise = null;
-    this.pairingResolve = null;
-    this.isAutoConnect = false;
+export function serializeSignalPayload(payload) {
+  return JSON.stringify({
+    v: SIGNAL_VERSION,
+    ...payload,
+  });
+}
+
+export function parseSignalPayload(rawPayload) {
+  let parsed = rawPayload;
+
+  if (typeof rawPayload === "string") {
+    try {
+      parsed = JSON.parse(rawPayload);
+    } catch {
+      throw new Error("That pairing payload is not valid JSON.");
+    }
   }
 
-  // Register a callback to be notified of state changes
+  if (!parsed || typeof parsed !== "object") {
+    throw new Error("Invalid pairing payload.");
+  }
+
+  if (parsed.v !== SIGNAL_VERSION) {
+    throw new Error("Unsupported pairing payload version.");
+  }
+
+  if (!parsed.type || !parsed.sdp) {
+    throw new Error("Pairing payload is missing required fields.");
+  }
+
+  return parsed;
+}
+
+function createChunkId() {
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+async function waitForIceGatheringComplete(pc) {
+  if (pc.iceGatheringState === "complete") return;
+
+  await new Promise((resolve) => {
+    const onStateChange = () => {
+      if (pc.iceGatheringState === "complete") {
+        pc.removeEventListener("icegatheringstatechange", onStateChange);
+        resolve();
+      }
+    };
+
+    pc.addEventListener("icegatheringstatechange", onStateChange);
+    setTimeout(() => {
+      pc.removeEventListener("icegatheringstatechange", onStateChange);
+      resolve();
+    }, 4000);
+  });
+}
+
+export class SyncManager {
+  constructor(options = {}) {
+    this.deviceId = options.deviceId || generateDeviceId();
+    this.deviceName = options.deviceName || "This Device";
+    this.pc = null;
+    this.channel = null;
+    this.messageHandlers = new Map();
+    this.listeners = new Set();
+    this.pendingChunks = new Map();
+    this.isConnected = false;
+    this.isInitiator = false;
+    this.peer = null;
+  }
+
   subscribe(callback) {
     this.listeners.add(callback);
     return () => this.listeners.delete(callback);
   }
 
-  // Notify all listeners of state changes
   notifyListeners(event) {
-    this.listeners.forEach(cb => cb(event));
+    this.listeners.forEach((cb) => cb(event));
   }
 
-  /**
-   * Connect to sync server
-   */
-  async connect(serverUrl, isAutoConnect = false) {
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      console.log("Already connected");
-      return;
+  updateDeviceName(deviceName) {
+    this.deviceName = deviceName || this.deviceName;
+  }
+
+  async createOffer() {
+    this.disconnect({ preservePeer: true, silent: true });
+    this.isInitiator = true;
+    const pc = this._createPeerConnection();
+    const channel = pc.createDataChannel("learning-tracker-sync", {
+      ordered: true,
+    });
+    this._attachDataChannel(channel);
+
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+    await waitForIceGatheringComplete(pc);
+
+    return serializeSignalPayload({
+      type: "offer",
+      sdp: pc.localDescription,
+      from: {
+        deviceId: this.deviceId,
+        deviceName: this.deviceName,
+      },
+      createdAt: Date.now(),
+    });
+  }
+
+  async acceptOffer(rawOffer) {
+    const offerPayload = parseSignalPayload(rawOffer);
+    if (offerPayload.type !== "offer") {
+      throw new Error("Please paste an offer payload here.");
     }
 
-    this.serverUrl = serverUrl;
-    this.isAutoConnect = isAutoConnect;
+    this.disconnect({ preservePeer: true, silent: true });
+    this.isInitiator = false;
+    this.peer = offerPayload.from || null;
 
-    return new Promise((resolve, reject) => {
+    const pc = this._createPeerConnection();
+    await pc.setRemoteDescription(new RTCSessionDescription(offerPayload.sdp));
+
+    const answer = await pc.createAnswer();
+    await pc.setLocalDescription(answer);
+    await waitForIceGatheringComplete(pc);
+
+    return serializeSignalPayload({
+      type: "answer",
+      sdp: pc.localDescription,
+      from: {
+        deviceId: this.deviceId,
+        deviceName: this.deviceName,
+      },
+      to: offerPayload.from || null,
+      createdAt: Date.now(),
+    });
+  }
+
+  async acceptAnswer(rawAnswer) {
+    const answerPayload = parseSignalPayload(rawAnswer);
+    if (answerPayload.type !== "answer") {
+      throw new Error("Please paste an answer payload here.");
+    }
+
+    if (!this.pc) {
+      throw new Error("Create an offer on this device first.");
+    }
+
+    await this.pc.setRemoteDescription(
+      new RTCSessionDescription(answerPayload.sdp),
+    );
+    this.peer = answerPayload.from || this.peer;
+  }
+
+  disconnect(options = {}) {
+    if (this.channel) {
+      this.channel.onopen = null;
+      this.channel.onclose = null;
+      this.channel.onerror = null;
+      this.channel.onmessage = null;
       try {
-        this.ws = new WebSocket(serverUrl);
-
-        this.ws.onopen = () => {
-          console.log("✓ Sync connected");
-          this.isConnected = true;
-          this.reconnectAttempts = 0;
-
-          // Send device info on connect
-          this.send("device_connect", {
-            deviceId: this.deviceId,
-            timestamp: Date.now(),
-          });
-
-          this.notifyListeners({ type: "connected" });
-          resolve();
-        };
-
-        this.ws.onmessage = (event) => {
-          try {
-            const message = JSON.parse(event.data);
-            this._handleMessage(message);
-          } catch (e) {
-            console.error("Failed to parse sync message:", e);
-          }
-        };
-
-        this.ws.onerror = (error) => {
-          console.error("Sync WebSocket error:", error);
-          // Only notify listeners about errors if it's a manual connection attempt
-          if (!this.isAutoConnect) {
-            this.notifyListeners({ type: "error", message: "WebSocket connection failed" });
-          }
-          reject(error);
-        };
-
-        this.ws.onclose = () => {
-          console.log("Sync disconnected (readyState:", this.ws?.readyState, ")");
-          this.isConnected = false;
-          this.notifyListeners({ type: "disconnected" });
-          this._attemptReconnect();
-        };
-      } catch (e) {
-        reject(e);
+        this.channel.close();
+      } catch {
+        // Ignore close errors from stale channels.
       }
-    });
-  }
+    }
 
-  /**
-   * Wait for pairing confirmation from server
-   */
-  waitForPairingConfirmation(timeoutMs = 10000) {
-    return new Promise((resolve, reject) => {
-      this.pairingResolve = resolve;
-      
-      const timeout = setTimeout(() => {
-        this.pairingResolve = null;
-        console.warn("Pairing confirmation timeout - server may not have received pairing request");
-        reject(new Error("Pairing confirmation timeout (10s)"));
-      }, timeoutMs);
+    if (this.pc) {
+      this.pc.ondatachannel = null;
+      this.pc.onconnectionstatechange = null;
+      this.pc.oniceconnectionstatechange = null;
+      try {
+        this.pc.close();
+      } catch {
+        // Ignore close errors from stale peer connections.
+      }
+    }
 
-      // Store timeout ID for cleanup
-      this._pairingTimeout = timeout;
-    });
-  }
+    this.channel = null;
+    this.pc = null;
+    this.isConnected = false;
+    this.pendingChunks.clear();
 
-  /**
-   * Disconnect from server
-   */
-  disconnect() {
-    if (this.ws) {
-      this.ws.close();
-      this.ws = null;
-      this.isConnected = false;
+    if (!options.preservePeer) {
+      this.peer = null;
+      this.isInitiator = false;
+    }
+
+    if (!options.silent) {
+      this.notifyListeners({ type: "disconnected" });
     }
   }
 
-  /**
-   * Send a message to the sync server
-   */
   send(type, payload = {}) {
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-      console.warn("Not connected to sync server");
+    if (!this.channel || this.channel.readyState !== "open") {
+      console.warn("Not connected to peer");
       return false;
     }
 
-    try {
-      this.ws.send(
-        JSON.stringify({
-          type,
-          deviceId: this.deviceId,
-          payload,
-          timestamp: Date.now(),
-        })
-      );
+    const envelope = JSON.stringify({
+      type,
+      deviceId: this.deviceId,
+      payload,
+      timestamp: Date.now(),
+    });
+
+    if (envelope.length <= CHUNK_SIZE) {
+      this.channel.send(envelope);
       return true;
-    } catch (e) {
-      console.error("Failed to send sync message:", e);
-      return false;
     }
+
+    const chunkId = createChunkId();
+    const total = Math.ceil(envelope.length / CHUNK_SIZE);
+
+    for (let index = 0; index < total; index += 1) {
+      const chunk = envelope.slice(index * CHUNK_SIZE, (index + 1) * CHUNK_SIZE);
+      this.channel.send(
+        JSON.stringify({
+          type: "__chunk__",
+          chunkId,
+          index,
+          total,
+          chunk,
+        }),
+      );
+    }
+
+    return true;
   }
 
-  /**
-   * Sync a specific data key with remote
-   */
   syncData(key, value) {
     return this.send("data_update", { key, value });
   }
 
-  /**
-   * Request full state sync from another device
-   */
-  requestStateSync(fromDeviceId) {
-    return this.send("request_state", { fromDeviceId });
+  requestStateSync() {
+    return this.send("snapshot_request");
   }
 
-  /**
-   * Handle incoming messages
-   */
+  on(messageType, handler) {
+    this.messageHandlers.set(messageType, handler);
+  }
+
+  _createPeerConnection() {
+    const pc = new RTCPeerConnection(RTC_CONFIG);
+    this.pc = pc;
+
+    pc.ondatachannel = (event) => {
+      this._attachDataChannel(event.channel);
+    };
+
+    pc.onconnectionstatechange = () => {
+      const state = pc.connectionState;
+
+      if (state === "connected") {
+        this.isConnected = true;
+      }
+
+      if (state === "failed" || state === "closed" || state === "disconnected") {
+        this.isConnected = false;
+        this.notifyListeners({ type: "disconnected" });
+      }
+    };
+
+    pc.oniceconnectionstatechange = () => {
+      if (pc.iceConnectionState === "failed") {
+        this.notifyListeners({
+          type: "error",
+          message: "Peer connection failed on this network.",
+        });
+      }
+    };
+
+    return pc;
+  }
+
+  _attachDataChannel(channel) {
+    this.channel = channel;
+
+    channel.onopen = () => {
+      this.isConnected = true;
+      this.send("hello", {
+        deviceId: this.deviceId,
+        deviceName: this.deviceName,
+        initiator: this.isInitiator,
+      });
+      this.notifyListeners({
+        type: "connected",
+        peer: this.peer,
+        isInitiator: this.isInitiator,
+      });
+    };
+
+    channel.onclose = () => {
+      this.isConnected = false;
+      this.notifyListeners({ type: "disconnected" });
+    };
+
+    channel.onerror = () => {
+      this.notifyListeners({
+        type: "error",
+        message: "Data channel error while syncing.",
+      });
+    };
+
+    channel.onmessage = (event) => {
+      try {
+        const message = JSON.parse(event.data);
+        if (message.type === "__chunk__") {
+          this._handleChunk(message);
+          return;
+        }
+        this._handleMessage(message);
+      } catch (error) {
+        console.error("Failed to parse peer message:", error);
+      }
+    };
+  }
+
+  _handleChunk(message) {
+    const { chunkId, index, total, chunk } = message;
+    const entry = this.pendingChunks.get(chunkId) || {
+      total,
+      parts: new Array(total),
+    };
+
+    entry.parts[index] = chunk;
+    this.pendingChunks.set(chunkId, entry);
+
+    if (entry.parts.filter(Boolean).length === total) {
+      this.pendingChunks.delete(chunkId);
+      this._handleMessage(JSON.parse(entry.parts.join("")));
+    }
+  }
+
   _handleMessage(message) {
     const { type, deviceId, payload } = message;
 
-    // Handle pairing confirmation
-    if (type === "pairing_confirmed") {
-      console.log("✅ Pairing confirmed by server with code:", payload.code);
-      this.isPaired = true;
-      if (this._pairingTimeout) {
-        clearTimeout(this._pairingTimeout);
-        this._pairingTimeout = null;
-      }
-      if (this.pairingResolve) {
-        this.pairingResolve(payload);
-        this.pairingResolve = null;
-      } else {
-        console.warn("Pairing confirmed but no resolver waiting");
-      }
+    if (type === "hello") {
+      this.peer = {
+        deviceId: payload.deviceId || deviceId,
+        deviceName: payload.deviceName || "Paired Device",
+      };
+
+      this.notifyListeners({
+        type: "peer_ready",
+        peer: this.peer,
+        isInitiator: this.isInitiator,
+      });
       return;
     }
 
-    // Handle welcome from server
-    if (type === "welcome") {
-      console.log("👋 Welcome message from server, device connected");
-      return;
-    }
-
-    // Call any registered handlers for this message type
     const handler = this.messageHandlers.get(type);
     if (handler) {
       handler(payload, deviceId);
     }
 
-    // Notify listeners
     this.notifyListeners({
       type: "message",
       messageType: type,
@@ -216,44 +378,8 @@ export class SyncManager {
       payload,
     });
   }
-
-  /**
-   * Register a handler for a specific message type
-   */
-  on(messageType, handler) {
-    this.messageHandlers.set(messageType, handler);
-  }
-
-  /**
-   * Attempt to reconnect to the sync server
-   */
-  _attemptReconnect() {
-    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      console.log(
-        "Max reconnect attempts reached, giving up on auto-reconnect"
-      );
-      return;
-    }
-
-    this.reconnectAttempts++;
-    console.log(
-      `Attempting to reconnect (${this.reconnectAttempts}/${this.maxReconnectAttempts})...`
-    );
-
-    setTimeout(() => {
-      if (this.serverUrl && !this.isConnected) {
-        this.connect(this.serverUrl, true).catch((e) => {
-          console.log("Reconnect attempt failed:", e);
-        });
-      }
-    }, this.reconnectDelay * this.reconnectAttempts);
-  }
 }
 
-/**
- * State Sync Helper
- * Manages which data should be synced
- */
 export class StateSyncHelper {
   constructor() {
     this.syncKeys = [
@@ -268,7 +394,6 @@ export class StateSyncHelper {
     ];
   }
 
-  // Get all data that should be synced
   getSyncableData(appState) {
     const syncData = {};
     this.syncKeys.forEach((key) => {
@@ -279,7 +404,6 @@ export class StateSyncHelper {
     return syncData;
   }
 
-  // Merge remote state with local state (remote takes precedence for now)
   mergeState(localState, remoteState) {
     return {
       ...localState,

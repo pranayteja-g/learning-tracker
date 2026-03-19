@@ -1,5 +1,5 @@
 /**
- * useSync Hook - manages network synchronization state and logic
+ * useSync Hook - manages direct peer synchronization over WebRTC.
  */
 
 import { useState, useEffect, useRef, useCallback } from "react";
@@ -7,24 +7,36 @@ import { idbSet, idbGet } from "../storage/db.js";
 import {
   SyncManager,
   StateSyncHelper,
-  generatePairingCode,
   generateDeviceId,
 } from "../sync/syncService.js";
-import { getDefaultSyncServerUrl } from "../utils/syncUrl.js";
 
 const SYNC_CONFIG_KEY = "sync_config";
 
-export function useSync() {
+export function useSync(options = {}) {
+  const { snapshot = null, onRemoteSnapshot = null, loaded = true } = options;
+
   const [syncConfig, setSyncConfig] = useState(null);
   const [isConnected, setIsConnected] = useState(false);
   const [connectionError, setConnectionError] = useState(null);
   const [pairedDevices, setPairedDevices] = useState([]);
-  const [currentPairingCode, setCurrentPairingCode] = useState(null);
+  const [currentSignalPayload, setCurrentSignalPayload] = useState(null);
+  const [currentSignalType, setCurrentSignalType] = useState(null);
+  const [awaitingAnswer, setAwaitingAnswer] = useState(false);
+  const [peerDevice, setPeerDevice] = useState(null);
+  const [lastSyncAt, setLastSyncAt] = useState(null);
+  const [initialSyncComplete, setInitialSyncComplete] = useState(false);
 
   const syncManagerRef = useRef(null);
   const stateSyncHelperRef = useRef(new StateSyncHelper());
+  const snapshotRef = useRef(snapshot);
+  const lastSentSnapshotRef = useRef(null);
+  const lastReceivedSnapshotRef = useRef(null);
+  const autoSyncTimerRef = useRef(null);
 
-  // Load sync config on mount
+  useEffect(() => {
+    snapshotRef.current = snapshot;
+  }, [snapshot]);
+
   useEffect(() => {
     const loadSyncConfig = async () => {
       try {
@@ -33,234 +45,241 @@ export function useSync() {
           setSyncConfig(config);
           setPairedDevices(config.pairedDevices || []);
         } else {
-          // Create new config
           const newConfig = {
             deviceId: generateDeviceId(),
-            deviceName: `Device ${Math.random().toString(36).substr(2, 5)}`,
+            deviceName: `Device ${Math.random().toString(36).slice(2, 7)}`,
             pairedDevices: [],
             createdAt: Date.now(),
           };
           await idbSet(SYNC_CONFIG_KEY, newConfig);
           setSyncConfig(newConfig);
         }
-      } catch (e) {
-        console.error("Failed to load sync config:", e);
+      } catch (error) {
+        console.error("Failed to load sync config:", error);
       }
     };
 
     loadSyncConfig();
   }, []);
 
-  // Initialize sync manager
-  useEffect(() => {
-    if (syncConfig && !syncManagerRef.current) {
-      syncManagerRef.current = new SyncManager({
-        deviceId: syncConfig.deviceId,
-      });
+  const persistPairedDevices = useCallback(async (nextDevices) => {
+    setPairedDevices(nextDevices);
 
-      // Subscribe to connection state changes
-      syncManagerRef.current.subscribe((event) => {
-        if (event.type === "connected") {
-          setIsConnected(true);
-          setConnectionError(null);
-        } else if (event.type === "disconnected") {
-          setIsConnected(false);
-        } else if (event.type === "error") {
-          setConnectionError(event.message);
-          setIsConnected(false);
-        }
-      });
+    setSyncConfig((current) => {
+      if (!current) return current;
+      const updated = { ...current, pairedDevices: nextDevices };
+      idbSet(SYNC_CONFIG_KEY, updated);
+      return updated;
+    });
+  }, []);
 
-      // Auto-connect to the configured sync server
-      const autoConnect = async () => {
-        try {
-          const serverUrl = getDefaultSyncServerUrl();
-          console.log("Attempting to connect to sync server at:", serverUrl);
-          await syncManagerRef.current.connect(serverUrl, true);
-        } catch (e) {
-          // Connection failed, but that's okay - user can manually connect
-          console.log(
-            "Auto-connect failed (user can manually connect later):",
-            e.message,
-          );
-        }
-      };
+  const sendFullSnapshot = useCallback((reason = "manual") => {
+    if (!syncManagerRef.current || !snapshotRef.current) return false;
 
-      // Try to auto-connect after a small delay
-      const timeout = setTimeout(autoConnect, 1000);
-      return () => clearTimeout(timeout);
+    const syncableData = stateSyncHelperRef.current.getSyncableData(snapshotRef.current);
+    const snapshotString = JSON.stringify(syncableData);
+    const sent = syncManagerRef.current.send("full_snapshot", {
+      reason,
+      data: syncableData,
+    });
+
+    if (sent) {
+      lastSentSnapshotRef.current = snapshotString;
+      setLastSyncAt(Date.now());
+      setInitialSyncComplete(true);
     }
+
+    return sent;
+  }, []);
+
+  useEffect(() => {
+    if (!syncConfig || syncManagerRef.current) return undefined;
+
+    const manager = new SyncManager({
+      deviceId: syncConfig.deviceId,
+      deviceName: syncConfig.deviceName,
+    });
+    syncManagerRef.current = manager;
+
+    const unsubscribe = manager.subscribe((event) => {
+      if (event.type === "connected") {
+        setIsConnected(true);
+        setConnectionError(null);
+        if (event.peer) setPeerDevice(event.peer);
+      } else if (event.type === "peer_ready") {
+        setPeerDevice(event.peer || null);
+        setIsConnected(true);
+        setConnectionError(null);
+
+        const peer = event.peer || null;
+        if (peer) {
+          const exists = pairedDevices.some((device) => device.deviceId === peer.deviceId);
+          if (!exists) {
+            persistPairedDevices([
+              ...pairedDevices,
+              {
+                ...peer,
+                connectedAt: Date.now(),
+              },
+            ]);
+          }
+        }
+
+        if (event.isInitiator && !initialSyncComplete) {
+          setTimeout(() => sendFullSnapshot("initial"), 300);
+        }
+      } else if (event.type === "disconnected") {
+        setIsConnected(false);
+        setAwaitingAnswer(false);
+      } else if (event.type === "error") {
+        setConnectionError(event.message);
+      }
+    });
+
+    manager.on("full_snapshot", async (payload) => {
+      const remoteData = payload?.data;
+      if (!remoteData || typeof remoteData !== "object") return;
+
+      const normalized = stateSyncHelperRef.current.getSyncableData(remoteData);
+      const snapshotString = JSON.stringify(normalized);
+      lastReceivedSnapshotRef.current = snapshotString;
+      setLastSyncAt(Date.now());
+      setInitialSyncComplete(true);
+
+      if (typeof onRemoteSnapshot === "function") {
+        await onRemoteSnapshot(normalized, payload?.reason || "peer");
+      }
+    });
+
+    manager.on("snapshot_request", () => {
+      sendFullSnapshot("request");
+    });
 
     return () => {
-      // Cleanup on unmount
-      if (syncManagerRef.current) {
-        syncManagerRef.current.disconnect();
-      }
+      unsubscribe();
+      manager.disconnect({ silent: true });
+      syncManagerRef.current = null;
     };
+  }, [initialSyncComplete, onRemoteSnapshot, pairedDevices, persistPairedDevices, sendFullSnapshot, syncConfig]);
+
+  useEffect(() => {
+    if (!syncManagerRef.current || !syncConfig) return;
+    syncManagerRef.current.updateDeviceName(syncConfig.deviceName);
   }, [syncConfig]);
 
-  /**
-   * Generate a new pairing code for this device and advertise it to server
-   */
-  const generateNewPairingCode = useCallback(() => {
-    const code = generatePairingCode();
-    setCurrentPairingCode(code);
+  useEffect(() => {
+    if (!loaded || !isConnected || !initialSyncComplete || !snapshot) return undefined;
 
-    // Tell server this device is waiting for this pairing code
-    if (syncManagerRef.current && syncConfig) {
-      const connected = syncManagerRef.current.send("advertise_pairing", {
-        pairingCode: code,
-        deviceName: syncConfig.deviceName || "Unknown Device",
-      });
-      if (connected) {
-        console.log("Advertising pairing code to server:", code);
-      } else {
-        console.warn("Not connected to server when advertising pairing code");
-      }
+    const syncableData = stateSyncHelperRef.current.getSyncableData(snapshot);
+    const snapshotString = JSON.stringify(syncableData);
+
+    if (
+      snapshotString === lastSentSnapshotRef.current ||
+      snapshotString === lastReceivedSnapshotRef.current
+    ) {
+      return undefined;
     }
 
-    return code;
-  }, [syncConfig]);
+    clearTimeout(autoSyncTimerRef.current);
+    autoSyncTimerRef.current = setTimeout(() => {
+      sendFullSnapshot("auto");
+    }, 500);
 
-  /**
-   * Connect to a remote device via server URL and pairing code
-   */
-  const connectToDevice = useCallback(
-    async (serverUrl, pairingCode, deviceName = "Remote Device") => {
-      if (!syncManagerRef.current) {
-        throw new Error("Sync manager not initialized");
-      }
+    return () => clearTimeout(autoSyncTimerRef.current);
+  }, [snapshot, loaded, isConnected, initialSyncComplete, sendFullSnapshot]);
 
-      try {
-        setConnectionError(null);
-        console.log("Connecting to server:", serverUrl);
+  const createPairOffer = useCallback(async () => {
+    if (!syncManagerRef.current) {
+      throw new Error("Sync manager not initialized");
+    }
 
-        // Connect to sync server
-        await syncManagerRef.current.connect(serverUrl);
-        console.log("WebSocket connected, sending pairing request...");
+    setConnectionError(null);
+    setPeerDevice(null);
+    setInitialSyncComplete(false);
 
-        // Set up pairing confirmation waiter
-        const pairingPromise =
-          syncManagerRef.current.waitForPairingConfirmation(10000);
+    const offer = await syncManagerRef.current.createOffer();
+    setCurrentSignalPayload(offer);
+    setCurrentSignalType("offer");
+    setAwaitingAnswer(true);
+    return offer;
+  }, []);
 
-        // Send pairing request
-        const sentSuccessfully = syncManagerRef.current.send("pairing_request", {
-          pairingCode,
-          deviceName: syncConfig?.deviceName || "Unknown Device",
-        });
+  const connectToDevice = useCallback(async (offerPayload) => {
+    if (!syncManagerRef.current) {
+      throw new Error("Sync manager not initialized");
+    }
 
-        if (!sentSuccessfully) {
-          throw new Error("Failed to send pairing request to server");
-        }
-        console.log("Pairing request sent with code:", pairingCode);
+    setConnectionError(null);
+    setInitialSyncComplete(false);
 
-        // Wait for server to confirm pairing (timeout after 10 seconds)
-        await pairingPromise;
-        console.log("Connection successful!");
+    const answer = await syncManagerRef.current.acceptOffer(offerPayload);
+    setCurrentSignalPayload(answer);
+    setCurrentSignalType("answer");
+    setAwaitingAnswer(false);
+    return answer;
+  }, []);
 
-        // Add to paired devices
-        const newPairedDevice = {
-          name: deviceName,
-          serverUrl,
-          connectedAt: Date.now(),
-        };
+  const finalizeConnection = useCallback(async (answerPayload) => {
+    if (!syncManagerRef.current) {
+      throw new Error("Sync manager not initialized");
+    }
 
-        const updatedPaired = [...pairedDevices, newPairedDevice];
-        setPairedDevices(updatedPaired);
+    setConnectionError(null);
+    await syncManagerRef.current.acceptAnswer(answerPayload);
+    setCurrentSignalPayload(null);
+    setCurrentSignalType(null);
+    setAwaitingAnswer(false);
+    return true;
+  }, []);
 
-        // Update stored config
-        if (syncConfig) {
-          const updated = { ...syncConfig, pairedDevices: updatedPaired };
-          await idbSet(SYNC_CONFIG_KEY, updated);
-          setSyncConfig(updated);
-        }
-
-        return true;
-      } catch (e) {
-        const errorMsg = `Connection failed: ${e.message}`;
-        setConnectionError(errorMsg);
-        console.error("Sync error:", errorMsg, e);
-        return false;
-      }
-    },
-    [syncConfig, pairedDevices],
-  );
-
-  /**
-   * Disconnect from sync server
-   */
   const disconnect = useCallback(() => {
     if (syncManagerRef.current) {
       syncManagerRef.current.disconnect();
-      setIsConnected(false);
     }
+    setCurrentSignalPayload(null);
+    setCurrentSignalType(null);
+    setAwaitingAnswer(false);
+    setInitialSyncComplete(false);
   }, []);
 
-  /**
-   * Sync data with remote device
-   */
-  const syncData = useCallback((key, value) => {
+  const requestFullSync = useCallback(() => {
     if (!syncManagerRef.current) return false;
-    return syncManagerRef.current.syncData(key, value);
+    return syncManagerRef.current.requestStateSync();
   }, []);
 
-  /**
-   * Request full state sync
-   */
-  const requestFullSync = useCallback((fromDeviceId) => {
-    if (!syncManagerRef.current) return false;
-    return syncManagerRef.current.requestStateSync(fromDeviceId);
-  }, []);
+  const unpairDevice = useCallback(async (deviceIndex) => {
+    const nextDevices = pairedDevices.filter((_, index) => index !== deviceIndex);
+    await persistPairedDevices(nextDevices);
 
-  /**
-   * Unpair a device
-   */
-  const unpairDevice = useCallback(
-    async (deviceIndex) => {
-      const updated = pairedDevices.filter((_, i) => i !== deviceIndex);
-      setPairedDevices(updated);
+    if (nextDevices.length === 0 && syncManagerRef.current && !syncManagerRef.current.isConnected) {
+      setPeerDevice(null);
+    }
+  }, [pairedDevices, persistPairedDevices]);
 
-      if (syncConfig) {
-        const config = { ...syncConfig, pairedDevices: updated };
-        await idbSet(SYNC_CONFIG_KEY, config);
-        setSyncConfig(config);
-      }
-
-      // If currently connected to this device, disconnect
-      if (updated.length === 0) {
-        disconnect();
-      }
-    },
-    [pairedDevices, syncConfig, disconnect],
-  );
-
-  /**
-   * Clear pairing code display
-   */
   const clearPairingCode = useCallback(() => {
-    setCurrentPairingCode(null);
+    setCurrentSignalPayload(null);
+    setCurrentSignalType(null);
   }, []);
 
   return {
-    // State
     deviceId: syncConfig?.deviceId,
     deviceName: syncConfig?.deviceName,
     isConnected,
     connectionError,
     pairedDevices,
-    currentPairingCode,
+    currentPairingCode: currentSignalPayload,
+    currentSignalType,
+    awaitingAnswer,
+    peerDevice,
+    lastSyncAt,
     syncConfig,
-
-    // Actions
-    generateNewPairingCode,
+    createPairOffer,
     connectToDevice,
+    finalizeConnection,
     disconnect,
-    syncData,
+    syncData: sendFullSnapshot,
     requestFullSync,
     unpairDevice,
     clearPairingCode,
-
-    // Internal
-    syncManager: syncManagerRef.current,
   };
 }

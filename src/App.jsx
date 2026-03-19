@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { useAppStorage }         from "./storage/hooks.js";
 import { useIsMobile }           from "./hooks/useIsMobile.js";
 import { validateRoadmap, downloadJSON, getRoadmapStats, getNextUp } from "./utils/roadmap.js";
-import { flatTopicNames, allTopicNames, topicName, isExpanded } from "./utils/topics.js";
+import { flatTopicNames, topicName, isExpanded } from "./utils/topics.js";
 import { safeParseJSON } from "./utils/jsonParse.js";
 import { Toast }                 from "./components/ui/Toast.jsx";
 import { TopicCard }             from "./components/ui/TopicCard.jsx";
@@ -771,7 +771,7 @@ export default function App() {
           onClose={() => setActiveQuestRmId(null)}
         />
       )}
-      {process.env.NODE_ENV === "development" && (
+      {import.meta.env.DEV && (
         <AITimeoutTester />
       )}
     </div>
