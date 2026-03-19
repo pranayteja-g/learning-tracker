@@ -20,11 +20,6 @@ export function useQuest() {
     });
   }, []);
 
-  const save = useCallback((updated) => {
-    setQuests(updated);
-    idbSet(KEY, updated);
-  }, []);
-
   const startQuest = useCallback((questData) => {
     setQuests(prev => {
       const updated = {
@@ -106,9 +101,16 @@ export function useQuest() {
       (q.status === "failed" && !isOnCooldown(rmId));
   }, [quests, isOnCooldown]);
 
+  const replaceQuests = useCallback((nextQuests) => {
+    const safeQuests = nextQuests && typeof nextQuests === "object" ? nextQuests : {};
+    setQuests(safeQuests);
+    idbSet(KEY, safeQuests);
+  }, []);
+
   return {
     quests, loaded,
     getQuest, startQuest, advancePhase, completeQuest, clearQuest,
     isOnCooldown, cooldownRemaining, needsNewQuest,
+    replaceQuests,
   };
 }

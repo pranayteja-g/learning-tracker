@@ -29,6 +29,18 @@ Open [http://localhost:5173](http://localhost:5173)
 npm run build
 ```
 
+### Frontend Sync Server URL
+
+Set `VITE_SYNC_SERVER_URL` so the frontend auto-connects to your hosted sync server.
+
+Example:
+
+```bash
+VITE_SYNC_SERVER_URL=wss://learning-tracker-production-0996.up.railway.app
+```
+
+Use `.env.local` for local development and add the same variable in your frontend hosting provider before building for production.
+
 ## Network Sync (Multi-Device)
 
 Sync your learning progress across multiple devices on the same network.
