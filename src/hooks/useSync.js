@@ -10,6 +10,7 @@ import {
   generatePairingCode,
   generateDeviceId,
 } from "../sync/syncService.js";
+import { getDefaultSyncServerUrl } from "../utils/syncUrl.js";
 
 const SYNC_CONFIG_KEY = "sync_config";
 
@@ -70,22 +71,18 @@ export function useSync() {
         }
       });
 
-      // Auto-connect to local sync server
+      // Auto-connect to the configured sync server
       const autoConnect = async () => {
         try {
-          // Try to detect the server - first check if we're on localhost (dev)
-          if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
-            console.log("📡 Attempting to connect to local sync server...");
-            await syncManagerRef.current.connect("ws://localhost:3001", true);
-          } else {
-            // For other hosts, try to connect to same host on port 3001
-            const serverUrl = `ws://${window.location.hostname}:3001`;
-            console.log("📡 Attempting to connect to sync server at:", serverUrl);
-            await syncManagerRef.current.connect(serverUrl, true);
-          }
+          const serverUrl = getDefaultSyncServerUrl();
+          console.log("Attempting to connect to sync server at:", serverUrl);
+          await syncManagerRef.current.connect(serverUrl, true);
         } catch (e) {
           // Connection failed, but that's okay - user can manually connect
-          console.log("ℹ️ Auto-connect failed (user can manually connect later):", e.message);
+          console.log(
+            "Auto-connect failed (user can manually connect later):",
+            e.message,
+          );
         }
       };
 
@@ -108,7 +105,7 @@ export function useSync() {
   const generateNewPairingCode = useCallback(() => {
     const code = generatePairingCode();
     setCurrentPairingCode(code);
-    
+
     // Tell server this device is waiting for this pairing code
     if (syncManagerRef.current && syncConfig) {
       const connected = syncManagerRef.current.send("advertise_pairing", {
@@ -116,12 +113,12 @@ export function useSync() {
         deviceName: syncConfig.deviceName || "Unknown Device",
       });
       if (connected) {
-        console.log("📢 Advertising pairing code to server:", code);
+        console.log("Advertising pairing code to server:", code);
       } else {
         console.warn("Not connected to server when advertising pairing code");
       }
     }
-    
+
     return code;
   }, [syncConfig]);
 
@@ -136,29 +133,30 @@ export function useSync() {
 
       try {
         setConnectionError(null);
-        console.log("🔗 Connecting to server:", serverUrl);
+        console.log("Connecting to server:", serverUrl);
 
         // Connect to sync server
         await syncManagerRef.current.connect(serverUrl);
-        console.log("✓ WebSocket connected, sending pairing request...");
+        console.log("WebSocket connected, sending pairing request...");
 
         // Set up pairing confirmation waiter
-        const pairingPromise = syncManagerRef.current.waitForPairingConfirmation(10000);
+        const pairingPromise =
+          syncManagerRef.current.waitForPairingConfirmation(10000);
 
         // Send pairing request
         const sentSuccessfully = syncManagerRef.current.send("pairing_request", {
           pairingCode,
           deviceName: syncConfig?.deviceName || "Unknown Device",
         });
-        
+
         if (!sentSuccessfully) {
           throw new Error("Failed to send pairing request to server");
         }
-        console.log("📤 Pairing request sent with code:", pairingCode);
+        console.log("Pairing request sent with code:", pairingCode);
 
         // Wait for server to confirm pairing (timeout after 10 seconds)
         await pairingPromise;
-        console.log("✅ Connection successful!");
+        console.log("Connection successful!");
 
         // Add to paired devices
         const newPairedDevice = {
@@ -181,11 +179,11 @@ export function useSync() {
       } catch (e) {
         const errorMsg = `Connection failed: ${e.message}`;
         setConnectionError(errorMsg);
-        console.error("❌ Sync error:", errorMsg, e);
+        console.error("Sync error:", errorMsg, e);
         return false;
       }
     },
-    [syncConfig, pairedDevices]
+    [syncConfig, pairedDevices],
   );
 
   /**
@@ -233,7 +231,7 @@ export function useSync() {
         disconnect();
       }
     },
-    [pairedDevices, syncConfig, disconnect]
+    [pairedDevices, syncConfig, disconnect],
   );
 
   /**
