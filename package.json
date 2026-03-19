@@ -12,6 +12,7 @@
     "start": "node sync-server.js"
   },
   "dependencies": {
+    "qrcode": "^1.5.4",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "ws": "^8.19.0"

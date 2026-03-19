@@ -107,5 +107,19 @@ export function useQuizResults() {
     return results[`${rmId}::${topic}`]?.proficiency || 0;
   }, [results]);
 
-  return { results, recordQuizResult, getTopicResult, hasPassedTopic, getStars, getProficiency };
+  const replaceResults = useCallback((nextResults) => {
+    const safeResults = nextResults && typeof nextResults === "object" ? nextResults : {};
+    setResults(safeResults);
+    idbSet(KEY, safeResults);
+  }, []);
+
+  return {
+    results,
+    recordQuizResult,
+    getTopicResult,
+    hasPassedTopic,
+    getStars,
+    getProficiency,
+    replaceResults,
+  };
 }

@@ -4,19 +4,16 @@ import { TEMPLATES } from "../../constants/templates.js";
 import { downloadJSON } from "../../utils/roadmap.js";
 import { flatTopicNames } from "../../utils/topics.js";
 import { loadAIConfig, saveAIConfig, PROVIDERS } from "../../ai/providers.js";
-import { useSync } from "../../hooks/useSync.js";
 import { NetworkSyncPanel } from "../sync/NetworkSyncPanel.jsx";
 
 export function ManageModal({ roadmaps, onClose, onImportRoadmap, onDelete, onEdit, onCreate,
-  onExportBackup, onImportBackup }) {
+  onExportBackup, onImportBackup, syncState }) {
 
   const fileRef    = useRef(null);
   const backupRef  = useRef(null);
   const [tab, setTab] = useState("roadmaps"); // "roadmaps" | "data" | "settings" | "sync"
   const [aiConfig, setAIConfig] = useState(loadAIConfig);
   const [showKey,  setShowKey]  = useState({});
-  const syncState = useSync();
-
   const handleSaveAI = () => {
     saveAIConfig(aiConfig);
     // Show brief confirmation
@@ -152,8 +149,7 @@ export function ManageModal({ roadmaps, onClose, onImportRoadmap, onDelete, onEd
           {tab === "sync" && (
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
               <NetworkSyncPanel 
-                onClose={() => setTab("data")} 
-                useSync={() => syncState}
+                useSync={syncState}
               />
             </div>
           )}

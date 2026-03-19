@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback } from "react";
 
 const KEY = "learning-tracker-streak-v1";
 
@@ -14,9 +14,17 @@ function yesterdayStr() {
 
 function loadStreak() {
   try {
-    return JSON.parse(localStorage.getItem(KEY)) || {
+    const data = JSON.parse(localStorage.getItem(KEY)) || {
       current: 0, longest: 0, lastStudyDate: null, totalDays: 0,
     };
+    const today = todayStr();
+    const yesterday = yesterdayStr();
+    if (data.lastStudyDate && data.lastStudyDate !== today && data.lastStudyDate !== yesterday) {
+      const reset = { ...data, current: 0 };
+      localStorage.setItem(KEY, JSON.stringify(reset));
+      return reset;
+    }
+    return data;
   } catch { return { current: 0, longest: 0, lastStudyDate: null, totalDays: 0 }; }
 }
 
@@ -48,20 +56,15 @@ export function useStreak() {
     });
   }, []);
 
-  // Check on mount if streak has been broken (no activity yesterday or today)
-  useEffect(() => {
-    const data = loadStreak();
-    const today = todayStr();
-    const yesterday = yesterdayStr();
-    // If last study was before yesterday, reset current streak
-    if (data.lastStudyDate && data.lastStudyDate !== today && data.lastStudyDate !== yesterday) {
-      const reset = { ...data, current: 0 };
-      saveStreak(reset);
-      setStreakState(reset);
-    }
-  }, []);
-
   const studiedToday = streak.lastStudyDate === todayStr();
 
-  return { streak, recordActivity, studiedToday };
+  const replaceStreak = useCallback((nextStreak) => {
+    const safeStreak = nextStreak && typeof nextStreak === "object"
+      ? nextStreak
+      : { current: 0, longest: 0, lastStudyDate: null, totalDays: 0 };
+    saveStreak(safeStreak);
+    setStreakState(safeStreak);
+  }, []);
+
+  return { streak, recordActivity, studiedToday, replaceStreak };
 }

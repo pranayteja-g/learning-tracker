@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { useAppStorage }         from "./storage/hooks.js";
 import { useIsMobile }           from "./hooks/useIsMobile.js";
 import { validateRoadmap, downloadJSON, getRoadmapStats, getNextUp } from "./utils/roadmap.js";
-import { flatTopicNames, allTopicNames, topicName, isExpanded } from "./utils/topics.js";
+import { flatTopicNames, topicName, isExpanded } from "./utils/topics.js";
 import { safeParseJSON } from "./utils/jsonParse.js";
 import { Toast }                 from "./components/ui/Toast.jsx";
 import { TopicCard }             from "./components/ui/TopicCard.jsx";
@@ -25,6 +25,7 @@ import { buildQuestPrompt }       from "./ai/prompts.js";
 import { callAI }                 from "./ai/providers.js";
 import { loadAIConfig }           from "./ai/providers.js";
 import { AITimeoutTester }        from "./components/debug/AITimeoutTester.jsx";
+import { useSync }                from "./hooks/useSync.js";
 
 export default function App() {
   const { roadmaps, setRoadmaps, progress, setProgress, notes, setNotes,
@@ -45,10 +46,10 @@ export default function App() {
   const [loadingQuestRmIds, setLoadingQuestRmIds] = useState([]);
   const [questBoardOpen,    setQuestBoardOpen]    = useState(false);
   const [searchOpen,     setSearchOpen]     = useState(false);
-  const { streak, recordActivity, studiedToday } = useStreak();
-  const { results: quizResults, recordQuizResult, hasPassedTopic, getStars } = useQuizResults();
+  const { streak, recordActivity, studiedToday, replaceStreak } = useStreak();
+  const { results: quizResults, recordQuizResult, hasPassedTopic, getStars, replaceResults } = useQuizResults();
   const { quests, loaded: questLoaded, startQuest, advancePhase, completeQuest,
-          isOnCooldown, cooldownRemaining, needsNewQuest, getQuest } = useQuest();
+          isOnCooldown, cooldownRemaining, needsNewQuest, getQuest, replaceQuests } = useQuest();
   const importRef = useRef(null);
 
   const showFeedback = (ok, msg) => {
@@ -224,6 +225,40 @@ export default function App() {
       `learning-tracker-backup-${new Date().toISOString().slice(0,10)}.json`
     );
   };
+
+  const syncState = useSync({
+    loaded: loaded && questLoaded,
+    snapshot: {
+      roadmaps,
+      progress,
+      notes,
+      resources,
+      topicMeta,
+      quests,
+      quizResults,
+      streak,
+    },
+    onRemoteSnapshot: async (remoteSnapshot) => {
+      if (remoteSnapshot.roadmaps)  setRoadmaps(remoteSnapshot.roadmaps);
+      if (remoteSnapshot.progress)  setProgress(remoteSnapshot.progress);
+      if (remoteSnapshot.notes)     setNotes(remoteSnapshot.notes);
+      if (remoteSnapshot.resources) setResources(remoteSnapshot.resources);
+      if (remoteSnapshot.topicMeta) setTopicMeta(remoteSnapshot.topicMeta);
+      if (remoteSnapshot.quests)    replaceQuests(remoteSnapshot.quests);
+      if (remoteSnapshot.quizResults) replaceResults(remoteSnapshot.quizResults);
+      if (remoteSnapshot.streak)    replaceStreak(remoteSnapshot.streak);
+
+      const firstKey = remoteSnapshot.roadmaps ? Object.keys(remoteSnapshot.roadmaps)[0] : null;
+      if (firstKey) {
+        setActiveRoadmap(firstKey);
+        setActiveSection(null);
+        if (isMobile) setMobileScreen("sections");
+        else setView("sections");
+      }
+
+      showFeedback(true, "Sync received from paired device.");
+    },
+  });
 
   const generateQuest = async (rmId) => {
     const roadmap = roadmaps[rmId];
@@ -568,6 +603,7 @@ export default function App() {
       {showManage  && <ManageModal roadmaps={roadmaps} onClose={() => setShowManage(false)}
                         onImportRoadmap={handleImportRoadmap} onDelete={handleDeleteRoadmap}
                         onExportBackup={handleExport} onImportBackup={handleImportBackup}
+                        syncState={syncState}
                         onEdit={r => { setEditorModal({ existing: r }); setShowManage(false); }}
                         onCreate={() => { setEditorModal({ existing: null }); setShowManage(false); }} />}
       {editorModal !== null && <RoadmapEditorModal existing={editorModal.existing}
@@ -753,6 +789,7 @@ export default function App() {
       {showManage  && <ManageModal roadmaps={roadmaps} onClose={() => setShowManage(false)}
                         onImportRoadmap={handleImportRoadmap} onDelete={handleDeleteRoadmap}
                         onExportBackup={handleExport} onImportBackup={handleImportBackup}
+                        syncState={syncState}
                         onEdit={r => { setEditorModal({ existing: r }); setShowManage(false); }}
                         onCreate={() => { setEditorModal({ existing: null }); setShowManage(false); }} />}
       {editorModal !== null && <RoadmapEditorModal existing={editorModal.existing}
@@ -771,7 +808,7 @@ export default function App() {
           onClose={() => setActiveQuestRmId(null)}
         />
       )}
-      {process.env.NODE_ENV === "development" && (
+      {import.meta.env.DEV && (
         <AITimeoutTester />
       )}
     </div>
