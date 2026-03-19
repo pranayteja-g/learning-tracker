@@ -26,7 +26,8 @@ export function NetworkSyncPanel({ onClose, useSync }) {
   const [showConnectModal, setShowConnectModal] = useState(false);
   const [showPairingCode, setShowPairingCode] = useState(false);
   const [showServerConnect, setShowServerConnect] = useState(false);
-  const [serverUrl, setServerUrl] = useState("ws://192.168.31.183:3001");
+  // Railway sync server (update after deployment)
+  const [serverUrl, setServerUrl] = useState("wss://learning-tracker-production-70a8.up.railway.app");
 
   const handleConnectToServer = async (e) => {
     e.preventDefault();
