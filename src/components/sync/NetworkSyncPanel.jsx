@@ -6,6 +6,7 @@ import { useState } from "react";
 import "./NetworkSyncPanel.css";
 import { ConnectDeviceModal } from "./ConnectDeviceModal";
 import { PairingCodeDisplay } from "./PairingCodeDisplay";
+import { getDefaultSyncServerUrl } from "../../utils/syncUrl";
 
 export function NetworkSyncPanel({ onClose, useSync }) {
   const syncState = typeof useSync === 'function' ? useSync() : useSync;
@@ -26,8 +27,7 @@ export function NetworkSyncPanel({ onClose, useSync }) {
   const [showConnectModal, setShowConnectModal] = useState(false);
   const [showPairingCode, setShowPairingCode] = useState(false);
   const [showServerConnect, setShowServerConnect] = useState(false);
-  // Railway sync server (update after deployment)
-  const [serverUrl, setServerUrl] = useState("wss://learning-tracker-production-70a8.up.railway.app");
+  const [serverUrl, setServerUrl] = useState(getDefaultSyncServerUrl());
 
   const handleConnectToServer = async (e) => {
     e.preventDefault();
