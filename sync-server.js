@@ -3,9 +3,9 @@
 /**
  * Learning Tracker Sync Server
  * Run this on your local network to enable device-to-device synchronization
- * 
+ *
  * Usage: node sync-server.js [--port 3001]
- * 
+ *
  * For Railway deployment: PORT environment variable is set automatically
  */
 
@@ -15,7 +15,8 @@ import os from "os";
 
 // Railway sets PORT env variable, otherwise use CLI arg or default
 const DEFAULT_PORT = 3001;
-const port = parseInt(process.env.PORT) || parseInt(process.argv[2]) || DEFAULT_PORT;
+const port =
+  parseInt(process.env.PORT) || parseInt(process.argv[2]) || DEFAULT_PORT;
 const HEARTBEAT_INTERVAL = 30000; // Send heartbeat every 30 seconds
 
 // In-memory store of connected devices and their sync codes
@@ -39,7 +40,7 @@ const server = http.createServer((req, res) => {
           name: d.name,
           connectedAt: d.connectedAt,
         })),
-      })
+      }),
     );
   } else {
     res.writeHead(404);
@@ -54,7 +55,8 @@ const wss = new WebSocketServer({ server });
 if (heartbeatInterval) clearInterval(heartbeatInterval);
 heartbeatInterval = setInterval(() => {
   devices.forEach((device) => {
-    if (device.ws.readyState === 1) { // OPEN
+    if (device.ws.readyState === 1) {
+      // OPEN
       device.ws.ping();
     }
   });
@@ -62,7 +64,7 @@ heartbeatInterval = setInterval(() => {
 
 wss.on("connection", (ws) => {
   console.log(`[${new Date().toLocaleTimeString()}] New connection`);
-  
+
   // Handle pong responses (keep-alive acknowledgment)
   ws.on("pong", () => {
     // Connection is alive, no action needed
@@ -80,7 +82,9 @@ wss.on("connection", (ws) => {
       });
     } catch (e) {
       console.error("Failed to parse message:", e.message);
-      ws.send(JSON.stringify({ type: "error", message: "Invalid message format" }));
+      ws.send(
+        JSON.stringify({ type: "error", message: "Invalid message format" }),
+      );
     }
   });
 
@@ -88,16 +92,20 @@ wss.on("connection", (ws) => {
     if (deviceId) {
       devices.delete(deviceId);
       if (syncCode) syncCodes.delete(syncCode);
-      
+
       // Clean up waiting pairing codes for this device
       for (const [code, waiting] of waitingDevices.entries()) {
         if (waiting.deviceId === deviceId) {
-          console.log(`[${new Date().toLocaleTimeString()}] 🗑️ Cleaned up pairing code ${code} for disconnected device`);
+          console.log(
+            `[${new Date().toLocaleTimeString()}] 🗑️ Cleaned up pairing code ${code} for disconnected device`,
+          );
           waitingDevices.delete(code);
         }
       }
-      
-      console.log(`[${new Date().toLocaleTimeString()}] ${deviceId} disconnected`);
+
+      console.log(
+        `[${new Date().toLocaleTimeString()}] ${deviceId} disconnected`,
+      );
       broadcastToAll({
         type: "device_disconnected",
         deviceId,
@@ -132,14 +140,16 @@ function handleMessage(ws, message, onDeviceConnected) {
       syncCode: null,
     };
     devices.set(deviceId, device);
-    console.log(`[${new Date().toLocaleTimeString()}] ✓ ${device.name} (${deviceId.slice(0, 12)}) connected`);
+    console.log(
+      `[${new Date().toLocaleTimeString()}] ✓ ${device.name} (${deviceId.slice(0, 12)}) connected`,
+    );
 
     ws.send(
       JSON.stringify({
         type: "welcome",
         deviceId,
         timestamp: Date.now(),
-      })
+      }),
     );
 
     broadcastToAll({
@@ -153,14 +163,16 @@ function handleMessage(ws, message, onDeviceConnected) {
   else if (type === "advertise_pairing") {
     const pairingCode = payload.pairingCode;
     const deviceName = payload.deviceName || "Unknown";
-    
+
     waitingDevices.set(pairingCode, {
       deviceId,
       name: deviceName,
       timestamp: Date.now(),
     });
-    
-    console.log(`[${new Date().toLocaleTimeString()}] 📢 ${deviceName} (${deviceId.slice(0, 12)}) waiting for pairing code: ${pairingCode}`);
+
+    console.log(
+      `[${new Date().toLocaleTimeString()}] 📢 ${deviceName} (${deviceId.slice(0, 12)}) waiting for pairing code: ${pairingCode}`,
+    );
   }
 
   // Handle pairing request
@@ -168,26 +180,32 @@ function handleMessage(ws, message, onDeviceConnected) {
     const pairingCode = payload.pairingCode;
     const requestingDeviceId = deviceId;
     const requestingDeviceName = payload.deviceName || "Unknown Device";
-    
-    console.log(`[${new Date().toLocaleTimeString()}] 🔗 Pairing request from ${requestingDeviceName} with code: ${pairingCode}`);
-    
+
+    console.log(
+      `[${new Date().toLocaleTimeString()}] 🔗 Pairing request from ${requestingDeviceName} with code: ${pairingCode}`,
+    );
+
     // Check if another device is waiting for this code
     if (waitingDevices.has(pairingCode)) {
       const waitingDevice = waitingDevices.get(pairingCode);
       const waitingDeviceId = waitingDevice.deviceId;
-      
-      console.log(`[${new Date().toLocaleTimeString()}] ✅ Code match! ${waitingDevice.name} + ${requestingDeviceName}`);
-      
+
+      console.log(
+        `[${new Date().toLocaleTimeString()}] ✅ Code match! ${waitingDevice.name} + ${requestingDeviceName}`,
+      );
+
       // Confirm to the requesting device
       const confirmMsg = JSON.stringify({
         type: "pairing_confirmed",
         payload: { code: pairingCode },
         timestamp: Date.now(),
       });
-      
-      console.log(`[${new Date().toLocaleTimeString()}] 📤 Confirming to requester...`);
+
+      console.log(
+        `[${new Date().toLocaleTimeString()}] 📤 Confirming to requester...`,
+      );
       ws.send(confirmMsg);
-      
+
       // Notify the waiting device that pairing succeeded
       if (devices.has(waitingDeviceId)) {
         const waiterWs = devices.get(waitingDeviceId).ws;
@@ -197,14 +215,16 @@ function handleMessage(ws, message, onDeviceConnected) {
             payload: { code: pairingCode, pairedWith: requestingDeviceName },
             timestamp: Date.now(),
           });
-          console.log(`[${new Date().toLocaleTimeString()}] 📤 Confirming to waiter...`);
+          console.log(
+            `[${new Date().toLocaleTimeString()}] 📤 Confirming to waiter...`,
+          );
           waiterWs.send(waiterConfirmMsg);
         }
       }
-      
+
       // Clean up
       waitingDevices.delete(pairingCode);
-      
+
       // Update both devices' sync codes
       if (devices.has(requestingDeviceId)) {
         devices.get(requestingDeviceId).syncCode = pairingCode;
@@ -213,14 +233,18 @@ function handleMessage(ws, message, onDeviceConnected) {
         devices.get(waitingDeviceId).syncCode = pairingCode;
       }
       syncCodes.set(pairingCode, [waitingDeviceId, requestingDeviceId]);
-      
+
       onDeviceConnected(requestingDeviceId, pairingCode);
     } else {
-      console.log(`[${new Date().toLocaleTimeString()}] ❌ No device waiting for code ${pairingCode}`);
-      ws.send(JSON.stringify({
-        type: "pairing_error",
-        payload: { message: "No device waiting for this pairing code" },
-      }));
+      console.log(
+        `[${new Date().toLocaleTimeString()}] ❌ No device waiting for code ${pairingCode}`,
+      );
+      ws.send(
+        JSON.stringify({
+          type: "pairing_error",
+          payload: { message: "No device waiting for this pairing code" },
+        }),
+      );
     }
   }
 
@@ -253,7 +277,9 @@ function handleDataUpdate(fromDeviceId, payload) {
     timestamp: Date.now(),
   });
 
-  console.log(`[${new Date().toLocaleTimeString()}] 📤 Data update from ${fromDeviceId.slice(0, 12)}: ${key}`);
+  console.log(
+    `[${new Date().toLocaleTimeString()}] 📤 Data update from ${fromDeviceId.slice(0, 12)}: ${key}`,
+  );
 
   // Broadcast to all other devices
   broadcastToAllExcept(fromDeviceId, {
@@ -282,10 +308,12 @@ function handleStateSync(ws, deviceId, payload) {
       type: "state_sync",
       state,
       timestamp: Date.now(),
-    })
+    }),
   );
 
-  console.log(`[${new Date().toLocaleTimeString()}] 🔄 State sync sent to ${deviceId.slice(0, 12)}`);
+  console.log(
+    `[${new Date().toLocaleTimeString()}] 🔄 State sync sent to ${deviceId.slice(0, 12)}`,
+  );
 }
 
 /**
@@ -304,7 +332,9 @@ function handleFullStateSync(fromDeviceId, payload) {
       });
     });
 
-    console.log(`[${new Date().toLocaleTimeString()}] 📥 Full state sync from ${fromDeviceId.slice(0, 12)}: ${Object.keys(state).length} items`);
+    console.log(
+      `[${new Date().toLocaleTimeString()}] 📥 Full state sync from ${fromDeviceId.slice(0, 12)}: ${Object.keys(state).length} items`,
+    );
   }
 }
 
@@ -329,19 +359,26 @@ function broadcastToAllExcept(exceptDeviceId, message) {
     }
   });
 }
-
+console.log(`Starting server...`);
+console.log(`process.env.PORT = ${process.env.PORT}`);
+console.log(`Using port: ${port}`);
+console.log(`Binding to host: 0.0.0.0`);
 // Start server
-server.listen(port, '0.0.0.0', () => {
+server.listen(port, "0.0.0.0", () => {
   // Check if running on Railway (has RAILWAY_PUBLIC_DOMAIN)
   const isRailway = !!process.env.RAILWAY_PUBLIC_DOMAIN;
-  
+
   if (isRailway) {
     const railwayUrl = `wss://${process.env.RAILWAY_PUBLIC_DOMAIN}`;
     console.log(`\n🚀 Learning Tracker Sync Server running on Railway`);
     console.log(`🌐 Public URL: ${railwayUrl}\n`);
-    console.log(`Use this URL in your app (with WSS for HTTPS):\n${railwayUrl}\n`);
+    console.log(
+      `Use this URL in your app (with WSS for HTTPS):\n${railwayUrl}\n`,
+    );
   } else {
-    console.log(`\n🚀 Learning Tracker Sync Server running on ws://localhost:${port}`);
+    console.log(
+      `\n🚀 Learning Tracker Sync Server running on ws://localhost:${port}`,
+    );
     console.log(`📡 Local network: ws://${getLocalIP()}:${port}\n`);
   }
   console.log("Press Ctrl+C to stop\n");
