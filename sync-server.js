@@ -5,14 +5,17 @@
  * Run this on your local network to enable device-to-device synchronization
  * 
  * Usage: node sync-server.js [--port 3001]
+ * 
+ * For Railway deployment: PORT environment variable is set automatically
  */
 
 import { WebSocketServer } from "ws";
 import http from "http";
 import os from "os";
 
+// Railway sets PORT env variable, otherwise use CLI arg or default
 const DEFAULT_PORT = 3001;
-const port = parseInt(process.argv[2]) || DEFAULT_PORT;
+const port = parseInt(process.env.PORT) || parseInt(process.argv[2]) || DEFAULT_PORT;
 const HEARTBEAT_INTERVAL = 30000; // Send heartbeat every 30 seconds
 
 // In-memory store of connected devices and their sync codes
@@ -328,9 +331,19 @@ function broadcastToAllExcept(exceptDeviceId, message) {
 }
 
 // Start server
-server.listen(port, () => {
-  console.log(`\n🚀 Learning Tracker Sync Server running on ws://localhost:${port}`);
-  console.log(`📡 Local network: ws://${getLocalIP()}:${port}\n`);
+server.listen(port, '0.0.0.0', () => {
+  // Check if running on Railway (has RAILWAY_PUBLIC_DOMAIN)
+  const isRailway = !!process.env.RAILWAY_PUBLIC_DOMAIN;
+  
+  if (isRailway) {
+    const railwayUrl = `wss://${process.env.RAILWAY_PUBLIC_DOMAIN}`;
+    console.log(`\n🚀 Learning Tracker Sync Server running on Railway`);
+    console.log(`🌐 Public URL: ${railwayUrl}\n`);
+    console.log(`Use this URL in your app (with WSS for HTTPS):\n${railwayUrl}\n`);
+  } else {
+    console.log(`\n🚀 Learning Tracker Sync Server running on ws://localhost:${port}`);
+    console.log(`📡 Local network: ws://${getLocalIP()}:${port}\n`);
+  }
   console.log("Press Ctrl+C to stop\n");
 });
 

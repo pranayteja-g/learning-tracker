@@ -8,7 +8,8 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "sync-server": "node sync-server.js"
+    "sync-server": "node sync-server.js",
+    "start": "node sync-server.js"
   },
   "dependencies": {
     "react": "^19.2.0",
