@@ -7,15 +7,11 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview",
-    "sync-server": "node sync-server.js",
-    "start": "node sync-server.js"
+    "preview": "vite preview"
   },
   "dependencies": {
-    "qrcode": "^1.5.4",
     "react": "^19.2.0",
-    "react-dom": "^19.2.0",
-    "ws": "^8.19.0"
+    "react-dom": "^19.2.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
