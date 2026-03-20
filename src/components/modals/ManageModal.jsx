@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { SyncTab } from "./SyncTab.jsx";
 import { StorageIndicator } from "../ui/StorageIndicator.jsx";
 import { TEMPLATES } from "../../constants/templates.js";
 import { downloadJSON } from "../../utils/roadmap.js";
@@ -6,7 +7,7 @@ import { flatTopicNames } from "../../utils/topics.js";
 import { loadAIConfig, saveAIConfig, PROVIDERS } from "../../ai/providers.js";
 
 export function ManageModal({ roadmaps, onClose, onImportRoadmap, onDelete, onEdit, onCreate,
-  onExportBackup, onImportBackup }) {
+  onExportBackup, onImportBackup, onGetSnapshot, onApplySnapshot }) {
 
   const fileRef = useRef(null);
   const backupRef = useRef(null);
@@ -45,6 +46,7 @@ export function ManageModal({ roadmaps, onClose, onImportRoadmap, onDelete, onEd
             <button style={tabStyle("roadmaps")} onClick={() => setTab("roadmaps")}>Roadmaps</button>
             <button style={tabStyle("data")} onClick={() => setTab("data")}>Data</button>
             <button style={tabStyle("settings")} onClick={() => setTab("settings")}>AI</button>
+            <button style={tabStyle("sync")} onClick={() => setTab("sync")}>Sync</button>
           </div>
         </div>
 
@@ -66,7 +68,7 @@ export function ManageModal({ roadmaps, onClose, onImportRoadmap, onDelete, onEd
                       <div style={{ fontSize: 13, color: "#ccc", fontWeight: 500,
                         overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{rm.label}</div>
                       <div style={{ fontSize: 11, color: "#555", marginTop: 1 }}>
-                        {Object.keys(rm.sections).length} sections · {Object.values(rm.sections).reduce((acc, ts) => acc + flatTopicNames(ts).length, 0)} topics
+                        {Object.keys(rm.sections).length} sections  {Object.values(rm.sections).reduce((acc, ts) => acc + flatTopicNames(ts).length, 0)} topics
                       </div>
                     </div>
                     <button onClick={() => { onEdit(rm); onClose(); }}
@@ -135,6 +137,10 @@ export function ManageModal({ roadmaps, onClose, onImportRoadmap, onDelete, onEd
                 Importing a backup will merge with your current data, not replace it.
               </div>
             </div>
+          )}
+
+          {tab === "sync" && (
+            <SyncTab onGetSnapshot={onGetSnapshot} onApplySnapshot={onApplySnapshot} />
           )}
 
           {tab === "settings" && (

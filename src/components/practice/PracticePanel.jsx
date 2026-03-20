@@ -166,23 +166,17 @@ export function PracticePanel({ open, onClose, roadmap, roadmaps, progress, note
     <>
       {/* Backdrop — covers full screen including nav, blocking all taps */}
       <div onClick={onClose} style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.55)", zIndex:90 }} />
-      {/* Nav dim overlay — makes nav look intentionally inactive */}
-      {isMobile && <div style={{ position:"fixed", bottom:0, left:0, right:0,
-        height:"calc(56px + env(safe-area-inset-bottom))",
-        background:"rgba(0,0,0,0.35)",
-        backdropFilter:"blur(1px)", WebkitBackdropFilter:"blur(1px)",
-        zIndex:92, pointerEvents:"none" }} />}
+
       <div style={isMobile ? {
-        position: "fixed", left: 0, right: 0,
-        top: "env(safe-area-inset-top, 0px)",
-        bottom: "56px",
-        background: "#13131a", borderTop: "1px solid #1e1e24",
+        position: "fixed", left: 0, right: 0, top: 0, bottom: 0,
+        background: "#13131a",
         zIndex: 91, display: "flex", flexDirection: "column",
-        boxShadow: "0 -8px 40px rgba(0,0,0,0.5)",
-        borderRadius: "16px 16px 0 0",
+        paddingTop: "env(safe-area-inset-top)",
+        paddingBottom: "env(safe-area-inset-bottom)",
       } : {
         position: "fixed", top: 0, right: 0, bottom: 0,
-        width: "420px",
+        width: ["code","quiz","questionnaire"].includes(result?.studyMode || studyMode) ? "580px" : "420px",
+        transition: "width 0.2s ease",
         background: "#13131a", borderLeft: "1px solid #1e1e24",
         zIndex: 91, display: "flex", flexDirection: "column",
         paddingTop: "env(safe-area-inset-top)",
@@ -270,7 +264,7 @@ export function PracticePanel({ open, onClose, roadmap, roadmaps, progress, note
                 ))}
               </div>
 
-              {(studyMode === "quiz" || studyMode === "questionnaire") && (
+              {(studyMode === "quiz" || studyMode === "questionnaire" || studyMode === "code") && (
                 <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                   <div>
                     <div style={labelStyle}>Scope</div>
@@ -293,7 +287,7 @@ export function PracticePanel({ open, onClose, roadmap, roadmaps, progress, note
                       ))}
                     </div>
                   </div>
-                  {studyMode === "quiz" && (
+                  {(studyMode === "quiz" || studyMode === "code") && (
                     <div>
                       <div style={labelStyle}>Difficulty</div>
                       <div style={{ display: "flex", gap: 5 }}>
