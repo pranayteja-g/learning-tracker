@@ -19,6 +19,7 @@ import { InstallPrompt }        from "./components/ui/InstallPrompt.jsx";
 import { useStreak }            from "./hooks/useStreak.js";
 import { useQuizResults }       from "./hooks/useQuizResults.js";
 import { useQuest }               from "./hooks/useQuest.js";
+import { useXP }                  from "./hooks/useXP.js";
 import { QuestBoard }             from "./components/quest/QuestCard.jsx";
 import { QuestModal }             from "./components/quest/QuestModal.jsx";
 import { buildQuestPrompt }       from "./ai/prompts.js";
@@ -49,6 +50,7 @@ export default function App() {
   const { results: quizResults, recordQuizResult, hasPassedTopic, getStars } = useQuizResults();
   const { quests, loaded: questLoaded, startQuest, advancePhase, completeQuest,
           isOnCooldown, cooldownRemaining, needsNewQuest, getQuest } = useQuest();
+  const { xpData, awardQuestXP } = useXP();
   const importRef = useRef(null);
 
   const showFeedback = (ok, msg) => {
@@ -509,7 +511,14 @@ export default function App() {
             quest={getQuest(activeQuestRmId)} rmId={activeQuestRmId}
             roadmaps={roadmaps} progress={progress}
             onAdvancePhase={advancePhase}
-            onCompleteQuest={completeQuest}
+            onCompleteQuest={(rmId, passed, allResults, activePhases) => {
+              completeQuest(rmId, passed);
+              return passed ? {
+                prevXP: xpData.xp || 0,
+                awardXP: () => awardQuestXP(getQuest(rmId) || {}, allResults, activePhases, true),
+                xpData,
+              } : null;
+            }}
             onClose={() => setActiveQuestRmId(null)}
           />
         )}
