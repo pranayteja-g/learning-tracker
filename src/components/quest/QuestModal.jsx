@@ -350,19 +350,18 @@ export function QuestModal({ quest, rmId, roadmaps, progress, onAdvancePhase, on
       const rewardInfo = onCompleteQuest(rmId, passed, allResults, activePhases);
       if (passed && rewardInfo) {
         const prevXP = rewardInfo.prevXP || 0;
-        rewardInfo.awardXP?.();
-        // Small delay so xpData updates before we read it
-        setTimeout(() => {
-          const newXpData = rewardInfo.xpData;
+        // awardXP is async (AI badge generation) — await it then show reward
+        rewardInfo.awardXP?.().then(result => {
           setRewardData({
             phaseResults: allResults,
             activePhases,
-            xpEarned: newXpData?.lastQuestXP || 0,
+            xpEarned:  result?.earned || 0,
             prevXP,
-            newXP: prevXP + (newXpData?.lastQuestXP || 0),
-            newBadges: newXpData?.lastNewBadges || [],
+            newXP:     prevXP + (result?.earned || 0),
+            newBadges: rewardInfo.xpData?.lastNewBadges || [],
+            aiBadge:   result?.aiBadge || null,
           });
-        }, 100);
+        });
       }
     }
   };
@@ -430,6 +429,7 @@ export function QuestModal({ quest, rmId, roadmaps, progress, onAdvancePhase, on
             prevXP={rewardData.prevXP}
             newXP={rewardData.newXP}
             newBadges={rewardData.newBadges}
+            aiBadge={rewardData.aiBadge}
             onClose={onClose}
           />
         )}

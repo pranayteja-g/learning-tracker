@@ -513,11 +513,14 @@ export default function App() {
             onAdvancePhase={advancePhase}
             onCompleteQuest={(rmId, passed, allResults, activePhases) => {
               completeQuest(rmId, passed);
-              return passed ? {
-                prevXP: xpData.xp || 0,
-                awardXP: () => awardQuestXP(getQuest(rmId) || {}, allResults, activePhases, true),
+              if (!passed) return null;
+              const prevXP  = xpData.xp || 0;
+              const apiKey  = loadAIConfig().keys?.groq?.trim();
+              return {
+                prevXP,
                 xpData,
-              } : null;
+                awardXP: () => awardQuestXP(getQuest(rmId) || {}, allResults, activePhases, true, apiKey),
+              };
             }}
             onClose={() => setActiveQuestRmId(null)}
           />

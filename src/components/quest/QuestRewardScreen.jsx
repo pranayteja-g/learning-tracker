@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { BADGES, LEVELS, getLevel, getNextLevel } from "../../hooks/useXP.js";
+import { MILESTONE_BADGES, LEVELS, getLevel, getNextLevel } from "../../hooks/useXP.js";
 
 // ── Confetti ──────────────────────────────────────────────────────────────────
 function Confetti() {
@@ -99,27 +99,30 @@ function XPBar({ prevXP, newXP, color }) {
 }
 
 // ── Badge Card ────────────────────────────────────────────────────────────────
-function BadgeCard({ badgeId, isNew }) {
-  const badge = BADGES.find(b => b.id === badgeId);
+function BadgeCard({ badge, isNew, isAI }) {
   if (!badge) return null;
+  const bg     = isAI ? "#1a1a2e" : isNew ? "#1a2420" : "#16161b";
+  const border = isAI ? "#7b5ea766" : isNew ? "#52b78866" : "#2a2a35";
+  const color  = isAI ? "#c4b5fd"  : isNew ? "#52b788"   : "#888";
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 10,
-      background: isNew ? "#1a2420" : "#16161b",
-      border: `1px solid ${isNew ? "#52b78866" : "#2a2a35"}`,
+      background: bg, border: `1px solid ${border}`,
       borderRadius: 8, padding: "10px 12px" }}>
       <span style={{ fontSize: 24, flexShrink: 0 }}>{badge.icon}</span>
-      <div>
-        <div style={{ fontSize: 13, fontWeight: 700, color: isNew ? "#52b788" : "#888" }}>
-          {badge.name} {isNew && <span style={{ fontSize: 10, color: "#52b788" }}>NEW</span>}
+      <div style={{ flex: 1 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <span style={{ fontSize: 13, fontWeight: 700, color }}>{badge.name}</span>
+          {isNew  && <span style={{ fontSize: 9, background: "#52b78833", color: "#52b788", borderRadius: 3, padding: "1px 5px" }}>NEW</span>}
+          {isAI   && <span style={{ fontSize: 9, background: "#7b5ea733", color: "#c4b5fd", borderRadius: 3, padding: "1px 5px" }}>✨ AI</span>}
         </div>
-        <div style={{ fontSize: 11, color: "#555" }}>{badge.desc}</div>
+        <div style={{ fontSize: 11, color: "#555", marginTop: 2 }}>{badge.desc}</div>
       </div>
     </div>
   );
 }
 
 // ── Main QuestRewardScreen ────────────────────────────────────────────────────
-export function QuestRewardScreen({ quest, phaseResults, activePhases, xpEarned, prevXP, newXP, newBadges, onClose }) {
+export function QuestRewardScreen({ quest, phaseResults, activePhases, xpEarned, prevXP, newXP, newBadges, aiBadge, onClose }) {
 
   const allScores = activePhases.map((p, i) => ({
     name: p.name,
@@ -194,13 +197,25 @@ export function QuestRewardScreen({ quest, phaseResults, activePhases, xpEarned,
             <XPBar prevXP={prevXP} newXP={newXP} />
           </div>
 
-          {/* New badges */}
+          {/* AI story badge */}
+          {aiBadge && (
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ fontSize: 11, color: "#555", textTransform: "uppercase",
+                letterSpacing: 1, marginBottom: 10 }}>✨ Your Story Badge</div>
+              <BadgeCard badge={aiBadge} isNew={true} isAI={true} />
+            </div>
+          )}
+
+          {/* Milestone badges */}
           {newBadges.length > 0 && (
             <div style={{ marginBottom: 20 }}>
               <div style={{ fontSize: 11, color: "#555", textTransform: "uppercase",
-                letterSpacing: 1, marginBottom: 10 }}>🏅 Badges Unlocked</div>
+                letterSpacing: 1, marginBottom: 10 }}>🏅 Milestones Unlocked</div>
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {newBadges.map(id => <BadgeCard key={id} badgeId={id} isNew={true} />)}
+                {newBadges.map(id => {
+                  const badge = MILESTONE_BADGES.find(b => b.id === id);
+                  return badge ? <BadgeCard key={id} badge={badge} isNew={true} isAI={false} /> : null;
+                })}
               </div>
             </div>
           )}
