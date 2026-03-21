@@ -218,6 +218,244 @@ function AIGeneratePanel({ onGenerated, defaultColor, defaultAccent }) {
 }
 
 // ── Main Editor Modal ─────────────────────────────────────────────────────────
+
+// ── Image Import Panel ────────────────────────────────────────────────────────
+function ImageImportPanel({ onGenerated, defaultColor, defaultAccent }) {
+  const aiConfig = loadAIConfig();
+  const hasKey   = !!aiConfig.keys?.[aiConfig.provider]?.trim();
+
+  const [image,   setImage]   = useState(null);  // { base64, mimeType, preview }
+  const [loading, setLoading] = useState(false);
+  const [error,   setError]   = useState("");
+  const [preview, setPreview] = useState(null);
+
+  const handleFile = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) { setError("Please upload an image file."); return; }
+    const isPdf = file.type === "application/pdf";
+    const maxSize = isPdf ? 20 * 1024 * 1024 : 4 * 1024 * 1024;
+    if (file.size > maxSize) { setError(isPdf ? "PDF must be under 20MB." : "Image must be under 4MB."); return; }
+    setError(""); setPreview(null);
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const dataUrl = ev.target.result;
+      const base64  = dataUrl.split(",")[1];
+      setImage({ base64, mimeType: file.type, preview: dataUrl, name: file.name });
+    };
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  };
+
+  const isPDF = image?.mimeType === "application/pdf";
+
+  const analyse = async () => {
+    if (!image) return;
+    setLoading(true); setError(""); setPreview(null);
+
+    const PROMPT = `Analyse this roadmap and extract ALL topics/nodes visible in it.
+Group them into logical sections based on how they are organised.
+Generate a suitable label for the overall roadmap.
+
+Respond ONLY with valid JSON in this exact format:
+{
+  "label": "Roadmap name",
+  "sections": {
+    "Section Name": ["Topic 1", "Topic 2", "Topic 3"],
+    "Another Section": ["Topic A", "Topic B"]
+  }
+}
+
+Rules:
+- Extract every visible node/box/topic
+- Group related topics under the same section
+- Section names should be concise (2-4 words)
+- Topic names should match exactly what appears in the source
+- Do not invent topics not present in the source
+- Minimum 2 sections, minimum 3 topics per section`;
+
+    try {
+      let text = "";
+
+      if (isPDF) {
+        // PDFs → Gemini (supports PDF natively)
+        const apiKey = aiConfig.keys?.gemini?.trim();
+        if (!apiKey) throw new Error("PDF import requires a Gemini API key. Add one in Settings → AI.");
+
+        const response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              contents: [{
+                parts: [
+                  { text: PROMPT },
+                  { inline_data: { mime_type: "application/pdf", data: image.base64 } }
+                ]
+              }],
+              generationConfig: { responseMimeType: "application/json", maxOutputTokens: 4096 }
+            })
+          }
+        );
+        if (!response.ok) {
+          const err = await response.json();
+          throw new Error(err.error?.message || `Gemini API error ${response.status}`);
+        }
+        const data = await response.json();
+        text = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+
+      } else {
+        // Images → Groq vision
+        const apiKey = aiConfig.keys?.groq?.trim();
+        if (!apiKey) throw new Error("Image import requires a Groq API key. Add one in Settings → AI.");
+
+        const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
+          body: JSON.stringify({
+            model: "meta-llama/llama-4-scout-17b-16e-instruct",
+            max_tokens: 4096,
+            response_format: { type: "json_object" },
+            messages: [{
+              role: "user",
+              content: [
+                { type: "text", text: PROMPT },
+                { type: "image_url", image_url: { url: `data:${image.mimeType};base64,${image.base64}` } }
+              ]
+            }]
+          })
+        });
+        if (!response.ok) {
+          const err = await response.json();
+          throw new Error(err.error?.message || `Groq API error ${response.status}`);
+        }
+        const data = await response.json();
+        text = data.choices?.[0]?.message?.content || "";
+      }
+
+      const parsed = safeParseJSON(text);
+      if (!parsed.label || !parsed.sections) throw new Error("Could not extract roadmap structure. Try a clearer file.");
+      const totalTopics   = Object.values(parsed.sections).flat().length;
+      const totalSections = Object.keys(parsed.sections).length;
+      setPreview({ ...parsed, totalTopics, totalSections });
+
+    } catch(e) {
+      setError(e.message || "Analysis failed. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const accept = () => {
+    if (!preview) return;
+    onGenerated({ label: preview.label, sections: preview.sections, color: defaultColor, accent: defaultAccent });
+  };
+
+  if (!hasKey) return (
+    <div style={{ textAlign: "center", padding: "24px 0" }}>
+      <div style={{ fontSize: 28, marginBottom: 10 }}>🔑</div>
+      <div style={{ fontSize: 13, color: "#ccc", marginBottom: 6 }}>Groq API key required</div>
+      <div style={{ fontSize: 12, color: "#555" }}>Images use Groq vision · PDFs use Gemini. Add the relevant key in Settings → AI.</div>
+    </div>
+  );
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      <div style={{ background: "#0f0f13", borderRadius: 8, padding: "12px 14px", border: "1px solid #1e1e24" }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: "#c4b5fd", marginBottom: 6 }}>📷 Import from Image</div>
+        <div style={{ fontSize: 12, color: "#666", lineHeight: 1.7 }}>
+          Upload a screenshot or photo of any roadmap (roadmap.sh, mind maps, hand-drawn, etc).
+          The AI will read all the topics and generate a structured roadmap for your app.
+        </div>
+      </div>
+
+      {/* Upload area */}
+      <label style={{ display: "block", cursor: "pointer" }}>
+        <input type="file" accept="image/*,application/pdf" onChange={handleFile} style={{ display: "none" }} />
+        <div style={{ border: `2px dashed ${image ? "#7b5ea7" : "#2a2a35"}`, borderRadius: 10,
+          padding: image ? 0 : "30px 20px", textAlign: "center",
+          background: image ? "transparent" : "#0f0f13",
+          transition: "all 0.2s", overflow: "hidden" }}>
+          {image ? (
+            image.mimeType === "application/pdf" ? (
+              <div style={{ padding: "20px", textAlign: "center" }}>
+                <div style={{ fontSize: 36, marginBottom: 8 }}>📄</div>
+                <div style={{ fontSize: 13, color: "#c4b5fd", fontWeight: 600 }}>{image.name}</div>
+                <div style={{ fontSize: 11, color: "#555", marginTop: 4 }}>PDF ready to analyse</div>
+              </div>
+            ) : (
+              <img src={image.preview} alt="Roadmap preview"
+                style={{ width: "100%", maxHeight: 200, objectFit: "contain", display: "block" }} />
+            )
+          ) : (
+            <>
+              <div style={{ fontSize: 32, marginBottom: 8 }}>🖼️</div>
+              <div style={{ fontSize: 13, color: "#888", marginBottom: 4 }}>Tap to upload image or PDF</div>
+              <div style={{ fontSize: 11, color: "#444" }}>PNG, JPG, WebP (4MB) · PDF (20MB)</div>
+            </>
+          )}
+        </div>
+      </label>
+
+      {image && !preview && (
+        <div style={{ display: "flex", gap: 8 }}>
+          <button onClick={analyse} disabled={loading}
+            style={{ flex: 1, padding: "11px", background: loading ? "#1e1e24" : "#7b5ea7",
+              border: "none", borderRadius: 8, color: loading ? "#555" : "#fff",
+              fontSize: 13, fontWeight: 700, cursor: loading ? "default" : "pointer", fontFamily: "inherit" }}>
+            {loading ? "Analysing image…" : "✨ Analyse & Generate"}
+          </button>
+          <button onClick={() => { setImage(null); setError(""); }}
+            style={{ padding: "11px 14px", background: "#1e1e24", border: "1px solid #2a2a35",
+              borderRadius: 8, color: "#666", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>
+            ✕
+          </button>
+        </div>
+      )}
+
+      {error && (
+        <div style={{ padding: "10px 14px", background: "#2e1a1a", borderRadius: 8,
+          color: "#e05252", fontSize: 13, border: "1px solid #e0525233" }}>
+          {error}
+        </div>
+      )}
+
+      {preview && (
+        <div style={{ background: "#16161b", borderRadius: 10, border: "1px solid #52b78844", padding: "14px 16px" }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: "#fff", marginBottom: 4 }}>{preview.label}</div>
+          <div style={{ fontSize: 12, color: "#52b788", marginBottom: 12 }}>
+            {preview.totalSections} sections · {preview.totalTopics} topics extracted
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 14 }}>
+            {Object.entries(preview.sections).map(([sec, topics]) => (
+              <div key={sec} style={{ background: "#0f0f13", borderRadius: 7, padding: "8px 12px" }}>
+                <div style={{ fontSize: 11, color: "#7b5ea7", fontWeight: 700, marginBottom: 4 }}>{sec}</div>
+                <div style={{ fontSize: 12, color: "#666", lineHeight: 1.6 }}>
+                  {topics.slice(0, 5).join(" · ")}{topics.length > 5 ? ` · +${topics.length - 5} more` : ""}
+                </div>
+              </div>
+            ))}
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={accept}
+              style={{ flex: 1, padding: "10px", background: "#52b788", border: "none",
+                borderRadius: 8, color: "#fff", fontSize: 13, fontWeight: 700,
+                cursor: "pointer", fontFamily: "inherit" }}>
+              ✓ Use This Roadmap
+            </button>
+            <button onClick={() => { setPreview(null); setImage(null); }}
+              style={{ padding: "10px 14px", background: "#1e1e24", border: "1px solid #2a2a35",
+                borderRadius: 8, color: "#666", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>
+              Retry
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function RoadmapEditorModal({ existing, onSave, onClose }) {
   const isEdit = !!existing;
 
@@ -363,8 +601,9 @@ export function RoadmapEditorModal({ existing, onSave, onClose }) {
           {!isEdit && (
             <div style={{ display: "flex", gap: 2 }}>
               {[
-                { id: "ai",     label: "✨ Generate with AI",  },
-                { id: "manual", label: "✏️ Build manually",    },
+                { id: "ai",     label: "✨ Generate with AI" },
+                { id: "image",  label: "📷 Import from Image" },
+                { id: "manual", label: "✏️ Build manually"   },
               ].map(t => (
                 <button key={t.id} onClick={() => setTab(t.id)}
                   style={{ padding: "9px 18px", border: "none", background: "transparent",
@@ -381,6 +620,15 @@ export function RoadmapEditorModal({ existing, onSave, onClose }) {
 
         {/* Body */}
         <div style={{ overflowY: "auto", flex: 1, padding: "20px 22px" }}>
+
+          {/* ── IMAGE TAB ── */}
+          {tab === "image" && (
+            <ImageImportPanel
+              onGenerated={handleAIGenerated}
+              defaultColor={color}
+              defaultAccent={accent}
+            />
+          )}
 
           {/* ── AI TAB ── */}
           {tab === "ai" && (
