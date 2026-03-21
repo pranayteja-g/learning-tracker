@@ -225,6 +225,15 @@ export default function App() {
     );
   };
 
+  const handleGetSnapshot = () => ({
+    version: 2, exportedAt: new Date().toISOString(),
+    roadmaps, progress, notes, resources, topicMeta,
+  });
+
+  const handleApplySnapshot = async (data) => {
+    handleImportBackupData(data);
+  };
+
   const generateQuest = async (rmId) => {
     const roadmap = roadmaps[rmId];
     if (!roadmap) return;
@@ -568,6 +577,7 @@ export default function App() {
       {showManage  && <ManageModal roadmaps={roadmaps} onClose={() => setShowManage(false)}
                         onImportRoadmap={handleImportRoadmap} onDelete={handleDeleteRoadmap}
                         onExportBackup={handleExport} onImportBackup={handleImportBackup}
+                        onGetSnapshot={handleGetSnapshot} onApplySnapshot={handleApplySnapshot}
                         onEdit={r => { setEditorModal({ existing: r }); setShowManage(false); }}
                         onCreate={() => { setEditorModal({ existing: null }); setShowManage(false); }} />}
       {editorModal !== null && <RoadmapEditorModal existing={editorModal.existing}
@@ -753,6 +763,7 @@ export default function App() {
       {showManage  && <ManageModal roadmaps={roadmaps} onClose={() => setShowManage(false)}
                         onImportRoadmap={handleImportRoadmap} onDelete={handleDeleteRoadmap}
                         onExportBackup={handleExport} onImportBackup={handleImportBackup}
+                        onGetSnapshot={handleGetSnapshot} onApplySnapshot={handleApplySnapshot}
                         onEdit={r => { setEditorModal({ existing: r }); setShowManage(false); }}
                         onCreate={() => { setEditorModal({ existing: null }); setShowManage(false); }} />}
       {editorModal !== null && <RoadmapEditorModal existing={editorModal.existing}

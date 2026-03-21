@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { CodeEditor, SUPPORTED_LANGUAGES } from "../ui/CodeEditor.jsx";
 import { callAI, loadAIConfig } from "../../ai/providers.js";
 import { safeParseJSON } from "../../utils/jsonParse.js";
 import { MessageRenderer } from "./MessageRenderer.jsx";
@@ -8,14 +9,9 @@ export function CodeWriteView({ questions, rm, onComplete }) {
   const [answers,   setAnswers]   = useState({});   // idx -> code string
   const [feedback,  setFeedback]  = useState({});   // idx -> {loading, result}
   const [submitted, setSubmitted] = useState(false);
-  const textareaRef = useRef(null);
 
   const q      = questions[current];
   const totalQ = questions.length;
-
-  useEffect(() => {
-    textareaRef.current?.focus();
-  }, [current]);
 
   const evaluate = async (idx) => {
     const code = answers[idx]?.trim();
@@ -170,24 +166,18 @@ Respond ONLY with JSON:
       </div>
 
       {/* Code editor */}
-      <div style={{ position: "relative", marginBottom: 10 }}>
+      <div style={{ marginBottom: 10 }}>
         <div style={{ fontSize: 10, color: "#555", textTransform: "uppercase",
           letterSpacing: 1, marginBottom: 6 }}>Your code ({q.language})</div>
-        <textarea
-          ref={textareaRef}
-          value={answers[current] || ""}
-          onChange={e => setAnswers(a => ({ ...a, [current]: e.target.value }))}
-          placeholder={`// Write your ${q.language} code here...\n`}
-          spellCheck={false}
-          style={{
-            width: "100%", minHeight: 180, padding: "12px",
-            background: "#0d1117", border: `1px solid ${fb?.result ? (fb.result.correct ? "#52b78888" : "#ee9b0088") : "#2a2a35"}`,
-            borderRadius: 8, color: "#c9d1d9",
-            fontFamily: "'Fira Code','Consolas',monospace", fontSize: 13,
-            lineHeight: 1.7, resize: "vertical", outline: "none",
-            boxSizing: "border-box",
-          }}
-        />
+        <div style={{ border: `1px solid ${fb?.result ? (fb.result.correct ? "#52b788" : "#ee9b00") : "#2a2a35"}`,
+          borderRadius: 8, overflow: "hidden" }}>
+          <CodeEditor
+            language={(q.language || "java").toLowerCase()}
+            value={answers[current] || ""}
+            onChange={val => setAnswers(a => ({ ...a, [current]: val }))}
+            minHeight={320}
+          />
+        </div>
       </div>
 
       {/* Feedback */}
