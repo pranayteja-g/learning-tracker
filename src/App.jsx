@@ -34,6 +34,67 @@ import { callAI }                 from "./ai/providers.js";
 import { loadAIConfig }           from "./ai/providers.js";
 import { AITimeoutTester }        from "./components/debug/AITimeoutTester.jsx";
 
+// ── Compact inline timer for home screen ────────────────────────────────────
+function CompactTimer({ color }) {
+  const PRESETS = [25*60, 15*60, 10*60, 5*60];
+  const LABELS  = ["25m", "15m", "10m", "5m"];
+  const [sel,     setSel]     = React.useState(0);
+  const [left,    setLeft]    = React.useState(PRESETS[0]);
+  const [running, setRunning] = React.useState(false);
+  const [done,    setDone]    = React.useState(false);
+
+  React.useEffect(() => {
+    if (!running) return;
+    const t = setInterval(() => setLeft(l => {
+      if (l <= 1) { clearInterval(t); setRunning(false); setDone(true);
+        navigator.vibrate?.([200,100,200]); return 0; }
+      return l - 1;
+    }), 1000);
+    return () => clearInterval(t);
+  }, [running]);
+
+  const mins = String(Math.floor(left/60)).padStart(2,"0");
+  const secs = String(left%60).padStart(2,"0");
+  const pct  = ((PRESETS[sel]-left)/PRESETS[sel])*100;
+  const R = 18, C = 2*Math.PI*R;
+
+  const pick = (i) => { setSel(i); setLeft(PRESETS[i]); setRunning(false); setDone(false); };
+
+  return (
+    <div style={{ background: "#16161b", borderRadius: 10, border: "1px solid #1e1e24",
+      padding: "10px 14px", flexShrink: 0, display: "flex", alignItems: "center", gap: 12 }}>
+      <div style={{ position:"relative", flexShrink:0, width:44, height:44 }}>
+        <svg width={44} height={44} style={{ transform:"rotate(-90deg)" }}>
+          <circle cx={22} cy={22} r={R} fill="none" stroke="#1e1e24" strokeWidth={4}/>
+          <circle cx={22} cy={22} r={R} fill="none" stroke={done?"#52b788":color}
+            strokeWidth={4} strokeLinecap="round"
+            strokeDasharray={C} strokeDashoffset={C*(1-pct/100)}
+            style={{ transition:"stroke-dashoffset 1s linear" }}/>
+        </svg>
+        <div style={{ position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center" }}>
+          <span style={{ fontSize:done?16:10, fontWeight:700, color:"#fff", fontVariantNumeric:"tabular-nums" }}>
+            {done?"🎉":`${mins}:${secs}`}
+          </span>
+        </div>
+      </div>
+      <div style={{ display:"flex", gap:4, flex:1 }}>
+        {LABELS.map((l,i) => (
+          <button key={i} onClick={() => pick(i)}
+            style={{ flex:1, padding:"5px 0", background:sel===i?color+"22":"transparent",
+              border:`1px solid ${sel===i?color:"#2a2a35"}`, borderRadius:5,
+              color:sel===i?"#fff":"#555", fontSize:10, cursor:"pointer", fontFamily:"inherit" }}>{l}</button>
+        ))}
+      </div>
+      <button onClick={() => { setDone(false); setRunning(r=>!r); }}
+        style={{ padding:"7px 12px", background:running?"#2e1a1a":color, border:"none",
+          borderRadius:7, color:running?"#e05252":"#fff",
+          fontSize:12, fontWeight:700, cursor:"pointer", fontFamily:"inherit", flexShrink:0 }}>
+        {running?"⏸":"▶"}
+      </button>
+    </div>
+  );
+}
+
 export default function App() {
   const { roadmaps, setRoadmaps, progress, setProgress, notes, setNotes,
           resources, setResources, topicMeta, setTopicMeta, loaded } = useAppStorage();
@@ -380,12 +441,21 @@ export default function App() {
               </h1>
             </div>
           </div>
-          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
             <StreakBadge streak={{ ...streak, studiedToday }} isMobile={true} />
             <button onClick={() => setSearchOpen(true)}
-              style={{ width: 36, height: 36, display: "flex", alignItems: "center", justifyContent: "center",
-                border: "none", borderRadius: 10, cursor: "pointer", background: "#1e1e24",
-                color: "#888", fontSize: 16 }}>🔍</button>
+              style={{ width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center",
+                border: "none", borderRadius: 8, cursor: "pointer", background: "#1e1e24",
+                color: "#888", fontSize: 15 }}>🔍</button>
+            <button onClick={() => setPracticeOpen(o => !o)}
+              style={{ width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center",
+                border: "none", borderRadius: 8, cursor: "pointer",
+                background: practiceOpen ? "#7b5ea722" : "#1e1e24",
+                color: practiceOpen ? "#c4b5fd" : "#888", fontSize: 15 }}>🤖</button>
+            <button onClick={() => setShowManage(true)}
+              style={{ width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center",
+                border: "none", borderRadius: 8, cursor: "pointer", background: "#1e1e24",
+                color: "#888", fontSize: 15 }}>⚙️</button>
           </div>
         </div>
         <input ref={importRef} type="file" accept=".json" onChange={handleImportRoadmap} style={{ display: "none" }} />
