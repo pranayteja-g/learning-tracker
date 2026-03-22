@@ -707,6 +707,7 @@ export default function App() {
                     fontFamily: "inherit", fontSize: 13, fontWeight: active ? 700 : 400,
                     background: active ? val.color : "#1a1a1f", color: active ? "#fff" : "#888", position: "relative", top: 1 }}>
                   {val.label} <span style={{ fontSize: 11, opacity: 0.75, marginLeft: 4 }}>{s.pct}%</span>
+                  {s.pct === 100 && <span style={{ marginLeft: 4 }}>🎓</span>}
                 </button>
               );
             })}
@@ -731,6 +732,14 @@ export default function App() {
                 <div style={{ height: "100%", width: `${stats.pct}%`, background: rm.color, borderRadius: 4, transition: "width 0.4s" }} />
               </div>
               <div style={{ fontSize: 12, color: rm.accent, marginTop: 4 }}>{stats.done} / {stats.total}</div>
+              {stats.pct === 100 && (
+                <button onClick={() => setCertificate({ rm, stats })}
+                  style={{ width: "100%", marginTop: 8, padding: "6px", background: rm.color + "22",
+                    border: `1px solid ${rm.color}44`, borderRadius: 6, color: rm.accent,
+                    fontSize: 11, cursor: "pointer", fontFamily: "inherit", fontWeight: 700 }}>
+                  🎓 View Certificate
+                </button>
+              )}
             </div>
             <div style={{ padding: "8px 14px", borderBottom: "1px solid #1e1e24", display: "flex", flexDirection: "column", gap: 6 }}>
               <button onClick={() => setView(v => v === "nextup" ? "sections" : "nextup")}
@@ -761,6 +770,13 @@ export default function App() {
 
           {/* Main content */}
           <div style={{ flex: 1, overflowY: "auto", padding: "22px 26px" }}>
+            {/* Daily goal + timer row */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 20 }}>
+              <DailyGoalWidget goal={goal} todayCount={todayCount} pct={goalPct}
+                goalMet={goalMet} goalStreak={goalStreak} onSetGoal={setGoal}
+                color={rm?.color || "#7b5ea7"} />
+              <StudyTimer color={rm?.color || "#7b5ea7"} isMobile={false} />
+            </div>
             {/* Collapsible Quest Board */}
             <div style={{ marginBottom: 20 }}>
               <button onClick={() => setQuestBoardOpen(o => !o)}
