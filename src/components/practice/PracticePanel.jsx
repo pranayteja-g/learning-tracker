@@ -50,7 +50,7 @@ const INTERVIEW_MODES = [
 const SCOPES   = ["section", "roadmap", "completed"];
 const Q_COUNTS = [5, 10, 15];
 
-export function PracticePanel({ open, onClose, onOpenSettings, roadmap, roadmaps, progress, notes, resources,
+export function PracticePanel({ open, onClose, onOpenSettings, onSaveProjects, roadmap, roadmaps, progress, notes, resources,
   topicMeta, curSection, isMobile, onSaveToNotes, onQuizComplete, quizResults = {} }) {
 
   const [tab,          setTab]          = useState("study");
@@ -156,7 +156,13 @@ export function PracticePanel({ open, onClose, onOpenSettings, roadmap, roadmaps
       const maxTokens = isJsonMode ? Math.max(8192, qCount * 400) : 2048;
       const { text, usage: u } = await callAI({ provider, apiKey, systemPrompt: sys, userPrompt, maxTokens });
       recordUsage(u);
-      const r = { tab, studyMode, intMode, data: safeParseJSON(text) };
+      const parsed = safeParseJSON(text);
+      if (studyMode === "project" && onSaveProjects && rm) {
+        const projects = Array.isArray(parsed) ? parsed : [parsed];
+        onSaveProjects(rm.id, projects);
+        return; // Don't set result — board opens instead
+      }
+      const r = { tab, studyMode, intMode, data: parsed };
       setResult(r);
       if (studyMode === "project") savedResultRef.current = r;
     } catch (e) {
