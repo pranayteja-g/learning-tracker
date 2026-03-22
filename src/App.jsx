@@ -20,6 +20,13 @@ import { useStreak }            from "./hooks/useStreak.js";
 import { useQuizResults }       from "./hooks/useQuizResults.js";
 import { useQuest }               from "./hooks/useQuest.js";
 import { useXP }                  from "./hooks/useXP.js";
+import { OnboardingFlow }         from "./components/screens/OnboardingFlow.jsx";
+import { DailyGoalWidget }        from "./components/ui/DailyGoal.jsx";
+import { StudyTimer }             from "./components/ui/StudyTimer.jsx";
+import { CompletionCertificate }  from "./components/ui/CompletionCertificate.jsx";
+import { useDailyGoal }           from "./hooks/useDailyGoal.js";
+import { useSpacedRepetition }    from "./hooks/useSpacedRepetition.js";
+
 import { QuestBoard }             from "./components/quest/QuestCard.jsx";
 import { QuestModal }             from "./components/quest/QuestModal.jsx";
 import { buildQuestPrompt }       from "./ai/prompts.js";
@@ -46,12 +53,16 @@ export default function App() {
   const [activeQuestRmId, setActiveQuestRmId] = useState(null);
   const [loadingQuestRmIds, setLoadingQuestRmIds] = useState([]);
   const [questBoardOpen,    setQuestBoardOpen]    = useState(false);
+  const [certificate,       setCertificate]       = useState(null);  // roadmap to show cert for
+  const [showOnboarding,    setShowOnboarding]    = useState(false);
   const [searchOpen,     setSearchOpen]     = useState(false);
   const { streak, recordActivity, studiedToday } = useStreak();
   const { results: quizResults, recordQuizResult, hasPassedTopic, getStars } = useQuizResults();
   const { quests, loaded: questLoaded, startQuest, advancePhase, completeQuest,
           isOnCooldown, cooldownRemaining, needsNewQuest, getQuest } = useQuest();
   const { xpData, awardQuestXP } = useXP();
+  const { goal, todayCount, pct: goalPct, goalMet, goalStreak, setGoal, recordTopicDone } = useDailyGoal();
+  const { getDueTopics, recordReview, getTopicLevel, getNextReview } = useSpacedRepetition();
   const importRef = useRef(null);
 
   const showFeedback = (ok, msg) => {
@@ -72,7 +83,7 @@ export default function App() {
   const toggle = (key, topic) => {
     const wasUndone = !progress[`${key}::${topic}`];
     setProgress(p => ({ ...p, [`${key}::${topic}`]: !p[`${key}::${topic}`] }));
-    if (wasUndone) recordActivity();
+    if (wasUndone) { recordActivity(); recordTopicDone(); }
   };
 
   const openNote = (key, topic) => setNoteModal({ roadmap: key, topic });
@@ -286,12 +297,13 @@ export default function App() {
   if (rmKeys.length === 0) return (
     <>
       <style>{globalStyle}</style>
-      <WelcomeScreen onImportBackup={handleImportBackup} onImportRoadmap={handleImportRoadmap}
-        onCreate={() => setEditorModal({ existing: null })} />
+      <OnboardingFlow
+        onComplete={() => {}}
+        onCreate={(tmpl) => {
+          if (tmpl) handleSaveRoadmap({ ...tmpl, id: tmpl.id || tmpl.label.toLowerCase().replace(/\s+/g,"-") });
+        }}
+      />
       {feedback && <Toast feedback={feedback} isMobile={isMobile} />}
-      {editorModal !== null && (
-        <RoadmapEditorModal existing={editorModal.existing} onSave={handleSaveRoadmap} onClose={() => setEditorModal(null)} />
-      )}
     </>
   );
 
@@ -420,6 +432,14 @@ export default function App() {
                 ⚙️ <span>Settings</span>
               </button>
             </div>
+
+            {/* Daily goal */}
+            <DailyGoalWidget goal={goal} todayCount={todayCount} pct={goalPct}
+              goalMet={goalMet} goalStreak={goalStreak} onSetGoal={setGoal}
+              color={rm?.color || "#7b5ea7"} />
+
+            {/* Study timer */}
+            <StudyTimer color={rm?.color || "#7b5ea7"} isMobile={true} />
 
             {/* Roadmap cards — clean & simple */}
             <div style={{ fontSize: 11, color: "#444", textTransform: "uppercase",
@@ -612,6 +632,13 @@ export default function App() {
       <SearchOverlay open={searchOpen} onClose={() => setSearchOpen(false)}
         roadmaps={roadmaps} notes={notes} resources={resources}
         onNavigate={handleSearchNavigate} isMobile={isMobile} />
+      {certificate && (
+        <CompletionCertificate
+          roadmap={certificate.rm}
+          stats={certificate.stats}
+          onClose={() => setCertificate(null)}
+        />
+      )}
       <InstallPrompt />
       {feedback    && <Toast feedback={feedback} isMobile={isMobile} />}
       {noteModal   && <NoteModal noteModal={noteModal} roadmaps={roadmaps} notes={notes}
@@ -800,6 +827,13 @@ export default function App() {
       <SearchOverlay open={searchOpen} onClose={() => setSearchOpen(false)}
         roadmaps={roadmaps} notes={notes} resources={resources}
         onNavigate={handleSearchNavigate} isMobile={isMobile} />
+      {certificate && (
+        <CompletionCertificate
+          roadmap={certificate.rm}
+          stats={certificate.stats}
+          onClose={() => setCertificate(null)}
+        />
+      )}
       <InstallPrompt />
       {feedback    && <Toast feedback={feedback} isMobile={isMobile} />}
       {noteModal   && <NoteModal noteModal={noteModal} roadmaps={roadmaps} notes={notes}
