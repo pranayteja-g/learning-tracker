@@ -26,6 +26,8 @@ import { StudyTimer }             from "./components/ui/StudyTimer.jsx";
 import { CompletionCertificate }  from "./components/ui/CompletionCertificate.jsx";
 import { useDailyGoal }           from "./hooks/useDailyGoal.js";
 import { useSpacedRepetition }    from "./hooks/useSpacedRepetition.js";
+import { useProjects }            from "./hooks/useProjects.js";
+import { ProjectBoard }           from "./components/screens/ProjectBoard.jsx";
 
 import { QuestBoard }             from "./components/quest/QuestCard.jsx";
 import { QuestModal }             from "./components/quest/QuestModal.jsx";
@@ -114,7 +116,8 @@ export default function App() {
   const [activeQuestRmId, setActiveQuestRmId] = useState(null);
   const [loadingQuestRmIds, setLoadingQuestRmIds] = useState([]);
   const [questBoardOpen,    setQuestBoardOpen]    = useState(false);
-  const [certificate,       setCertificate]       = useState(null);  // roadmap to show cert for
+  const [certificate,       setCertificate]       = useState(null);
+  const [projectBoardRm,    setProjectBoardRm]    = useState(null);  // roadmap to show cert for
   const [showOnboarding,    setShowOnboarding]    = useState(false);
   const [searchOpen,     setSearchOpen]     = useState(false);
   const { streak, recordActivity, studiedToday } = useStreak();
@@ -124,6 +127,7 @@ export default function App() {
   const { xpData, awardQuestXP } = useXP();
   const { goal, todayCount, pct: goalPct, goalMet, goalStreak, setGoal, recordTopicDone } = useDailyGoal();
   const { getDueTopics, recordReview, getTopicLevel, getNextReview } = useSpacedRepetition();
+  const { projects, addProjects, toggleMilestone, setStatus: setProjectStatus, deleteProject, getProjects, getStats: getProjectStats } = useProjects();
   const importRef = useRef(null);
 
   const showFeedback = (ok, msg) => {
@@ -560,12 +564,21 @@ export default function App() {
                   fontSize: 11, cursor: "pointer", fontFamily: "inherit" }}>✏️ Edit</button>
             </div>
 
-            <button onClick={() => setMobileScreen("nextup")}
-              style={{ width: "100%", padding: "13px 16px", background: "#16161b", border: `1px solid ${rm.color}44`,
-                borderRadius: 10, color: rm.accent, fontSize: 14, cursor: "pointer", fontFamily: "inherit",
-                textAlign: "left", marginBottom: 12, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <span>🎯 Next Up</span><span style={{ color: "#555", fontSize: 18 }}>›</span>
-            </button>
+            <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+              <button onClick={() => setMobileScreen("nextup")}
+                style={{ flex: 1, padding: "13px 16px", background: "#16161b", border: `1px solid ${rm.color}44`,
+                  borderRadius: 10, color: rm.accent, fontSize: 14, cursor: "pointer", fontFamily: "inherit",
+                  textAlign: "left", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span>🎯 Next Up</span><span style={{ color: "#555", fontSize: 16 }}>›</span>
+              </button>
+              <button onClick={() => setProjectBoardRm(rmKey)}
+                style={{ flex: 1, padding: "13px 16px", background: "#16161b", border: `1px solid ${rm.color}44`,
+                  borderRadius: 10, color: rm.accent, fontSize: 14, cursor: "pointer", fontFamily: "inherit",
+                  textAlign: "left", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span>🔨 Projects</span>
+                <span style={{ fontSize: 11, color: "#555" }}>{getProjectStats(rmKey).inprogress > 0 ? `${getProjectStats(rmKey).inprogress} active` : ""}</span>
+              </button>
+            </div>
 
             {sections.map(section => {
               const ts   = rm.sections[section];
@@ -689,6 +702,16 @@ export default function App() {
       <SearchOverlay open={searchOpen} onClose={() => setSearchOpen(false)}
         roadmaps={roadmaps} notes={notes} resources={resources}
         onNavigate={handleSearchNavigate} isMobile={isMobile} />
+      {projectBoardRm && roadmaps[projectBoardRm] && (
+        <ProjectBoard
+          rm={roadmaps[projectBoardRm]}
+          projects={getProjects(projectBoardRm)}
+          onSetStatus={setProjectStatus}
+          onToggleMilestone={toggleMilestone}
+          onDelete={deleteProject}
+          onClose={() => setProjectBoardRm(null)}
+        />
+      )}
       {certificate && (
         <CompletionCertificate
           roadmap={certificate.rm}
@@ -710,6 +733,7 @@ export default function App() {
                         onSave={handleSaveRoadmap} onClose={() => setEditorModal(null)} />}
       <PracticePanel open={practiceOpen} onClose={() => setPracticeOpen(false)}
         onOpenSettings={() => { setManageTab("settings"); setShowManage(true); }}
+        onSaveProjects={(rmId, projs) => { addProjects(rmId, projs); setPracticeOpen(false); setProjectBoardRm(rmId); }}
         roadmap={rm} roadmaps={roadmaps} progress={progress}
         notes={notes} resources={resources} topicMeta={topicMeta} curSection={curSec} isMobile={isMobile}
         onSaveToNotes={appendToNote} quizResults={quizResults}
@@ -900,6 +924,16 @@ export default function App() {
       <SearchOverlay open={searchOpen} onClose={() => setSearchOpen(false)}
         roadmaps={roadmaps} notes={notes} resources={resources}
         onNavigate={handleSearchNavigate} isMobile={isMobile} />
+      {projectBoardRm && roadmaps[projectBoardRm] && (
+        <ProjectBoard
+          rm={roadmaps[projectBoardRm]}
+          projects={getProjects(projectBoardRm)}
+          onSetStatus={setProjectStatus}
+          onToggleMilestone={toggleMilestone}
+          onDelete={deleteProject}
+          onClose={() => setProjectBoardRm(null)}
+        />
+      )}
       {certificate && (
         <CompletionCertificate
           roadmap={certificate.rm}
@@ -921,6 +955,7 @@ export default function App() {
                         onSave={handleSaveRoadmap} onClose={() => setEditorModal(null)} />}
       <PracticePanel open={practiceOpen} onClose={() => setPracticeOpen(false)}
         onOpenSettings={() => { setManageTab("settings"); setShowManage(true); }}
+        onSaveProjects={(rmId, projs) => { addProjects(rmId, projs); setPracticeOpen(false); setProjectBoardRm(rmId); }}
         roadmap={rm} roadmaps={roadmaps} progress={progress}
         notes={notes} resources={resources} topicMeta={topicMeta} curSection={curSec} isMobile={isMobile}
         onSaveToNotes={appendToNote} quizResults={quizResults}

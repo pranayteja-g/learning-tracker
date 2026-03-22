@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { callAI, loadAIConfig, saveAIConfig, PROVIDERS } from "../../ai/providers.js";
 import { useUsage } from "../../ai/useUsage.js";
 import { allTopicNames, flatTopicNames } from "../../utils/topics.js";
@@ -10,6 +10,7 @@ import {
   buildQuizPrompt, buildQuestionnairePrompt, buildExplainPrompt, buildStudyPlanPrompt,
   buildInterviewQuestionsPrompt, buildFlashcardsPrompt, buildCheatSheetPrompt,
   buildCodeChallengePrompt,
+  buildProjectPrompt,
 } from "../../ai/prompts.js";
 import { buildQuizContext, buildQuestionnaireContext, buildExplainContext, buildStudyPlanContext } from "../../ai/context.js";
 import { QuizView }          from "../ai/QuizView.jsx";
@@ -17,11 +18,11 @@ import { CodeWriteView }     from "../ai/CodeWriteView.jsx";
 import { QuestionnaireView } from "../ai/QuestionnaireView.jsx";
 import { ExplainView }       from "../ai/ExplainView.jsx";
 import { StudyPlanView }     from "../ai/StudyPlanView.jsx";
+import { ProjectView }       from "../ai/ProjectView.jsx";
 import { InterviewModeView } from "../interview/InterviewModeView.jsx";
 import { FlashcardView }     from "../interview/FlashcardView.jsx";
 import { CheatSheetView }    from "../interview/CheatSheetView.jsx";
 import { TimedQuizView }     from "../interview/TimedQuizView.jsx";
-import { APIKeySetup }       from "../ai/APIKeySetup.jsx";
 import { StorageIndicator }  from "../ui/StorageIndicator.jsx";
 
 const TABS = [
@@ -36,6 +37,7 @@ const STUDY_MODES = [
   { id: "questionnaire", label: "Q&A",        icon: "💬", desc: "Open ended" },
   { id: "explain",       label: "Explain",    icon: "📖", desc: "Deep dive + chat" },
   { id: "studyplan",     label: "Study Plan", icon: "📅", desc: "5-day plan" },
+  { id: "project",       label: "Project",    icon: "🔨", desc: "Build something" },
 ];
 
 const INTERVIEW_MODES = [
@@ -48,7 +50,7 @@ const INTERVIEW_MODES = [
 const SCOPES   = ["section", "roadmap", "completed"];
 const Q_COUNTS = [5, 10, 15];
 
-export function PracticePanel({ open, onClose, roadmap, roadmaps, progress, notes, resources,
+export function PracticePanel({ open, onClose, onOpenSettings, onSaveProjects, roadmap, roadmaps, progress, notes, resources,
   topicMeta, curSection, isMobile, onSaveToNotes, onQuizComplete, quizResults = {} }) {
 
   const [tab,          setTab]          = useState("study");
@@ -57,10 +59,12 @@ export function PracticePanel({ open, onClose, roadmap, roadmaps, progress, note
   const [scope,        setScope]        = useState("section");
   const [qCount,       setQCount]       = useState(5);
   const [difficulty,   setDifficulty]   = useState("mixed");
+  const [projDifficulty, setProjDifficulty] = useState("both");
   const [explainTopic, setExplainTopic] = useState("");
   const [timeSecs,     setTimeSecs]     = useState(600);
   const [selRmKeys,    setSelRmKeys]    = useState([]);
   const [result,       setResult]       = useState(null);
+  const savedResultRef                  = useRef(null);
   const [loading,      setLoading]      = useState(false);
   const [error,        setError]        = useState("");
 
@@ -76,6 +80,15 @@ export function PracticePanel({ open, onClose, roadmap, roadmaps, progress, note
   const barColor = pct >= 90 ? "#e05252" : pct >= 70 ? "#ee9b00" : "#52b788";
 
   const switchTab = (t) => { setTab(t); setResult(null); setError(""); };
+  const handleStudyModeChange = (mode) => {
+    setStudyMode(mode);
+    if (mode === "project" && savedResultRef.current?.studyMode === "project") {
+      setResult(savedResultRef.current);
+    } else if (mode !== "project") {
+      setResult(null);
+    }
+    setError("");
+  };
 
   const generate = async () => {
     if (!rm || !hasKey) return;
@@ -108,6 +121,11 @@ export function PracticePanel({ open, onClose, roadmap, roadmaps, progress, note
           const ctx = buildQuizContext({ roadmap: rm, progress, scope, sectionKey: curSection });
           if (!ctx.topics.length) throw new Error("No topics for this scope.");
           userPrompt = buildCodeChallengePrompt(ctx, qCount, difficulty);
+        } else if (studyMode === "project") {
+          const ctx = buildQuizContext({ roadmap: rm, progress, scope, sectionKey: curSection });
+          if (!ctx.topics.length) throw new Error("No topics for this scope.");
+          const count = projDifficulty === "both" ? 2 : 2;
+          userPrompt = buildProjectPrompt(rm.label, ctx.topics.map(t => t.topic || t), projDifficulty, count);
         }
       } else if (tab === "interview") {
         const scope_rms = selRmKeys.length > 0
@@ -133,12 +151,20 @@ export function PracticePanel({ open, onClose, roadmap, roadmaps, progress, note
 
       const sys = tab === "interview" ? INTERVIEW_SYSTEM_PROMPT : SYSTEM_PROMPT;
       // JSON modes need more tokens: 15 questions × ~200 tokens each = ~3000 minimum
-      const jsonModes = ["quiz", "code", "questionnaire", "interview", "flashcards", "cheatsheet"];
+      const jsonModes = ["quiz", "code", "questionnaire", "interview", "flashcards", "cheatsheet", "project"];
       const isJsonMode = (tab === "study" && jsonModes.includes(studyMode)) || tab === "interview";
       const maxTokens = isJsonMode ? Math.max(8192, qCount * 400) : 2048;
       const { text, usage: u } = await callAI({ provider, apiKey, systemPrompt: sys, userPrompt, maxTokens });
       recordUsage(u);
-      setResult({ tab, studyMode, intMode, data: safeParseJSON(text) });
+      const parsed = safeParseJSON(text);
+      if (studyMode === "project" && onSaveProjects && rm) {
+        const projects = Array.isArray(parsed) ? parsed : [parsed];
+        onSaveProjects(rm.id, projects);
+        return; // Don't set result — board opens instead
+      }
+      const r = { tab, studyMode, intMode, data: parsed };
+      setResult(r);
+      if (studyMode === "project") savedResultRef.current = r;
     } catch (e) {
       setError(e.message || "Something went wrong.");
     } finally {
@@ -223,15 +249,27 @@ export function PracticePanel({ open, onClose, roadmap, roadmaps, progress, note
         {/* Body */}
         <div style={{ overflowY: "auto", flex: 1 }}>
 
-          {/* Settings */}
+          {/* Settings — redirect to main settings */}
           {tab === "settings" && (
-            <div style={{ padding: "16px 18px", display: "flex", flexDirection: "column", gap: 14 }}>
-              <StorageIndicator />
-              <APIKeySetup config={aiConfig}
-                onSave={cfg => { saveAIConfig(cfg); setAIConfig(cfg); switchTab("study"); }}
-                usage={usage} limit={limit} pct={pct}
-                onResetUsage={resetUsage}
-                onSaveLimit={saveLimit} />
+            <div style={{ padding: "32px 20px", display: "flex", flexDirection: "column",
+              alignItems: "center", gap: 16, textAlign: "center" }}>
+              <div style={{ fontSize: 36 }}>⚙️</div>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: "#fff", marginBottom: 6 }}>AI Settings</div>
+                <div style={{ fontSize: 13, color: "#555", lineHeight: 1.6 }}>
+                  Manage your API keys, provider and token limits in the main Settings panel.
+                </div>
+              </div>
+              <button onClick={() => { onClose(); onOpenSettings?.(); }}
+                style={{ padding: "11px 28px", background: "#7b5ea7", border: "none",
+                  borderRadius: 8, color: "#fff", fontSize: 13, fontWeight: 700,
+                  cursor: "pointer", fontFamily: "inherit" }}>
+                Open Settings → AI
+              </button>
+              <div style={{ fontSize: 12, color: "#444", marginTop: 4 }}>
+                Current provider: <span style={{ color: "#888" }}>{PROVIDERS[aiConfig.provider]?.name || aiConfig.provider}</span>
+                {" · "}{hasKey ? <span style={{ color: "#52b788" }}>Key configured ✓</span> : <span style={{ color: "#e05252" }}>No key</span>}
+              </div>
             </div>
           )}
 
@@ -264,7 +302,7 @@ export function PracticePanel({ open, onClose, roadmap, roadmaps, progress, note
                 ))}
               </div>
 
-              {(studyMode === "quiz" || studyMode === "questionnaire" || studyMode === "code") && (
+              {(studyMode === "quiz" || studyMode === "questionnaire" || studyMode === "code" || studyMode === "project") && (
                 <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                   <div>
                     <div style={labelStyle}>Scope</div>
@@ -276,6 +314,7 @@ export function PracticePanel({ open, onClose, roadmap, roadmaps, progress, note
                       ))}
                     </div>
                   </div>
+                  {studyMode !== "project" && (
                   <div>
                     <div style={labelStyle}>Questions</div>
                     <div style={{ display: "flex", gap: 5 }}>
@@ -287,7 +326,19 @@ export function PracticePanel({ open, onClose, roadmap, roadmaps, progress, note
                       ))}
                     </div>
                   </div>
-                  {(studyMode === "quiz" || studyMode === "code") && (
+                  )}
+                  {studyMode === "project" && (
+                <div>
+                  <div style={labelStyle}>Project Scale</div>
+                  <div style={{ display: "flex", gap: 5 }}>
+                    {[["both","🎲 Both"],["beginner","Beginner"],["intermediate","Intermediate"]].map(([v,l]) => (
+                      <button key={v} onClick={() => setProjDifficulty(v)}
+                        style={{ ...chipBtn(projDifficulty===v, rm?.color, rm?.accent), fontSize: 11 }}>{l}</button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {(studyMode === "quiz" || studyMode === "code") && (
                     <div>
                       <div style={labelStyle}>Difficulty</div>
                       <div style={{ display: "flex", gap: 5 }}>
@@ -427,6 +478,7 @@ export function PracticePanel({ open, onClose, roadmap, roadmaps, progress, note
                 <ExplainView data={result.data} rm={rm} topic={explainTopic}
                   rmKey={rm?.id} sectionKey={curSection} onSaveToNotes={onSaveToNotes} />}
               {result.tab === "study" && result.studyMode === "studyplan" && <StudyPlanView data={result.data} rm={rm} />}
+              {result.tab === "study" && result.studyMode === "project" && <ProjectView projects={result.data} rm={rm} />}
               {result.tab === "interview" && result.intMode === "interview" && <InterviewModeView questions={result.data} rm={rm} />}
               {result.tab === "interview" && result.intMode === "flashcards" && <FlashcardView cards={result.data} rm={rm} />}
               {result.tab === "interview" && result.intMode === "cheatsheet" && <CheatSheetView data={result.data} rm={rm} />}
