@@ -642,3 +642,43 @@ Respond with ONLY valid JSON:
   "redFlags": ["mistake 1", "mistake 2", "mistake 3"]
 }`;
 }
+
+// ── Project Ideas Prompt ──────────────────────────────────────────────────────
+export function buildProjectPrompt(roadmapName, topics, difficulty, count = 2) {
+  const diffLabel = difficulty === "both" ? "one beginner and one intermediate"
+    : difficulty === "beginner" ? `${count} beginner`
+    : `${count} intermediate`;
+
+  return `You are a senior software mentor. Generate ${diffLabel} project idea${count > 1 ? "s" : ""} for a student learning ${roadmapName}.
+
+Topics they have studied: ${topics.join(", ")}
+
+For each project respond with a JSON object. Respond ONLY with a JSON array:
+[
+  {
+    "title": "Project name (specific and catchy)",
+    "difficulty": "beginner" | "intermediate",
+    "estimatedTime": "e.g. 1-2 hours",
+    "description": "2-3 sentences: what it is, why it's useful, what makes it interesting",
+    "outcome": "One sentence describing the finished product the student will have",
+    "topics": ["topic1", "topic2"],
+    "milestones": [
+      { "title": "Step title", "desc": "Brief description of what to do in this step" }
+    ],
+    "hints": [
+      "Practical hint if they get stuck on this project"
+    ],
+    "links": [
+      { "title": "Resource name", "url": "https://...", "desc": "Why this is useful" }
+    ]
+  }
+]
+
+Rules:
+- Projects must be buildable with ONLY the topics listed — no external frameworks unless they are in the list
+- Milestones: 4-6 steps, ordered from setup to completion
+- Hints: 2-3 practical tips specific to this project
+- Links: 2-3 real GitHub repos or docs pages relevant to this exact project (not generic tutorials)
+- Beginner: straightforward, clear requirements, minimal edge cases
+- Intermediate: requires combining multiple concepts, has some complexity`;
+}

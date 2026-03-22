@@ -44,7 +44,7 @@ function Section({ title, defaultOpen = true, children, isMobile }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
     <div style={{ background: "#16161b", borderRadius: 12, border: "1px solid #1e1e24",
-      marginBottom: 12, overflow: "hidden" }}>
+      marginBottom: 12, overflow: "hidden", boxSizing: "border-box" }}>
       <button onClick={() => setOpen(o => !o)}
         style={{ width: "100%", padding: "14px 16px", background: "transparent", border: "none",
           display: "flex", alignItems: "center", justifyContent: "space-between",
@@ -83,7 +83,7 @@ export function Dashboard({ roadmaps, progress, notes, resources, topicMeta,
   );
 
   return (
-    <div style={{ padding: isMobile ? "12px" : "28px", overflowY: "auto",
+    <div style={{ padding: isMobile ? "12px" : "28px", overflowY: "auto", overflowX: "hidden",
       maxHeight: isMobile ? "calc(100dvh - 56px)" : "calc(100vh - 88px)",
       paddingBottom: isMobile ? "90px" : "40px" }}>
 
@@ -292,12 +292,13 @@ export function Dashboard({ roadmaps, progress, notes, resources, topicMeta,
       </div>
 
       {/* ── XP & Badges ── */}
-      <div style={card}>
-        {/* XP Level bar */}
-        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
+      {/* ── XP & Level ── */}
+      <div style={{ background: "#16161b", borderRadius: 12, border: "1px solid #1e1e24",
+        padding: "16px", marginBottom: 12 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
           <span style={{ fontSize: 28 }}>{level.icon}</span>
-          <div style={{ flex: 1 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 5 }}>
               <span style={{ fontSize: 14, fontWeight: 700, color: level.color }}>{level.name}</span>
               <span style={{ fontSize: 13, color: "#888", fontVariantNumeric: "tabular-nums" }}>{xp.toLocaleString()} XP</span>
             </div>
@@ -311,63 +312,70 @@ export function Dashboard({ roadmaps, progress, notes, resources, topicMeta,
             )}
           </div>
         </div>
+      </div>
 
-        {/* Milestone badges */}
-        {label(`🏅 Milestone Badges (${(xpData?.badges || []).length} / ${MILESTONE_BADGES.length})`)}
-        <div style={{ display: "grid",
-          gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(auto-fill, minmax(200px, 1fr))",
-          gap: 8, marginBottom: (xpData?.aiBadges?.length > 0) ? 16 : 0 }}>
+      {/* ── Milestone Badges ── */}
+      <div style={{ background: "#16161b", borderRadius: 12, border: "1px solid #1e1e24",
+        padding: "16px", marginBottom: 12 }}>
+        {label(`🏅 Badges (${(xpData?.badges || []).length} / ${MILESTONE_BADGES.length})`)}
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(2, 1fr)",
+          gap: 8,
+          boxSizing: "border-box",
+        }}>
           {MILESTONE_BADGES.map(badge => {
             const earned = (xpData?.badges || []).includes(badge.id);
             return (
-              <div key={badge.id} style={{ display: "flex", alignItems: "center", gap: 8,
-                background: earned ? "#16161b" : "#0f0f13",
+              <div key={badge.id} style={{
+                display: "flex", alignItems: "center", gap: 8,
+                background: earned ? "#1e1e24" : "#0f0f13",
                 border: `1px solid ${earned ? "#2a2a35" : "#1a1a1a"}`,
                 borderRadius: 8, padding: "8px 10px",
-                opacity: earned ? 1 : 0.4 }}>
-                <span style={{ fontSize: 20, flexShrink: 0 }}>{badge.icon}</span>
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: earned ? "#ccc" : "#444",
+                opacity: earned ? 1 : 0.35,
+                minWidth: 0, overflow: "hidden",
+              }}>
+                <span style={{ fontSize: 18, flexShrink: 0 }}>{badge.icon}</span>
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: earned ? "#ccc" : "#444",
                     overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     {badge.name}
                   </div>
-                  <div style={{ fontSize: 10, color: "#555", overflow: "hidden",
-                    textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{badge.desc}</div>
+                  <div style={{ fontSize: 10, color: "#444", overflow: "hidden",
+                    textOverflow: "ellipsis", whiteSpace: "nowrap", lineHeight: 1.3 }}>
+                    {badge.desc}
+                  </div>
                 </div>
               </div>
             );
           })}
         </div>
-
-        {/* AI story badges */}
-        {(xpData?.aiBadges || []).length > 0 && (
-          <>
-            {label(`✨ Story Badges (${(xpData?.aiBadges || []).length})`)}
-            <div style={{ display: "grid",
-              gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill, minmax(220px, 1fr))",
-              gap: 8 }}>
-              {[...(xpData?.aiBadges || [])].reverse().map(badge => (
-                <div key={badge.id} style={{ display: "flex", alignItems: "center", gap: 8,
-                  background: "#1a1a2e", border: "1px solid #7b5ea733",
-                  borderRadius: 8, padding: "8px 10px" }}>
-                  <span style={{ fontSize: 20, flexShrink: 0 }}>{badge.icon}</span>
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 2 }}>
-                      <span style={{ fontSize: 12, fontWeight: 700, color: "#c4b5fd",
-                        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        {badge.name}
-                      </span>
-                      <span style={{ fontSize: 9, background: "#7b5ea733", color: "#c4b5fd",
-                        borderRadius: 3, padding: "1px 4px", flexShrink: 0 }}>AI</span>
-                    </div>
-                    <div style={{ fontSize: 10, color: "#555", lineHeight: 1.4 }}>{badge.desc}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </>
-        )}
       </div>
+
+      {/* ── AI Story Badges ── */}
+      {(xpData?.aiBadges || []).length > 0 && (
+        <div style={{ background: "#16161b", borderRadius: 12, border: "1px solid #1e1e24",
+          padding: "16px", marginBottom: 12 }}>
+          {label(`✨ Story Badges (${(xpData?.aiBadges || []).length})`)}
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {[...(xpData?.aiBadges || [])].reverse().map(badge => (
+              <div key={badge.id} style={{ display: "flex", alignItems: "center", gap: 10,
+                background: "#1a1a2e", border: "1px solid #7b5ea733",
+                borderRadius: 8, padding: "10px 12px" }}>
+                <span style={{ fontSize: 22, flexShrink: 0 }}>{badge.icon}</span>
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: "#c4b5fd" }}>{badge.name}</span>
+                    <span style={{ fontSize: 9, background: "#7b5ea733", color: "#c4b5fd",
+                      borderRadius: 3, padding: "1px 5px", flexShrink: 0 }}>AI</span>
+                  </div>
+                  <div style={{ fontSize: 11, color: "#666", lineHeight: 1.4 }}>{badge.desc}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* ── Notes ── */}
       {allNotes.length > 0 && (
