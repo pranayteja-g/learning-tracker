@@ -428,7 +428,7 @@ export default function App() {
           paddingTop: "calc(12px + env(safe-area-inset-top))" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             {["sections","topics","nextup"].includes(mobileScreen) && (
-              <button onClick={() => mobileScreen === "topics" ? setMobileScreen("sections") : setMobileScreen("roadmaps")}
+              <button onClick={() => mobileScreen === "topics" ? setMobileScreen("sections") : mobileScreen === "nextup" ? setMobileScreen("sections") : setMobileScreen("roadmaps")}
                 style={{ background: "transparent", border: "none", color: "#888",
                   fontSize: 20, cursor: "pointer", padding: 0, lineHeight: 1, marginRight: 2 }}>‹</button>
             )}
@@ -447,15 +447,11 @@ export default function App() {
               style={{ width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center",
                 border: "none", borderRadius: 8, cursor: "pointer", background: "#1e1e24",
                 color: "#888", fontSize: 15 }}>🔍</button>
-            <button onClick={() => setPracticeOpen(o => !o)}
-              style={{ width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center",
-                border: "none", borderRadius: 8, cursor: "pointer",
-                background: practiceOpen ? "#7b5ea722" : "#1e1e24",
-                color: practiceOpen ? "#c4b5fd" : "#888", fontSize: 15 }}>🤖</button>
             <button onClick={() => setShowManage(true)}
               style={{ width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center",
                 border: "none", borderRadius: 8, cursor: "pointer", background: "#1e1e24",
                 color: "#888", fontSize: 15 }}>⚙️</button>
+
           </div>
         </div>
         <input ref={importRef} type="file" accept=".json" onChange={handleImportRoadmap} style={{ display: "none" }} />
@@ -485,23 +481,14 @@ export default function App() {
 
         {mobileScreen === "roadmaps" && (
           <div style={{ padding: "20px 16px", paddingBottom: "100px" }}>
-            {/* Practice + Settings quick access */}
-            <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
-              <button onClick={() => setPracticeOpen(o => !o)}
-                style={{ flex: 1, padding: "11px", background: "#1e1e24", border: "1px solid #2a2a35",
-                  borderRadius: 10, color: "#888", fontSize: 13, fontWeight: 600,
-                  cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center",
-                  justifyContent: "center", gap: 6 }}>
-                🤖 <span>Practice</span>
-              </button>
-              <button onClick={() => setShowManage(true)}
-                style={{ flex: 1, padding: "11px", background: "#1e1e24", border: "1px solid #2a2a35",
-                  borderRadius: 10, color: "#888", fontSize: 13, fontWeight: 600,
-                  cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center",
-                  justifyContent: "center", gap: 6 }}>
-                ⚙️ <span>Settings</span>
-              </button>
-            </div>
+            {/* Practice quick access */}
+            <button onClick={() => setPracticeOpen(o => !o)}
+              style={{ width: "100%", padding: "11px", background: "#1e1e24", border: "1px solid #2a2a35",
+                borderRadius: 10, color: "#888", fontSize: 13, fontWeight: 600,
+                cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center",
+                justifyContent: "center", gap: 6, marginBottom: 10 }}>
+              🤖 <span>Practice</span>
+            </button>
 
             {/* Daily goal */}
             <DailyGoalWidget goal={goal} todayCount={todayCount} pct={goalPct}
