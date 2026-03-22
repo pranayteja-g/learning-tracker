@@ -27,6 +27,7 @@ import { CompletionCertificate }  from "./components/ui/CompletionCertificate.js
 import { useDailyGoal }           from "./hooks/useDailyGoal.js";
 import { useSpacedRepetition }    from "./hooks/useSpacedRepetition.js";
 import { useProjects }            from "./hooks/useProjects.js";
+import { useClippings }           from "./hooks/useClippings.js";
 import { ProjectBoard }           from "./components/screens/ProjectBoard.jsx";
 
 import { QuestBoard }             from "./components/quest/QuestCard.jsx";
@@ -128,6 +129,7 @@ export default function App() {
   const { goal, todayCount, pct: goalPct, goalMet, goalStreak, setGoal, recordTopicDone } = useDailyGoal();
   const { getDueTopics, recordReview, getTopicLevel, getNextReview } = useSpacedRepetition();
   const { projects, addProjects, toggleMilestone, setStatus: setProjectStatus, deleteProject, getProjects, getStats: getProjectStats } = useProjects();
+  const { clippings, addClipping, updateClipping, deleteClipping } = useClippings();
   const importRef = useRef(null);
 
   const showFeedback = (ok, msg) => {
@@ -466,7 +468,8 @@ export default function App() {
         {mobileScreen === "dashboard" && (
           <Dashboard roadmaps={roadmaps} progress={progress} notes={notes} resources={resources}
             topicMeta={topicMeta} isMobile={true} onOpenRoadmap={goToRoadmap} quizResults={quizResults}
-            onOpenNote={(modal) => setNoteModal(modal)} />
+            onOpenNote={(modal) => setNoteModal(modal)}
+            clippings={clippings} onAddClipping={addClipping} onUpdateClipping={updateClipping} onDeleteClipping={deleteClipping} />
         )}
 
         {mobileScreen === "quests" && (
@@ -800,7 +803,8 @@ export default function App() {
         <Dashboard roadmaps={roadmaps} progress={progress} notes={notes} resources={resources}
           topicMeta={topicMeta} isMobile={false} quizResults={quizResults}
           onOpenRoadmap={(key) => { setActiveRoadmap(key); setView("sections"); setActiveSection(null); }}
-          onOpenNote={(modal) => setNoteModal(modal)} />
+          onOpenNote={(modal) => setNoteModal(modal)}
+          clippings={clippings} onAddClipping={addClipping} onUpdateClipping={updateClipping} onDeleteClipping={deleteClipping} />
       )}
 
       {view !== "dashboard" && rm && (
