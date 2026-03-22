@@ -19,6 +19,14 @@ import { InstallPrompt }        from "./components/ui/InstallPrompt.jsx";
 import { useStreak }            from "./hooks/useStreak.js";
 import { useQuizResults }       from "./hooks/useQuizResults.js";
 import { useQuest }               from "./hooks/useQuest.js";
+import { useXP }                  from "./hooks/useXP.js";
+import { OnboardingFlow }         from "./components/screens/OnboardingFlow.jsx";
+import { DailyGoalWidget }        from "./components/ui/DailyGoal.jsx";
+import { StudyTimer }             from "./components/ui/StudyTimer.jsx";
+import { CompletionCertificate }  from "./components/ui/CompletionCertificate.jsx";
+import { useDailyGoal }           from "./hooks/useDailyGoal.js";
+import { useSpacedRepetition }    from "./hooks/useSpacedRepetition.js";
+
 import { QuestBoard }             from "./components/quest/QuestCard.jsx";
 import { QuestModal }             from "./components/quest/QuestModal.jsx";
 import { buildQuestPrompt }       from "./ai/prompts.js";
@@ -38,17 +46,23 @@ export default function App() {
   const [mobileScreen,   setMobileScreen]   = useState("roadmaps");
   const [noteModal,      setNoteModal]      = useState(null);
   const [showManage,     setShowManage]     = useState(false);
+  const [manageTab,      setManageTab]      = useState("roadmaps");
   const [editorModal,    setEditorModal]    = useState(null);
   const [feedback,       setFeedback]       = useState(null);
   const [practiceOpen,   setPracticeOpen]   = useState(false);
   const [activeQuestRmId, setActiveQuestRmId] = useState(null);
   const [loadingQuestRmIds, setLoadingQuestRmIds] = useState([]);
   const [questBoardOpen,    setQuestBoardOpen]    = useState(false);
+  const [certificate,       setCertificate]       = useState(null);  // roadmap to show cert for
+  const [showOnboarding,    setShowOnboarding]    = useState(false);
   const [searchOpen,     setSearchOpen]     = useState(false);
   const { streak, recordActivity, studiedToday } = useStreak();
   const { results: quizResults, recordQuizResult, hasPassedTopic, getStars } = useQuizResults();
   const { quests, loaded: questLoaded, startQuest, advancePhase, completeQuest,
           isOnCooldown, cooldownRemaining, needsNewQuest, getQuest } = useQuest();
+  const { xpData, awardQuestXP } = useXP();
+  const { goal, todayCount, pct: goalPct, goalMet, goalStreak, setGoal, recordTopicDone } = useDailyGoal();
+  const { getDueTopics, recordReview, getTopicLevel, getNextReview } = useSpacedRepetition();
   const importRef = useRef(null);
 
   const showFeedback = (ok, msg) => {
@@ -69,7 +83,7 @@ export default function App() {
   const toggle = (key, topic) => {
     const wasUndone = !progress[`${key}::${topic}`];
     setProgress(p => ({ ...p, [`${key}::${topic}`]: !p[`${key}::${topic}`] }));
-    if (wasUndone) recordActivity();
+    if (wasUndone) { recordActivity(); recordTopicDone(); }
   };
 
   const openNote = (key, topic) => setNoteModal({ roadmap: key, topic });
@@ -283,12 +297,13 @@ export default function App() {
   if (rmKeys.length === 0) return (
     <>
       <style>{globalStyle}</style>
-      <WelcomeScreen onImportBackup={handleImportBackup} onImportRoadmap={handleImportRoadmap}
-        onCreate={() => setEditorModal({ existing: null })} />
+      <OnboardingFlow
+        onComplete={() => {}}
+        onCreate={(tmpl) => {
+          if (tmpl) handleSaveRoadmap({ ...tmpl, id: tmpl.id || tmpl.label.toLowerCase().replace(/\s+/g,"-") });
+        }}
+      />
       {feedback && <Toast feedback={feedback} isMobile={isMobile} />}
-      {editorModal !== null && (
-        <RoadmapEditorModal existing={editorModal.existing} onSave={handleSaveRoadmap} onClose={() => setEditorModal(null)} />
-      )}
     </>
   );
 
@@ -365,21 +380,12 @@ export default function App() {
               </h1>
             </div>
           </div>
-          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
             <StreakBadge streak={{ ...streak, studiedToday }} isMobile={true} />
             <button onClick={() => setSearchOpen(true)}
-              style={{ width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center",
-                border: "none", borderRadius: 8, cursor: "pointer", background: "#1e1e24",
-                color: "#888", fontSize: 15 }}>🔍</button>
-            <button onClick={() => setPracticeOpen(o => !o)}
-              style={{ width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center",
-                border: "none", borderRadius: 8, cursor: "pointer",
-                background: practiceOpen ? "#7b5ea722" : "#1e1e24",
-                color: practiceOpen ? "#c4b5fd" : "#888", fontSize: 15 }}>🤖</button>
-            <button onClick={() => setShowManage(true)}
-              style={{ width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center",
-                border: "none", borderRadius: 8, cursor: "pointer", background: "#1e1e24",
-                color: "#888", fontSize: 15 }}>⚙️</button>
+              style={{ width: 36, height: 36, display: "flex", alignItems: "center", justifyContent: "center",
+                border: "none", borderRadius: 10, cursor: "pointer", background: "#1e1e24",
+                color: "#888", fontSize: 16 }}>🔍</button>
           </div>
         </div>
         <input ref={importRef} type="file" accept=".json" onChange={handleImportRoadmap} style={{ display: "none" }} />
@@ -389,7 +395,8 @@ export default function App() {
 
         {mobileScreen === "dashboard" && (
           <Dashboard roadmaps={roadmaps} progress={progress} notes={notes} resources={resources}
-            topicMeta={topicMeta} isMobile={true} onOpenRoadmap={goToRoadmap} quizResults={quizResults} />
+            topicMeta={topicMeta} isMobile={true} onOpenRoadmap={goToRoadmap} quizResults={quizResults}
+            onOpenNote={(modal) => setNoteModal(modal)} />
         )}
 
         {mobileScreen === "quests" && (
@@ -399,6 +406,7 @@ export default function App() {
               loadingRmIds={loadingQuestRmIds}
               isOnCooldown={isOnCooldown} cooldownRemaining={cooldownRemaining}
               isMobile={true}
+              singleColumn={true}
               onBegin={(rmId) => setActiveQuestRmId(rmId)}
               onGenerate={generateQuest}
             />
@@ -406,29 +414,73 @@ export default function App() {
         )}
 
         {mobileScreen === "roadmaps" && (
-          <div style={{ padding: "16px", paddingBottom: "96px" }}>
+          <div style={{ padding: "20px 16px", paddingBottom: "100px" }}>
+            {/* Practice + Settings quick access */}
+            <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
+              <button onClick={() => setPracticeOpen(o => !o)}
+                style={{ flex: 1, padding: "11px", background: "#1e1e24", border: "1px solid #2a2a35",
+                  borderRadius: 10, color: "#888", fontSize: 13, fontWeight: 600,
+                  cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center",
+                  justifyContent: "center", gap: 6 }}>
+                🤖 <span>Practice</span>
+              </button>
+              <button onClick={() => setShowManage(true)}
+                style={{ flex: 1, padding: "11px", background: "#1e1e24", border: "1px solid #2a2a35",
+                  borderRadius: 10, color: "#888", fontSize: 13, fontWeight: 600,
+                  cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center",
+                  justifyContent: "center", gap: 6 }}>
+                ⚙️ <span>Settings</span>
+              </button>
+            </div>
+
+            {/* Daily goal */}
+            <DailyGoalWidget goal={goal} todayCount={todayCount} pct={goalPct}
+              goalMet={goalMet} goalStreak={goalStreak} onSetGoal={setGoal}
+              color={rm?.color || "#7b5ea7"} />
+
+            {/* Study timer */}
+            <StudyTimer color={rm?.color || "#7b5ea7"} isMobile={true} />
+
+            {/* Roadmap cards — clean & simple */}
+            <div style={{ fontSize: 11, color: "#444", textTransform: "uppercase",
+              letterSpacing: 1, marginBottom: 12 }}>Your Roadmaps</div>
             {Object.values(roadmaps).map(val => {
               const s = getRoadmapStats(val, progress);
               return (
                 <div key={val.id} onClick={() => goToRoadmap(val.id)}
-                  style={{ background: "#16161b", border: `1px solid ${val.color}44`, borderRadius: 12,
-                    padding: "16px", marginBottom: 12, cursor: "pointer", display: "flex", alignItems: "center", gap: 14 }}>
-                  <div style={{ position: "relative", width: 56, height: 56, flexShrink: 0 }}>
-                    <RadialProgress pct={s.pct} color={val.color} size={56} />
-                    <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center",
-                      justifyContent: "center", fontSize: 11, fontWeight: 700, color: "#fff" }}>{s.pct}%</div>
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 16, fontWeight: 700, color: "#fff", marginBottom: 2 }}>{val.label}</div>
-                    <div style={{ fontSize: 12, color: val.accent, marginBottom: 8 }}>{s.done} / {s.total} topics</div>
-                    <div style={{ background: "#0f0f13", borderRadius: 4, height: 4, overflow: "hidden" }}>
-                      <div style={{ height: "100%", width: `${s.pct}%`, background: val.color, borderRadius: 4 }} />
+                  style={{ background: "#16161b", borderRadius: 12, marginBottom: 10,
+                    cursor: "pointer", overflow: "hidden",
+                    border: `1px solid ${val.color}33` }}>
+                  {/* Color accent bar */}
+                  <div style={{ height: 3, background: val.color, width: `${s.pct}%`,
+                    minWidth: s.pct > 0 ? 8 : 0, transition: "width 0.4s" }} />
+                  <div style={{ padding: "14px 16px", display: "flex", alignItems: "center", gap: 12 }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 15, fontWeight: 700, color: "#fff", marginBottom: 3 }}>{val.label}</div>
+                      <div style={{ fontSize: 12, color: "#555" }}>{s.done} of {s.total} topics</div>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <span style={{ fontSize: 16, fontWeight: 700, color: s.pct > 0 ? val.color : "#333" }}>
+                        {s.pct}%
+                      </span>
+                      <span style={{ color: "#333", fontSize: 18 }}>›</span>
                     </div>
                   </div>
-                  <span style={{ color: "#444", fontSize: 20 }}>›</span>
                 </div>
               );
             })}
+
+            {Object.keys(roadmaps).length === 0 && (
+              <div style={{ textAlign: "center", padding: "40px 20px", color: "#444" }}>
+                <div style={{ fontSize: 32, marginBottom: 10 }}>📚</div>
+                <div style={{ fontSize: 14, marginBottom: 8 }}>No roadmaps yet</div>
+                <button onClick={() => setShowManage(true)}
+                  style={{ padding: "10px 20px", background: "#7b5ea7", border: "none",
+                    borderRadius: 8, color: "#fff", fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>
+                  Create your first roadmap
+                </button>
+              </div>
+            )}
           </div>
         )}
 
@@ -509,7 +561,17 @@ export default function App() {
             quest={getQuest(activeQuestRmId)} rmId={activeQuestRmId}
             roadmaps={roadmaps} progress={progress}
             onAdvancePhase={advancePhase}
-            onCompleteQuest={completeQuest}
+            onCompleteQuest={(rmId, passed, allResults, activePhases) => {
+              completeQuest(rmId, passed);
+              if (!passed) return null;
+              const prevXP  = xpData.xp || 0;
+              const apiKey  = loadAIConfig().keys?.groq?.trim();
+              return {
+                prevXP,
+                xpData,
+                awardXP: () => awardQuestXP(getQuest(rmId) || {}, allResults, activePhases, true, apiKey),
+              };
+            }}
             onClose={() => setActiveQuestRmId(null)}
           />
         )}
@@ -524,11 +586,11 @@ export default function App() {
             const active = ["roadmaps","sections","topics","nextup"].includes(mobileScreen);
             return (
               <button onClick={() => setMobileScreen("roadmaps")}
-                style={{ flex: 1, padding: "10px 4px 12px", border: "none", background: "transparent",
-                  color: active ? (rm?.color || "#7b5ea7") : "#555", cursor: "pointer", fontFamily: "inherit",
+                style={{ flex: 1, padding: "12px 4px 14px", border: "none", background: "transparent",
+                  color: active ? (rm?.color || "#7b5ea7") : "#444", cursor: "pointer", fontFamily: "inherit",
                   borderTop: active ? `2px solid ${rm?.color || "#7b5ea7"}` : "2px solid transparent" }}>
-                <div style={{ fontSize: 18, marginBottom: 2 }}>📚</div>
-                <div style={{ fontSize: 10, fontWeight: active ? 700 : 400 }}>Learn</div>
+                <div style={{ fontSize: 20, marginBottom: 3 }}>📚</div>
+                <div style={{ fontSize: 10, fontWeight: active ? 700 : 400, letterSpacing: 0.3 }}>Learn</div>
               </button>
             );
           })()}
@@ -538,12 +600,12 @@ export default function App() {
             const hasActive = Object.values(quests).some(q => q?.status === "active");
             return (
               <button onClick={() => setMobileScreen("quests")}
-                style={{ flex: 1, padding: "10px 4px 12px", border: "none", background: "transparent",
-                  color: active ? "#c4b5fd" : "#555", cursor: "pointer", fontFamily: "inherit",
+                style={{ flex: 1, padding: "12px 4px 14px", border: "none", background: "transparent",
+                  color: active ? "#c4b5fd" : "#444", cursor: "pointer", fontFamily: "inherit",
                   borderTop: active ? "2px solid #7b5ea7" : "2px solid transparent",
                   position: "relative" }}>
-                <div style={{ fontSize: 18, marginBottom: 2 }}>🎯</div>
-                <div style={{ fontSize: 10, fontWeight: active ? 700 : 400 }}>Quests</div>
+                <div style={{ fontSize: 20, marginBottom: 3 }}>🎯</div>
+                <div style={{ fontSize: 10, fontWeight: active ? 700 : 400, letterSpacing: 0.3 }}>Quests</div>
                 {hasActive && !active && (
                   <div style={{ position: "absolute", top: 8, right: "calc(50% - 14px)",
                     width: 7, height: 7, borderRadius: "50%", background: "#7b5ea7" }} />
@@ -556,11 +618,11 @@ export default function App() {
             const active = mobileScreen === "dashboard";
             return (
               <button onClick={() => setMobileScreen("dashboard")}
-                style={{ flex: 1, padding: "10px 4px 12px", border: "none", background: "transparent",
-                  color: active ? "#c4b5fd" : "#555", cursor: "pointer", fontFamily: "inherit",
+                style={{ flex: 1, padding: "12px 4px 14px", border: "none", background: "transparent",
+                  color: active ? "#c4b5fd" : "#444", cursor: "pointer", fontFamily: "inherit",
                   borderTop: active ? "2px solid #7b5ea7" : "2px solid transparent" }}>
-                <div style={{ fontSize: 18, marginBottom: 2 }}>📊</div>
-                <div style={{ fontSize: 10, fontWeight: active ? 700 : 400 }}>Dashboard</div>
+                <div style={{ fontSize: 20, marginBottom: 3 }}>📊</div>
+                <div style={{ fontSize: 10, fontWeight: active ? 700 : 400, letterSpacing: 0.3 }}>Dashboard</div>
               </button>
             );
           })()}
@@ -570,11 +632,18 @@ export default function App() {
       <SearchOverlay open={searchOpen} onClose={() => setSearchOpen(false)}
         roadmaps={roadmaps} notes={notes} resources={resources}
         onNavigate={handleSearchNavigate} isMobile={isMobile} />
+      {certificate && (
+        <CompletionCertificate
+          roadmap={certificate.rm}
+          stats={certificate.stats}
+          onClose={() => setCertificate(null)}
+        />
+      )}
       <InstallPrompt />
       {feedback    && <Toast feedback={feedback} isMobile={isMobile} />}
       {noteModal   && <NoteModal noteModal={noteModal} roadmaps={roadmaps} notes={notes}
                         resources={resources} topicMeta={topicMeta} onSave={saveNote} onClose={() => setNoteModal(null)} />}
-      {showManage  && <ManageModal roadmaps={roadmaps} onClose={() => setShowManage(false)}
+      {showManage  && <ManageModal roadmaps={roadmaps} defaultTab={manageTab} onClose={() => { setShowManage(false); setManageTab("roadmaps"); }}
                         onImportRoadmap={handleImportRoadmap} onDelete={handleDeleteRoadmap}
                         onExportBackup={handleExport} onImportBackup={handleImportBackup}
                         onGetSnapshot={handleGetSnapshot} onApplySnapshot={handleApplySnapshot}
@@ -583,6 +652,7 @@ export default function App() {
       {editorModal !== null && <RoadmapEditorModal existing={editorModal.existing}
                         onSave={handleSaveRoadmap} onClose={() => setEditorModal(null)} />}
       <PracticePanel open={practiceOpen} onClose={() => setPracticeOpen(false)}
+        onOpenSettings={() => { setManageTab("settings"); setShowManage(true); }}
         roadmap={rm} roadmaps={roadmaps} progress={progress}
         notes={notes} resources={resources} topicMeta={topicMeta} curSection={curSec} isMobile={isMobile}
         onSaveToNotes={appendToNote} quizResults={quizResults}
@@ -637,6 +707,7 @@ export default function App() {
                     fontFamily: "inherit", fontSize: 13, fontWeight: active ? 700 : 400,
                     background: active ? val.color : "#1a1a1f", color: active ? "#fff" : "#888", position: "relative", top: 1 }}>
                   {val.label} <span style={{ fontSize: 11, opacity: 0.75, marginLeft: 4 }}>{s.pct}%</span>
+                  {s.pct === 100 && <span style={{ marginLeft: 4 }}>🎓</span>}
                 </button>
               );
             })}
@@ -647,7 +718,8 @@ export default function App() {
       {view === "dashboard" && (
         <Dashboard roadmaps={roadmaps} progress={progress} notes={notes} resources={resources}
           topicMeta={topicMeta} isMobile={false} quizResults={quizResults}
-          onOpenRoadmap={(key) => { setActiveRoadmap(key); setView("sections"); setActiveSection(null); }} />
+          onOpenRoadmap={(key) => { setActiveRoadmap(key); setView("sections"); setActiveSection(null); }}
+          onOpenNote={(modal) => setNoteModal(modal)} />
       )}
 
       {view !== "dashboard" && rm && (
@@ -660,6 +732,14 @@ export default function App() {
                 <div style={{ height: "100%", width: `${stats.pct}%`, background: rm.color, borderRadius: 4, transition: "width 0.4s" }} />
               </div>
               <div style={{ fontSize: 12, color: rm.accent, marginTop: 4 }}>{stats.done} / {stats.total}</div>
+              {stats.pct === 100 && (
+                <button onClick={() => setCertificate({ rm, stats })}
+                  style={{ width: "100%", marginTop: 8, padding: "6px", background: rm.color + "22",
+                    border: `1px solid ${rm.color}44`, borderRadius: 6, color: rm.accent,
+                    fontSize: 11, cursor: "pointer", fontFamily: "inherit", fontWeight: 700 }}>
+                  🎓 View Certificate
+                </button>
+              )}
             </div>
             <div style={{ padding: "8px 14px", borderBottom: "1px solid #1e1e24", display: "flex", flexDirection: "column", gap: 6 }}>
               <button onClick={() => setView(v => v === "nextup" ? "sections" : "nextup")}
@@ -690,6 +770,13 @@ export default function App() {
 
           {/* Main content */}
           <div style={{ flex: 1, overflowY: "auto", padding: "22px 26px" }}>
+            {/* Daily goal + timer row */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 20 }}>
+              <DailyGoalWidget goal={goal} todayCount={todayCount} pct={goalPct}
+                goalMet={goalMet} goalStreak={goalStreak} onSetGoal={setGoal}
+                color={rm?.color || "#7b5ea7"} />
+              <StudyTimer color={rm?.color || "#7b5ea7"} isMobile={false} />
+            </div>
             {/* Collapsible Quest Board */}
             <div style={{ marginBottom: 20 }}>
               <button onClick={() => setQuestBoardOpen(o => !o)}
@@ -756,11 +843,18 @@ export default function App() {
       <SearchOverlay open={searchOpen} onClose={() => setSearchOpen(false)}
         roadmaps={roadmaps} notes={notes} resources={resources}
         onNavigate={handleSearchNavigate} isMobile={isMobile} />
+      {certificate && (
+        <CompletionCertificate
+          roadmap={certificate.rm}
+          stats={certificate.stats}
+          onClose={() => setCertificate(null)}
+        />
+      )}
       <InstallPrompt />
       {feedback    && <Toast feedback={feedback} isMobile={isMobile} />}
       {noteModal   && <NoteModal noteModal={noteModal} roadmaps={roadmaps} notes={notes}
                         resources={resources} topicMeta={topicMeta} onSave={saveNote} onClose={() => setNoteModal(null)} />}
-      {showManage  && <ManageModal roadmaps={roadmaps} onClose={() => setShowManage(false)}
+      {showManage  && <ManageModal roadmaps={roadmaps} defaultTab={manageTab} onClose={() => { setShowManage(false); setManageTab("roadmaps"); }}
                         onImportRoadmap={handleImportRoadmap} onDelete={handleDeleteRoadmap}
                         onExportBackup={handleExport} onImportBackup={handleImportBackup}
                         onGetSnapshot={handleGetSnapshot} onApplySnapshot={handleApplySnapshot}
@@ -769,6 +863,7 @@ export default function App() {
       {editorModal !== null && <RoadmapEditorModal existing={editorModal.existing}
                         onSave={handleSaveRoadmap} onClose={() => setEditorModal(null)} />}
       <PracticePanel open={practiceOpen} onClose={() => setPracticeOpen(false)}
+        onOpenSettings={() => { setManageTab("settings"); setShowManage(true); }}
         roadmap={rm} roadmaps={roadmaps} progress={progress}
         notes={notes} resources={resources} topicMeta={topicMeta} curSection={curSec} isMobile={isMobile}
         onSaveToNotes={appendToNote} quizResults={quizResults}

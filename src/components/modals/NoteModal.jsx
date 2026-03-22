@@ -9,7 +9,8 @@ import { TOPIC_DIFFICULTIES, TIME_ESTIMATE_OPTIONS, RESOURCE_TYPES } from "../..
 
 const DIFFICULTIES = TOPIC_DIFFICULTIES;
 
-export function NoteModal({ noteModal, roadmaps, notes, resources, topicMeta, onSave, onClose }) {
+export function NoteModal({ noteModal, roadmaps, notes, resources, topicMeta, onSave, onClose, readOnly = false }) {
+  const isMobile = window.innerWidth < 768;
   const { roadmap: rmKey, topic } = noteModal;
   const rm = roadmaps[rmKey];
 
@@ -118,11 +119,24 @@ export function NoteModal({ noteModal, roadmaps, notes, resources, topicMeta, on
   const tabs = ["notes", "resources", "meta"];
 
   return (
-    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)",
-      display: "flex", alignItems: "center", justifyContent: "center", zIndex: 200, padding: "8px" }}>
-      <div onClick={e => e.stopPropagation()} style={{ background: "#16161b", border: "1px solid #2a2a35",
-        borderRadius: 12, width: "100%", maxWidth: expanded && tab === "notes" ? 820 : 620, boxShadow: "0 20px 60px rgba(0,0,0,0.6)", transition: "max-width 0.2s",
-        display: "flex", flexDirection: "column", maxHeight: "92vh", boxSizing: "border-box" }}>
+    <div onClick={onClose} style={{ position: "fixed", inset: 0,
+      background: isMobile ? "#13131a" : "rgba(0,0,0,0.75)",
+      display: "flex", alignItems: isMobile ? "flex-start" : "center",
+      justifyContent: "center", zIndex: 200,
+      padding: isMobile ? 0 : "8px" }}>
+      <div onClick={e => e.stopPropagation()} style={{
+        background: "#16161b",
+        border: isMobile ? "none" : "1px solid #2a2a35",
+        borderRadius: isMobile ? 0 : 12,
+        width: "100%",
+        maxWidth: isMobile ? "100%" : (expanded && tab === "notes" ? 820 : 620),
+        boxShadow: isMobile ? "none" : "0 20px 60px rgba(0,0,0,0.6)",
+        transition: "max-width 0.2s",
+        display: "flex", flexDirection: "column",
+        height: isMobile ? "100dvh" : "auto",
+        maxHeight: isMobile ? "100dvh" : "92vh",
+        paddingTop: isMobile ? "env(safe-area-inset-top)" : 0,
+        boxSizing: "border-box" }}>
 
         {/* Header */}
         <div style={{ padding: "18px 20px 0" }}>
@@ -152,11 +166,13 @@ export function NoteModal({ noteModal, roadmaps, notes, resources, topicMeta, on
         </div>
 
         {/* Tab content */}
-        <div style={{ padding: "16px 20px", overflowY: "auto", flex: 1 }}>
+        <div style={{ padding: "16px 20px", overflowY: "auto", flex: 1,
+          display: "flex", flexDirection: "column", minHeight: 0 }}>
 
           {/* ── Notes tab ── */}
           {tab === "notes" && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8,
+              flex: isMobile ? 1 : "none", minHeight: 0 }}>
               <div style={{ display: "flex", justifyContent: "flex-end", gap: 6 }}>
                 {editing && (
                   <button onClick={() => setExpanded(v => !v)}
@@ -178,16 +194,19 @@ export function NoteModal({ noteModal, roadmaps, notes, resources, topicMeta, on
                 <textarea ref={textareaRef} value={note} onChange={e => setNote(e.target.value)}
                   autoFocus
                   placeholder="Add your notes, key concepts, takeaways…"
-                  style={{ width: "100%", minHeight: expanded ? 420 : 220,
+                  style={{ width: "100%", minHeight: isMobile ? 0 : (expanded ? 420 : 220),
+                    flex: isMobile ? 1 : "none",
                     background: "#0f0f13", border: "1px solid #2a2a35",
-                    borderRadius: 7, padding: "12px 14px", color: "#e8e6e0",
-                    fontSize: expanded ? 15 : 14, fontFamily: "inherit",
-                    resize: "vertical", outline: "none", boxSizing: "border-box", lineHeight: 1.8 }} />
+                    borderRadius: 7, padding: "14px 16px", color: "#e8e6e0",
+                    fontSize: 15, fontFamily: "inherit",
+                    resize: isMobile ? "none" : "vertical",
+                    outline: "none", boxSizing: "border-box", lineHeight: 1.9 }} />
               ) : (
                 <div onClick={() => setEditing(true)}
-                  style={{ width: "100%", minHeight: 220,
+                  style={{ width: "100%", minHeight: isMobile ? 0 : 220,
+                    flex: isMobile ? 1 : "none",
                     background: "#0f0f13", border: "1px solid #1e1e24",
-                    borderRadius: 7, padding: "12px 14px", color: note ? "#e8e6e0" : "#444",
+                    borderRadius: 7, padding: "14px 16px", color: note ? "#e8e6e0" : "#444",
                     fontSize: 14, fontFamily: "inherit", lineHeight: 1.8,
                     whiteSpace: "pre-wrap", wordBreak: "break-word",
                     cursor: "text", boxSizing: "border-box" }}>
