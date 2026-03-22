@@ -1,4 +1,6 @@
-import { RadialProgress } from "../ui/RadialProgress.jsx";
+import { useState }          from "react";
+import { RadialProgress }    from "../ui/RadialProgress.jsx";
+import { useXP, MILESTONE_BADGES, getLevel, getNextLevel } from "../../hooks/useXP.js";
 import { getRoadmapStats, getTotalStats, getNextUp } from "../../utils/roadmap.js";
 import { getPerformanceStats } from "../../utils/performance.js";
 import { flatTopicNames } from "../../utils/topics.js";
@@ -37,8 +39,32 @@ function TopicPill({ topic, rmLabel, rmColor, rmAccent, bestScore, proficiency =
   );
 }
 
+
+function Section({ title, defaultOpen = true, children, isMobile }) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div style={{ background: "#16161b", borderRadius: 12, border: "1px solid #1e1e24",
+      marginBottom: 12, overflow: "hidden" }}>
+      <button onClick={() => setOpen(o => !o)}
+        style={{ width: "100%", padding: "14px 16px", background: "transparent", border: "none",
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          cursor: "pointer", fontFamily: "inherit" }}>
+        <span style={{ fontSize: 13, fontWeight: 700, color: "#ccc" }}>{title}</span>
+        <span style={{ fontSize: 14, color: "#444", transition: "transform 0.2s",
+          transform: open ? "rotate(180deg)" : "rotate(0deg)" }}>▾</span>
+      </button>
+      {open && <div style={{ padding: "0 16px 16px" }}>{children}</div>}
+    </div>
+  );
+}
+
 export function Dashboard({ roadmaps, progress, notes, resources, topicMeta,
-  quizResults = {}, isMobile, onOpenRoadmap }) {
+  quizResults = {}, isMobile, onOpenRoadmap, onOpenNote }) {
+  const { xpData } = useXP();
+  const level      = getLevel(xpData?.xp || 0);
+  const nextLevel  = getNextLevel(xpData?.xp || 0);
+  const xp         = xpData?.xp || 0;
+  const pct        = nextLevel ? Math.round(((xp - level.min) / (nextLevel.min - level.min)) * 100) : 100;
 
   const t        = getTotalStats(roadmaps, progress);
   const allNotes = Object.entries(notes).filter(([, v]) => v?.trim());
@@ -57,7 +83,7 @@ export function Dashboard({ roadmaps, progress, notes, resources, topicMeta,
   );
 
   return (
-    <div style={{ padding: isMobile ? "16px" : "28px", overflowY: "auto",
+    <div style={{ padding: isMobile ? "12px" : "28px", overflowY: "auto",
       maxHeight: isMobile ? "calc(100dvh - 56px)" : "calc(100vh - 88px)",
       paddingBottom: isMobile ? "90px" : "40px" }}>
 
@@ -265,6 +291,84 @@ export function Dashboard({ roadmaps, progress, notes, resources, topicMeta,
         })}
       </div>
 
+      {/* ── XP & Badges ── */}
+      <div style={card}>
+        {/* XP Level bar */}
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
+          <span style={{ fontSize: 28 }}>{level.icon}</span>
+          <div style={{ flex: 1 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+              <span style={{ fontSize: 14, fontWeight: 700, color: level.color }}>{level.name}</span>
+              <span style={{ fontSize: 13, color: "#888", fontVariantNumeric: "tabular-nums" }}>{xp.toLocaleString()} XP</span>
+            </div>
+            <div style={{ background: "#1e1e24", borderRadius: 4, height: 7, overflow: "hidden" }}>
+              <div style={{ height: "100%", width: `${pct}%`, background: level.color, borderRadius: 4, transition: "width 0.5s" }} />
+            </div>
+            {nextLevel && (
+              <div style={{ fontSize: 11, color: "#444", marginTop: 4 }}>
+                {(nextLevel.min - xp).toLocaleString()} XP to {nextLevel.icon} {nextLevel.name}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Milestone badges */}
+        {label(`🏅 Milestone Badges (${(xpData?.badges || []).length} / ${MILESTONE_BADGES.length})`)}
+        <div style={{ display: "grid",
+          gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(auto-fill, minmax(200px, 1fr))",
+          gap: 8, marginBottom: (xpData?.aiBadges?.length > 0) ? 16 : 0 }}>
+          {MILESTONE_BADGES.map(badge => {
+            const earned = (xpData?.badges || []).includes(badge.id);
+            return (
+              <div key={badge.id} style={{ display: "flex", alignItems: "center", gap: 8,
+                background: earned ? "#16161b" : "#0f0f13",
+                border: `1px solid ${earned ? "#2a2a35" : "#1a1a1a"}`,
+                borderRadius: 8, padding: "8px 10px",
+                opacity: earned ? 1 : 0.4 }}>
+                <span style={{ fontSize: 20, flexShrink: 0 }}>{badge.icon}</span>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: earned ? "#ccc" : "#444",
+                    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {badge.name}
+                  </div>
+                  <div style={{ fontSize: 10, color: "#555", overflow: "hidden",
+                    textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{badge.desc}</div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* AI story badges */}
+        {(xpData?.aiBadges || []).length > 0 && (
+          <>
+            {label(`✨ Story Badges (${(xpData?.aiBadges || []).length})`)}
+            <div style={{ display: "grid",
+              gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill, minmax(220px, 1fr))",
+              gap: 8 }}>
+              {[...(xpData?.aiBadges || [])].reverse().map(badge => (
+                <div key={badge.id} style={{ display: "flex", alignItems: "center", gap: 8,
+                  background: "#1a1a2e", border: "1px solid #7b5ea733",
+                  borderRadius: 8, padding: "8px 10px" }}>
+                  <span style={{ fontSize: 20, flexShrink: 0 }}>{badge.icon}</span>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 2 }}>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: "#c4b5fd",
+                        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {badge.name}
+                      </span>
+                      <span style={{ fontSize: 9, background: "#7b5ea733", color: "#c4b5fd",
+                        borderRadius: 3, padding: "1px 4px", flexShrink: 0 }}>AI</span>
+                    </div>
+                    <div style={{ fontSize: 10, color: "#555", lineHeight: 1.4 }}>{badge.desc}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+
       {/* ── Notes ── */}
       {allNotes.length > 0 && (
         <div style={card}>
@@ -275,10 +379,17 @@ export function Dashboard({ roadmaps, progress, notes, resources, topicMeta,
               const [rmId, topic] = key.split("::");
               const val = roadmaps[rmId];
               return (
-                <div key={key} style={{ background: "#0f0f13", border: `1px solid ${val?.color}22`,
-                  borderRadius: 8, padding: "10px 12px" }}>
-                  <div style={{ fontSize: 10, color: val?.accent, marginBottom: 4 }}>
-                    {val?.label} · {topic}
+                <div key={key}
+                  onClick={() => onOpenNote?.({ roadmap: rmId, topic })}
+                  style={{ background: "#0f0f13", border: `1px solid ${val?.color}22`,
+                    borderRadius: 8, padding: "10px 12px",
+                    cursor: onOpenNote ? "pointer" : "default",
+                    transition: "border-color 0.15s" }}
+                  onMouseEnter={e => { if (onOpenNote) e.currentTarget.style.borderColor = (val?.color || "#7b5ea7") + "55"; }}
+                  onMouseLeave={e => { if (onOpenNote) e.currentTarget.style.borderColor = (val?.color || "#7b5ea7") + "22"; }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                    <div style={{ fontSize: 10, color: val?.accent }}>{val?.label} · {topic}</div>
+                    {onOpenNote && <span style={{ fontSize: 11, color: "#444" }}>↗</span>}
                   </div>
                   <div style={{ fontSize: 12, color: "#666", overflow: "hidden", display: "-webkit-box",
                     WebkitLineClamp: 2, WebkitBoxOrient: "vertical", lineHeight: 1.5 }}>{text}</div>

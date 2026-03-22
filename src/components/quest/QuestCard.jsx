@@ -140,7 +140,7 @@ export function QuestCard({ rm, quest, loading, onBegin, onGenerate, isOnCooldow
 
 // Quest board — grid of all roadmap quest cards
 export function QuestBoard({ roadmaps, quests, loadingRmIds = [], onBegin, onGenerate,
-  isOnCooldown, cooldownRemaining, isMobile }) {
+  isOnCooldown, cooldownRemaining, isMobile, singleColumn = false }) {
 
   const rmList = Object.values(roadmaps);
   if (!rmList.length) return null;
@@ -150,8 +150,8 @@ export function QuestBoard({ roadmaps, quests, loadingRmIds = [], onBegin, onGen
       {/* Cards grid */}
       <div style={{
         display: "grid",
-        gridTemplateColumns: isMobile
-          ? rmList.length === 1 ? "1fr" : "repeat(2, 1fr)"
+        gridTemplateColumns: singleColumn || rmList.length === 1 ? "1fr"
+          : isMobile ? "repeat(2, 1fr)"
           : "repeat(auto-fill, minmax(220px, 1fr))",
         gap: 10,
       }}>

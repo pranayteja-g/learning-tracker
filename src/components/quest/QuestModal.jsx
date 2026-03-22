@@ -3,8 +3,9 @@ import { callAI, loadAIConfig } from "../../ai/providers.js";
 import { buildQuizPrompt, buildCodeChallengePrompt } from "../../ai/prompts.js";
 import { buildQuizContext } from "../../ai/context.js";
 import { safeParseJSON } from "../../utils/jsonParse.js";
-import { QuizView }      from "../ai/QuizView.jsx";
-import { CodeWriteView } from "../ai/CodeWriteView.jsx";
+import { QuizView }           from "../ai/QuizView.jsx";
+import { CodeWriteView }      from "../ai/CodeWriteView.jsx";
+import { QuestRewardScreen }  from "./QuestRewardScreen.jsx";
 
 const ALL_PHASES = [
   { name: "📖 Read", key: "read",  pass: null, next: "MCQ Quiz"          },
@@ -279,7 +280,8 @@ function ReadPhase({ quest, onComplete }) {
 // ── Main QuestModal ───────────────────────────────────────────────────────────
 export function QuestModal({ quest, rmId, roadmaps, progress, onAdvancePhase, onCompleteQuest, onClose }) {
   const [phaseData,    setPhaseData]    = useState(null);
-  const [phaseResult,  setPhaseResult]  = useState(null); // show result between phases
+  const [phaseResult,  setPhaseResult]  = useState(null);
+  const [rewardData,   setRewardData]   = useState(null);  // show reward on full completion
   const [loadingPhase, setLoadingPhase] = useState(false);
   const [error,        setError]        = useState("");
 
@@ -337,14 +339,30 @@ export function QuestModal({ quest, rmId, roadmaps, progress, onAdvancePhase, on
       onCompleteQuest(rmId, false);
     }
 
-    // If last phase passed, complete as passed
+    // If last phase passed, complete as passed and show reward
     if (currentPhase === activePhases.length - 1 && result.passed) {
       const allResults = { ...quest.phaseResults, [currentPhase]: result };
-      const mcqIdx = activePhases.findIndex(p => p.key === "mcq");
+      const mcqIdx  = activePhases.findIndex(p => p.key === "mcq");
       const codeIdx = activePhases.findIndex(p => p.key === "code");
-      const mcqPassed  = mcqIdx >= 0 ? (allResults[mcqIdx]?.score || 0) >= 80 : true;
+      const mcqPassed  = mcqIdx  >= 0 ? (allResults[mcqIdx]?.score  || 0) >= 80 : true;
       const codePassed = codeIdx >= 0 ? (allResults[codeIdx]?.score || 0) >= 70 : true;
-      onCompleteQuest(rmId, mcqPassed && codePassed && result.passed);
+      const passed = mcqPassed && codePassed && result.passed;
+      const rewardInfo = onCompleteQuest(rmId, passed, allResults, activePhases);
+      if (passed && rewardInfo) {
+        const prevXP = rewardInfo.prevXP || 0;
+        // awardXP is async (AI badge generation) — await it then show reward
+        rewardInfo.awardXP?.().then(result => {
+          setRewardData({
+            phaseResults: allResults,
+            activePhases,
+            xpEarned:  result?.earned || 0,
+            prevXP,
+            newXP:     prevXP + (result?.earned || 0),
+            newBadges: rewardInfo.xpData?.lastNewBadges || [],
+            aiBadge:   result?.aiBadge || null,
+          });
+        });
+      }
     }
   };
 
@@ -401,8 +419,23 @@ export function QuestModal({ quest, rmId, roadmaps, progress, onAdvancePhase, on
       {/* Content */}
       <div style={{ flex: 1, overflowY: "auto", paddingBottom: "env(safe-area-inset-bottom)" }}>
 
+        {/* Reward screen */}
+        {rewardData && (
+          <QuestRewardScreen
+            quest={quest}
+            phaseResults={rewardData.phaseResults}
+            activePhases={rewardData.activePhases}
+            xpEarned={rewardData.xpEarned}
+            prevXP={rewardData.prevXP}
+            newXP={rewardData.newXP}
+            newBadges={rewardData.newBadges}
+            aiBadge={rewardData.aiBadge}
+            onClose={onClose}
+          />
+        )}
+
         {/* Phase result screen */}
-        {phaseResult && (
+        {!rewardData && phaseResult && (
           <PhaseResult
             phase={phaseResult.phase}
             result={phaseResult.result}
