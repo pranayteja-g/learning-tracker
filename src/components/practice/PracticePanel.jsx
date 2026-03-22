@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { callAI, loadAIConfig, saveAIConfig, PROVIDERS } from "../../ai/providers.js";
 import { useUsage } from "../../ai/useUsage.js";
 import { allTopicNames, flatTopicNames } from "../../utils/topics.js";
@@ -64,6 +64,7 @@ export function PracticePanel({ open, onClose, onOpenSettings, roadmap, roadmaps
   const [timeSecs,     setTimeSecs]     = useState(600);
   const [selRmKeys,    setSelRmKeys]    = useState([]);
   const [result,       setResult]       = useState(null);
+  const savedResultRef                  = useRef(null);
   const [loading,      setLoading]      = useState(false);
   const [error,        setError]        = useState("");
 
@@ -79,6 +80,15 @@ export function PracticePanel({ open, onClose, onOpenSettings, roadmap, roadmaps
   const barColor = pct >= 90 ? "#e05252" : pct >= 70 ? "#ee9b00" : "#52b788";
 
   const switchTab = (t) => { setTab(t); setResult(null); setError(""); };
+  const handleStudyModeChange = (mode) => {
+    setStudyMode(mode);
+    if (mode === "project" && savedResultRef.current?.studyMode === "project") {
+      setResult(savedResultRef.current);
+    } else if (mode !== "project") {
+      setResult(null);
+    }
+    setError("");
+  };
 
   const generate = async () => {
     if (!rm || !hasKey) return;
@@ -146,7 +156,9 @@ export function PracticePanel({ open, onClose, onOpenSettings, roadmap, roadmaps
       const maxTokens = isJsonMode ? Math.max(8192, qCount * 400) : 2048;
       const { text, usage: u } = await callAI({ provider, apiKey, systemPrompt: sys, userPrompt, maxTokens });
       recordUsage(u);
-      setResult({ tab, studyMode, intMode, data: safeParseJSON(text) });
+      const r = { tab, studyMode, intMode, data: safeParseJSON(text) };
+      setResult(r);
+      if (studyMode === "project") savedResultRef.current = r;
     } catch (e) {
       setError(e.message || "Something went wrong.");
     } finally {
@@ -296,6 +308,7 @@ export function PracticePanel({ open, onClose, onOpenSettings, roadmap, roadmaps
                       ))}
                     </div>
                   </div>
+                  {studyMode !== "project" && (
                   <div>
                     <div style={labelStyle}>Questions</div>
                     <div style={{ display: "flex", gap: 5 }}>
@@ -307,6 +320,7 @@ export function PracticePanel({ open, onClose, onOpenSettings, roadmap, roadmaps
                       ))}
                     </div>
                   </div>
+                  )}
                   {studyMode === "project" && (
                 <div>
                   <div style={labelStyle}>Project Scale</div>
