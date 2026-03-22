@@ -1,4 +1,5 @@
 import { useState }          from "react";
+import { ClippingsSection }   from "./ClippingsSection.jsx";
 import { RadialProgress }    from "../ui/RadialProgress.jsx";
 import { useXP, MILESTONE_BADGES, getLevel, getNextLevel } from "../../hooks/useXP.js";
 import { getRoadmapStats, getTotalStats, getNextUp } from "../../utils/roadmap.js";
@@ -59,7 +60,8 @@ function Section({ title, defaultOpen = true, children, isMobile }) {
 }
 
 export function Dashboard({ roadmaps, progress, notes, resources, topicMeta,
-  quizResults = {}, isMobile, onOpenRoadmap, onOpenNote }) {
+  quizResults = {}, isMobile, onOpenRoadmap, onOpenNote,
+  clippings = [], onAddClipping, onUpdateClipping, onDeleteClipping }) {
   const { xpData } = useXP();
   const level      = getLevel(xpData?.xp || 0);
   const nextLevel  = getNextLevel(xpData?.xp || 0);
@@ -376,6 +378,18 @@ export function Dashboard({ roadmaps, progress, notes, resources, topicMeta,
           </div>
         </div>
       )}
+
+      {/* ── Clippings ── */}
+      <div style={{ background: "#16161b", borderRadius: 12, border: "1px solid #1e1e24",
+        padding: "16px", marginBottom: 12 }}>
+        <ClippingsSection
+          clippings={clippings}
+          onAdd={onAddClipping}
+          onUpdate={onUpdateClipping}
+          onDelete={onDeleteClipping}
+          isMobile={isMobile}
+        />
+      </div>
 
       {/* ── Notes ── */}
       {allNotes.length > 0 && (
