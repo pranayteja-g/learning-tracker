@@ -7,11 +7,11 @@ import { flatTopicNames } from "../../utils/topics.js";
 import { loadAIConfig, saveAIConfig, PROVIDERS } from "../../ai/providers.js";
 
 export function ManageModal({ roadmaps, onClose, onImportRoadmap, onDelete, onEdit, onCreate,
-  onExportBackup, onImportBackup, onGetSnapshot, onApplySnapshot }) {
+  onExportBackup, onImportBackup, onGetSnapshot, onApplySnapshot, defaultTab = "roadmaps" }) {
 
   const fileRef = useRef(null);
   const backupRef = useRef(null);
-  const [tab, setTab] = useState("roadmaps");
+  const [tab, setTab] = useState(defaultTab);
   const [aiConfig, setAIConfig] = useState(loadAIConfig);
   const [showKey, setShowKey] = useState({});
 

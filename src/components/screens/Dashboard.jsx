@@ -59,7 +59,7 @@ function Section({ title, defaultOpen = true, children, isMobile }) {
 }
 
 export function Dashboard({ roadmaps, progress, notes, resources, topicMeta,
-  quizResults = {}, isMobile, onOpenRoadmap }) {
+  quizResults = {}, isMobile, onOpenRoadmap, onOpenNote }) {
   const { xpData } = useXP();
   const level      = getLevel(xpData?.xp || 0);
   const nextLevel  = getNextLevel(xpData?.xp || 0);
@@ -379,10 +379,17 @@ export function Dashboard({ roadmaps, progress, notes, resources, topicMeta,
               const [rmId, topic] = key.split("::");
               const val = roadmaps[rmId];
               return (
-                <div key={key} style={{ background: "#0f0f13", border: `1px solid ${val?.color}22`,
-                  borderRadius: 8, padding: "10px 12px" }}>
-                  <div style={{ fontSize: 10, color: val?.accent, marginBottom: 4 }}>
-                    {val?.label} · {topic}
+                <div key={key}
+                  onClick={() => onOpenNote?.({ roadmap: rmId, topic })}
+                  style={{ background: "#0f0f13", border: `1px solid ${val?.color}22`,
+                    borderRadius: 8, padding: "10px 12px",
+                    cursor: onOpenNote ? "pointer" : "default",
+                    transition: "border-color 0.15s" }}
+                  onMouseEnter={e => { if (onOpenNote) e.currentTarget.style.borderColor = (val?.color || "#7b5ea7") + "55"; }}
+                  onMouseLeave={e => { if (onOpenNote) e.currentTarget.style.borderColor = (val?.color || "#7b5ea7") + "22"; }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                    <div style={{ fontSize: 10, color: val?.accent }}>{val?.label} · {topic}</div>
+                    {onOpenNote && <span style={{ fontSize: 11, color: "#444" }}>↗</span>}
                   </div>
                   <div style={{ fontSize: 12, color: "#666", overflow: "hidden", display: "-webkit-box",
                     WebkitLineClamp: 2, WebkitBoxOrient: "vertical", lineHeight: 1.5 }}>{text}</div>

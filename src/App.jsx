@@ -39,6 +39,7 @@ export default function App() {
   const [mobileScreen,   setMobileScreen]   = useState("roadmaps");
   const [noteModal,      setNoteModal]      = useState(null);
   const [showManage,     setShowManage]     = useState(false);
+  const [manageTab,      setManageTab]      = useState("roadmaps");
   const [editorModal,    setEditorModal]    = useState(null);
   const [feedback,       setFeedback]       = useState(null);
   const [practiceOpen,   setPracticeOpen]   = useState(false);
@@ -382,7 +383,8 @@ export default function App() {
 
         {mobileScreen === "dashboard" && (
           <Dashboard roadmaps={roadmaps} progress={progress} notes={notes} resources={resources}
-            topicMeta={topicMeta} isMobile={true} onOpenRoadmap={goToRoadmap} quizResults={quizResults} />
+            topicMeta={topicMeta} isMobile={true} onOpenRoadmap={goToRoadmap} quizResults={quizResults}
+            onOpenNote={(modal) => setNoteModal(modal)} />
         )}
 
         {mobileScreen === "quests" && (
@@ -614,7 +616,7 @@ export default function App() {
       {feedback    && <Toast feedback={feedback} isMobile={isMobile} />}
       {noteModal   && <NoteModal noteModal={noteModal} roadmaps={roadmaps} notes={notes}
                         resources={resources} topicMeta={topicMeta} onSave={saveNote} onClose={() => setNoteModal(null)} />}
-      {showManage  && <ManageModal roadmaps={roadmaps} onClose={() => setShowManage(false)}
+      {showManage  && <ManageModal roadmaps={roadmaps} defaultTab={manageTab} onClose={() => { setShowManage(false); setManageTab("roadmaps"); }}
                         onImportRoadmap={handleImportRoadmap} onDelete={handleDeleteRoadmap}
                         onExportBackup={handleExport} onImportBackup={handleImportBackup}
                         onGetSnapshot={handleGetSnapshot} onApplySnapshot={handleApplySnapshot}
@@ -623,6 +625,7 @@ export default function App() {
       {editorModal !== null && <RoadmapEditorModal existing={editorModal.existing}
                         onSave={handleSaveRoadmap} onClose={() => setEditorModal(null)} />}
       <PracticePanel open={practiceOpen} onClose={() => setPracticeOpen(false)}
+        onOpenSettings={() => { setManageTab("settings"); setShowManage(true); }}
         roadmap={rm} roadmaps={roadmaps} progress={progress}
         notes={notes} resources={resources} topicMeta={topicMeta} curSection={curSec} isMobile={isMobile}
         onSaveToNotes={appendToNote} quizResults={quizResults}
@@ -687,7 +690,8 @@ export default function App() {
       {view === "dashboard" && (
         <Dashboard roadmaps={roadmaps} progress={progress} notes={notes} resources={resources}
           topicMeta={topicMeta} isMobile={false} quizResults={quizResults}
-          onOpenRoadmap={(key) => { setActiveRoadmap(key); setView("sections"); setActiveSection(null); }} />
+          onOpenRoadmap={(key) => { setActiveRoadmap(key); setView("sections"); setActiveSection(null); }}
+          onOpenNote={(modal) => setNoteModal(modal)} />
       )}
 
       {view !== "dashboard" && rm && (
@@ -800,7 +804,7 @@ export default function App() {
       {feedback    && <Toast feedback={feedback} isMobile={isMobile} />}
       {noteModal   && <NoteModal noteModal={noteModal} roadmaps={roadmaps} notes={notes}
                         resources={resources} topicMeta={topicMeta} onSave={saveNote} onClose={() => setNoteModal(null)} />}
-      {showManage  && <ManageModal roadmaps={roadmaps} onClose={() => setShowManage(false)}
+      {showManage  && <ManageModal roadmaps={roadmaps} defaultTab={manageTab} onClose={() => { setShowManage(false); setManageTab("roadmaps"); }}
                         onImportRoadmap={handleImportRoadmap} onDelete={handleDeleteRoadmap}
                         onExportBackup={handleExport} onImportBackup={handleImportBackup}
                         onGetSnapshot={handleGetSnapshot} onApplySnapshot={handleApplySnapshot}
@@ -809,6 +813,7 @@ export default function App() {
       {editorModal !== null && <RoadmapEditorModal existing={editorModal.existing}
                         onSave={handleSaveRoadmap} onClose={() => setEditorModal(null)} />}
       <PracticePanel open={practiceOpen} onClose={() => setPracticeOpen(false)}
+        onOpenSettings={() => { setManageTab("settings"); setShowManage(true); }}
         roadmap={rm} roadmaps={roadmaps} progress={progress}
         notes={notes} resources={resources} topicMeta={topicMeta} curSection={curSec} isMobile={isMobile}
         onSaveToNotes={appendToNote} quizResults={quizResults}
