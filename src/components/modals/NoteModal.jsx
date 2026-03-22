@@ -34,6 +34,10 @@ export function NoteModal({ noteModal, roadmaps, notes, resources, topicMeta, on
   const [cheatSheet,   setCheatSheet]   = useState(null);
   const [csLoading,    setCsLoading]    = useState(false);
   const [csError,      setCsError]      = useState("");
+  const [genImage,     setGenImage]     = useState(null);   // { base64, mimeType, preview }
+  const [genLoading,   setGenLoading]   = useState(false);
+  const [genError,     setGenError]     = useState("");
+  const [genResult,    setGenResult]    = useState(null);   // generated notes string
 
   const { recordUsage } = useUsage();
   const textareaRef = useRef(null);
@@ -49,6 +53,93 @@ export function NoteModal({ noteModal, roadmaps, notes, resources, topicMeta, on
   };
 
   const removeLink = i => setLinks(l => l.filter((_, idx) => idx !== i));
+
+
+  // ── Generate notes from image ─────────────────────────────────────────────
+  const handleGenImage = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) { setGenError("Please upload an image file."); return; }
+    if (file.size > 4 * 1024 * 1024)    { setGenError("Image must be under 4MB."); return; }
+    setGenError(""); setGenResult(null);
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const dataUrl = ev.target.result;
+      setGenImage({ base64: dataUrl.split(",")[1], mimeType: file.type, preview: dataUrl });
+    };
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  };
+
+  const generateNotesFromImage = async () => {
+    if (!genImage) return;
+    setGenLoading(true); setGenError(""); setGenResult(null);
+    try {
+      const apiKey = loadAIConfig().keys?.groq?.trim();
+      if (!apiKey) throw new Error("Image analysis requires a Groq API key. Add one in Settings → AI.");
+
+      const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
+        body: JSON.stringify({
+          model: "meta-llama/llama-4-scout-17b-16e-instruct",
+          max_tokens: 2048,
+          messages: [{
+            role: "user",
+            content: [
+              {
+                type: "text",
+                text: `You are an expert study note creator. Analyse this image and create detailed, well-structured study notes.
+
+Topic context: "${topic}" from ${rm?.label || "a learning roadmap"}
+
+Instructions:
+1. Identify what type of content this is (code, diagram, text, math, language, etc.)
+2. Create comprehensive notes appropriate for that content type:
+   - Programming/code → explain concepts + provide annotated code examples
+   - Architecture/diagram → explain each component and how they interact
+   - Language learning → key vocabulary, grammar rules, example sentences
+   - Math/science → explain concepts with worked examples
+   - General text → structured summary with key points and examples
+3. Format with clear sections using markdown (## headings, bullet points, code blocks)
+4. Include practical examples relevant to the topic
+5. Add a "Key Takeaways" section at the end
+
+Write thorough, useful notes a student would actually want to study from.`
+              },
+              {
+                type: "image_url",
+                image_url: { url: `data:${genImage.mimeType};base64,${genImage.base64}` }
+              }
+            ]
+          }]
+        })
+      });
+
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error?.message || `API error ${response.status}`);
+      }
+
+      const data = await response.json();
+      const text = data.choices?.[0]?.message?.content || "";
+      if (!text.trim()) throw new Error("No notes generated. Try a clearer image.");
+      setGenResult(text.trim());
+    } catch(e) {
+      setGenError(e.message || "Failed to generate notes.");
+    } finally {
+      setGenLoading(false);
+    }
+  };
+
+  const saveGeneratedNotes = () => {
+    if (!genResult) return;
+    const existing = notes[`${rmKey}::${topic}`] || "";
+    const separator = existing ? "\n\n---\n\n" : "";
+    setNote(existing + separator + genResult);
+    setTab("notes");
+    setEditing(true);
+  };
 
   const handleSave = () => onSave({ rmKey, topic, note, difficulty, timeEst, links });
 
@@ -116,7 +207,7 @@ export function NoteModal({ noteModal, roadmaps, notes, resources, topicMeta, on
     setLinks(l => [...l, ...newLinks.map(r => ({ title: r.title, url: r.url }))]);
   };
 
-  const tabs = ["notes", "resources", "meta"];
+  const tabs = ["notes", "generate", "resources", "meta"];
 
   return (
     <div onClick={onClose} style={{ position: "fixed", inset: 0,
@@ -156,11 +247,11 @@ export function NoteModal({ noteModal, roadmaps, notes, resources, topicMeta, on
             {tabs.map(t => (
               <button key={t} onClick={() => setTab(t)} style={{
                 padding: "7px 14px", border: "none", background: "transparent", cursor: "pointer",
-                fontFamily: "inherit", fontSize: 12, textTransform: "capitalize",
+                fontFamily: "inherit", fontSize: 12,
                 color: tab === t ? rm?.accent : "#555",
                 borderBottom: tab === t ? `2px solid ${rm?.color}` : "2px solid transparent",
                 marginBottom: -1,
-              }}>{t}</button>
+              }}>{{ notes: "Notes", generate: "📸 AI", resources: "Resources", meta: "Meta" }[t] || t}</button>
             ))}
           </div>
         </div>
@@ -217,6 +308,91 @@ export function NoteModal({ noteModal, roadmaps, notes, resources, topicMeta, on
           )}
 
           {/* ── Resources tab ── */}
+          {/* ── Generate tab ── */}
+          {tab === "generate" && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+
+              {/* Explainer */}
+              <div style={{ background: "#0f0f13", borderRadius: 8, padding: "12px 14px",
+                border: "1px solid #1e1e24", fontSize: 12, color: "#666", lineHeight: 1.7 }}>
+                <span style={{ fontWeight: 700, color: "#c4b5fd" }}>📸 Generate notes from an image</span><br/>
+                Upload a photo of any learning material — textbook, whiteboard, diagram, code screenshot —
+                and AI will create detailed study notes tailored to the content type.
+              </div>
+
+              {/* Upload */}
+              <label style={{ cursor: "pointer", display: "block" }}>
+                <input type="file" accept="image/*" onChange={handleGenImage} style={{ display: "none" }} />
+                <div style={{ border: `2px dashed ${genImage ? (rm?.color || "#7b5ea7") : "#2a2a35"}`,
+                  borderRadius: 10, overflow: "hidden", textAlign: "center",
+                  background: "#0f0f13", transition: "border-color 0.2s" }}>
+                  {genImage ? (
+                    <img src={genImage.preview} alt="Upload preview"
+                      style={{ width: "100%", maxHeight: 200, objectFit: "contain", display: "block" }} />
+                  ) : (
+                    <div style={{ padding: "24px 20px" }}>
+                      <div style={{ fontSize: 28, marginBottom: 6 }}>📷</div>
+                      <div style={{ fontSize: 13, color: "#888", marginBottom: 3 }}>Tap to upload image</div>
+                      <div style={{ fontSize: 11, color: "#444" }}>PNG, JPG, WebP · max 4MB</div>
+                    </div>
+                  )}
+                </div>
+              </label>
+
+              {genImage && !genResult && (
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button onClick={generateNotesFromImage} disabled={genLoading}
+                    style={{ flex: 1, padding: "11px", background: genLoading ? "#1e1e24" : (rm?.color || "#7b5ea7"),
+                      border: "none", borderRadius: 8, color: genLoading ? "#555" : "#fff",
+                      fontSize: 13, fontWeight: 700, cursor: genLoading ? "default" : "pointer",
+                      fontFamily: "inherit" }}>
+                    {genLoading ? "Generating notes…" : "✨ Generate Notes"}
+                  </button>
+                  <button onClick={() => { setGenImage(null); setGenError(""); }}
+                    style={{ padding: "11px 14px", background: "#1e1e24", border: "1px solid #2a2a35",
+                      borderRadius: 8, color: "#555", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>
+                    ✕
+                  </button>
+                </div>
+              )}
+
+              {genError && (
+                <div style={{ padding: "10px 14px", background: "#2e1a1a", borderRadius: 8,
+                  color: "#e05252", fontSize: 13, border: "1px solid #e0525233" }}>
+                  {genError}
+                </div>
+              )}
+
+              {/* Result preview */}
+              {genResult && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  <div style={{ background: "#0f0f13", border: "1px solid #52b78833",
+                    borderRadius: 8, padding: "12px 14px", maxHeight: 300,
+                    overflowY: "auto", fontSize: 12, color: "#aaa",
+                    lineHeight: 1.7, whiteSpace: "pre-wrap", fontFamily: "inherit" }}>
+                    {genResult}
+                  </div>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button onClick={saveGeneratedNotes}
+                      style={{ flex: 1, padding: "11px", background: "#52b788",
+                        border: "none", borderRadius: 8, color: "#fff",
+                        fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+                      ✓ Save to Notes
+                    </button>
+                    <button onClick={() => { setGenResult(null); setGenImage(null); }}
+                      style={{ padding: "11px 14px", background: "#1e1e24", border: "1px solid #2a2a35",
+                        borderRadius: 8, color: "#555", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>
+                      Retry
+                    </button>
+                  </div>
+                  <div style={{ fontSize: 11, color: "#444", textAlign: "center" }}>
+                    Notes will be appended to any existing notes for this topic
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {tab === "resources" && (
             <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
 
