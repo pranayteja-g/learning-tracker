@@ -68,8 +68,7 @@ Be thorough — these are notes the user will study from.` },
   return data.choices?.[0]?.message?.content?.trim() || "";
 }
 
-async function generateFromUrl(url, apiKey, provider) {
-  if (!apiKey) throw new Error("No AI key configured.");
+async function generateFromUrl(url) {
 
   const prompt = `Fetch and analyse this URL, then create comprehensive study notes from its content: ${url}
 
