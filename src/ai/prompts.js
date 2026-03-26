@@ -211,15 +211,21 @@ Difficulty: ${difficulty}
 
 Each challenge must be solvable in 5-20 lines. Do NOT ask them to build full apps.
 
+IMPORTANT — starterCode field:
+- If the challenge asks to FIX, DEBUG, or COMPLETE code → always provide the broken/partial code in "starterCode"
+- If the challenge asks to WRITE from scratch → set "starterCode" to null
+- starterCode must be plain code only (no markdown fences)
+
 Respond with ONLY a JSON array, no other text:
 [
   {
-    "question": "Clear task description. If they need to trace/fix code, wrap it in a code fence with triple backticks and the language tag on its own line",
-    "language": "java | python | javascript | etc",
+    "question": "Clear task description — do NOT include code here, put it in starterCode",
+    "language": "java | python | javascript | sql | etc",
     "difficulty": "easy | medium | hard",
     "topic": "the specific topic this tests",
     "expectedBehaviour": "What correct code should do/output — be specific",
-    "hints": "One optional hint (or null)"
+    "hints": "One optional hint (or null)",
+    "starterCode": "The broken/partial code to fix, or null if writing from scratch"
   }
 ]`;
 }

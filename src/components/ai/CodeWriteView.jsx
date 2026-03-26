@@ -6,7 +6,12 @@ import { MessageRenderer } from "./MessageRenderer.jsx";
 
 export function CodeWriteView({ questions, rm, onComplete }) {
   const [current,   setCurrent]   = useState(0);
-  const [answers,   setAnswers]   = useState({});   // idx -> code string
+  const [answers,   setAnswers]   = useState(() => {
+    // Pre-populate with starterCode if provided
+    const init = {};
+    (questions || []).forEach((q, i) => { if (q.starterCode) init[i] = q.starterCode; });
+    return init;
+  });
   const [feedback,  setFeedback]  = useState({});   // idx -> {loading, result}
   const [submitted, setSubmitted] = useState(false);
 
@@ -167,8 +172,17 @@ Respond ONLY with JSON:
 
       {/* Code editor */}
       <div style={{ marginBottom: 10 }}>
-        <div style={{ fontSize: 10, color: "#555", textTransform: "uppercase",
-          letterSpacing: 1, marginBottom: 6 }}>Your code ({q.language})</div>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+          <div style={{ fontSize: 10, color: "#555", textTransform: "uppercase", letterSpacing: 1 }}>
+            Your code ({q.language})
+          </div>
+          {q.starterCode && (
+            <div style={{ fontSize: 10, color: "#ee9b00", background: "#ee9b0011",
+              border: "1px solid #ee9b0033", borderRadius: 4, padding: "1px 7px" }}>
+              🔧 Fix the code
+            </div>
+          )}
+        </div>
         <div style={{ border: `1px solid ${fb?.result ? (fb.result.correct ? "#52b788" : "#ee9b00") : "#2a2a35"}`,
           borderRadius: 8, overflow: "hidden" }}>
           <CodeEditor
