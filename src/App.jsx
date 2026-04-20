@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { idbSet } from "./storage/db.js";
 import { useAppStorage }         from "./storage/hooks.js";
 import { useIsMobile }           from "./hooks/useIsMobile.js";
 import { validateRoadmap, downloadJSON, getRoadmapStats, getNextUp } from "./utils/roadmap.js";
@@ -274,14 +275,28 @@ export default function App() {
   };
 
   const handleImportBackupData = (data) => {
+    // Core data — merge
     if (data.roadmaps)  setRoadmaps(prev  => ({ ...prev,  ...data.roadmaps }));
     if (data.progress)  setProgress(prev  => ({ ...prev,  ...data.progress }));
     if (data.notes)     setNotes(prev     => ({ ...prev,  ...data.notes }));
     if (data.resources) setResources(prev => ({ ...prev,  ...data.resources }));
     if (data.topicMeta) setTopicMeta(prev => ({ ...prev,  ...data.topicMeta }));
+    // Extended data — restore directly via IDB
+    if (data.clippings && Array.isArray(data.clippings)) {
+      idbSet("learning-tracker-clippings-v1", data.clippings);
+    }
+    if (data.projects && typeof data.projects === "object") {
+      idbSet("learning-tracker-projects-v1", data.projects);
+    }
+    if (data.quests && typeof data.quests === "object") {
+      idbSet("learning-tracker-quests-v2", data.quests);
+    }
+    if (data.xpData && typeof data.xpData === "object") {
+      idbSet("learning-tracker-xp-v1", data.xpData);
+    }
     const firstKey = data.roadmaps ? Object.keys(data.roadmaps)[0] : null;
     if (firstKey) { setActiveRoadmap(firstKey); if (isMobile) setMobileScreen("sections"); }
-    showFeedback(true, "Backup restored!");
+    showFeedback(true, "Backup restored! Reload the app to see all data.");
   };
 
   const handleImportBackup = (e) => {
@@ -301,14 +316,26 @@ export default function App() {
 
   const handleExport = () => {
     downloadJSON(
-      { version: 2, exportedAt: new Date().toISOString(), roadmaps, progress, notes, resources, topicMeta },
+      {
+        version: 3,
+        exportedAt: new Date().toISOString(),
+        // Core learning data
+        roadmaps, progress, notes, resources, topicMeta,
+        // Extended data
+        clippings,
+        projects,
+        quests,
+        xpData,
+      },
       `learning-tracker-backup-${new Date().toISOString().slice(0,10)}.json`
     );
   };
 
   const handleGetSnapshot = () => ({
-    version: 2, exportedAt: new Date().toISOString(),
+    version: 3,
+    exportedAt: new Date().toISOString(),
     roadmaps, progress, notes, resources, topicMeta,
+    clippings, projects, quests, xpData,
   });
 
   const handleApplySnapshot = async (data) => {
