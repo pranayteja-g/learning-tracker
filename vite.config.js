@@ -34,49 +34,50 @@ export default defineConfig({
         ],
       },
       workbox: {
+        // Cache all app shell files
         globPatterns: ['**/*.{js,css,html,svg,png,ico,woff,woff2}'],
+        // Cache API calls with network-first strategy (fall back to cache if offline)
         runtimeCaching: [
           {
+            // Anthropic API — network only (can't cache AI responses meaningfully)
             urlPattern: /^https:\/\/api\.anthropic\.com\/.*/i,
             handler: 'NetworkOnly',
           },
           {
+            // Groq API — network only
             urlPattern: /^https:\/\/api\.groq\.com\/.*/i,
             handler: 'NetworkOnly',
           },
           {
+            // Google Gemini — network only
             urlPattern: /^https:\/\/generativelanguage\.googleapis\.com\/.*/i,
             handler: 'NetworkOnly',
           },
           {
+            // Everything else (CDN fonts, images etc.) — cache first
             urlPattern: /^https:\/\/.*/i,
             handler: 'CacheFirst',
             options: {
               cacheName: 'external-cache',
               expiration: {
                 maxEntries: 50,
-                maxAgeSeconds: 60 * 60 * 24 * 30,
+                maxAgeSeconds: 60 * 60 * 24 * 30, // 30 days
               },
             },
           },
         ],
+        // Don't cache the Anthropic API key or user data in service worker
         navigateFallback: 'index.html',
         cleanupOutdatedCaches: true,
       },
       devOptions: {
+        // Enable PWA in dev mode so you can test it locally
         enabled: true,
         type: 'module',
       },
     }),
   ],
   server: {
-    host: true,
-    proxy: {
-      '/api/nvidia': {
-        target: 'https://integrate.api.nvidia.com',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api\/nvidia/, '/v1'),
-      },
-    },
+    host: true, // Expose to local network — useful for testing on a real phone
   },
 })

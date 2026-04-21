@@ -1,17 +1,12 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 
 function CooldownTimer({ ms, cooldownUntil }) {
-  const getRemaining = useCallback(
-    () => Math.max(0, (cooldownUntil || Date.now()) - Date.now()),
-    [cooldownUntil]
-  );
-  const [remaining, setRemaining] = useState(() => Math.max(ms || 0, getRemaining()));
-
+  const [remaining, setRemaining] = useState(ms);
   useEffect(() => {
-    const t = setInterval(() => setRemaining(getRemaining()), 1000);
+    setRemaining(ms);
+    const t = setInterval(() => setRemaining(r => Math.max(0, r - 1000)), 1000);
     return () => clearInterval(t);
-  }, [getRemaining]);
-
+  }, [cooldownUntil]);
   const h = Math.floor(remaining / 3600000);
   const m = Math.floor((remaining % 3600000) / 60000);
   const s = Math.floor((remaining % 60000) / 1000);
