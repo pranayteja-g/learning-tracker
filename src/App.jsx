@@ -30,6 +30,7 @@ import { useSpacedRepetition }    from "./hooks/useSpacedRepetition.js";
 import { useProjects }            from "./hooks/useProjects.js";
 import { useClippings }           from "./hooks/useClippings.js";
 import { ProjectBoard }           from "./components/screens/ProjectBoard.jsx";
+import { SagePanel }              from "./components/sage/SagePanel.jsx";
 
 import { QuestBoard }             from "./components/quest/QuestCard.jsx";
 import { QuestModal }             from "./components/quest/QuestModal.jsx";
@@ -119,7 +120,8 @@ export default function App() {
   const [loadingQuestRmIds, setLoadingQuestRmIds] = useState([]);
   const [questBoardOpen,    setQuestBoardOpen]    = useState(false);
   const [certificate,       setCertificate]       = useState(null);
-  const [projectBoardRm,    setProjectBoardRm]    = useState(null);  // roadmap to show cert for
+  const [projectBoardRm,    setProjectBoardRm]    = useState(null);
+  const [sageOpen,          setSageOpen]          = useState(false);  // roadmap to show cert for
   const [showOnboarding,    setShowOnboarding]    = useState(false);
   const [searchOpen,     setSearchOpen]     = useState(false);
   const { streak, recordActivity, studiedToday } = useStreak();
@@ -387,6 +389,17 @@ export default function App() {
       justifyContent: "center", color: "#555", fontFamily: "Georgia, serif" }}>Loading…</div>
   );
 
+
+  const sageAppContext = {
+    roadmaps, progress, notes, clippings, xpData,
+    setProgress,
+    setRoadmaps,
+    saveNote: (args) => {
+      setNotes(prev => ({ ...prev, [`${args.rmKey}::${args.topic}`]: args.note }));
+    },
+    addClipping,
+  };
+
   // ── Welcome ────────────────────────────────────────────────────────────────
   if (rmKeys.length === 0) return (
     <>
@@ -480,6 +493,11 @@ export default function App() {
               style={{ width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center",
                 border: "none", borderRadius: 8, cursor: "pointer", background: "#1e1e24",
                 color: "#888", fontSize: 15 }}>🔍</button>
+            <button onClick={() => setSageOpen(true)}
+              style={{ width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center",
+                border: "none", borderRadius: 8, cursor: "pointer",
+                background: sageOpen ? "#76b90022" : "#1e1e24",
+                color: sageOpen ? "#76b900" : "#888", fontSize: 15 }}>🌿</button>
             <button onClick={() => setShowManage(true)}
               style={{ width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center",
                 border: "none", borderRadius: 8, cursor: "pointer", background: "#1e1e24",
@@ -965,6 +983,7 @@ export default function App() {
           onClose={() => setProjectBoardRm(null)}
         />
       )}
+      <SagePanel open={sageOpen} onClose={() => setSageOpen(false)} appContext={sageAppContext} />
       {certificate && (
         <CompletionCertificate
           roadmap={certificate.rm}
