@@ -1,6 +1,7 @@
 /**
  * Sage Tool Definitions — what Sage can do to the app
  */
+import { allTopicNames, flatTopicNames } from "../../utils/topics.js";
 
 export const TOOL_DEFINITIONS = [
   {
@@ -107,7 +108,20 @@ export const TOOL_DEFINITIONS = [
 ];
 
 export function executeTool(name, args, appContext) {
-  const { roadmaps, progress, notes, clippings, setProgress, saveNote, addClipping, setRoadmaps, xpData } = appContext;
+  const {
+    roadmaps,
+    progress,
+    notes,
+    clippings,
+    setProgress,
+    saveNote,
+    addClipping,
+    setRoadmaps,
+    xpData,
+    getDueTopics,
+    recordActivity,
+    recordTopicDone,
+  } = appContext;
 
   switch (name) {
     case "get_progress": {
@@ -115,8 +129,7 @@ export function executeTool(name, args, appContext) {
         ? [roadmaps[args.roadmapId]].filter(Boolean)
         : Object.values(roadmaps);
       const result = rmList.map(rm => {
-        const allTopics = Object.values(rm.sections).flat()
-          .map(t => typeof t === "string" ? t : t?.name).filter(Boolean);
+        const allTopics = Object.values(rm.sections).flatMap(flatTopicNames);
         const done = allTopics.filter(t => progress[`${rm.id}::${t}`]).length;
         return { roadmap: rm.label, id: rm.id, total: allTopics.length, done, pct: Math.round((done / allTopics.length) * 100) };
       });
@@ -128,6 +141,10 @@ export function executeTool(name, args, appContext) {
     case "add_note": {
       const rm = roadmaps[args.roadmapId];
       if (!rm) return { success: false, error: `Roadmap "${args.roadmapId}" not found` };
+      const knownTopics = Object.values(rm.sections).flatMap(allTopicNames);
+      if (!knownTopics.includes(args.topic)) {
+        return { success: false, error: `Topic "${args.topic}" was not found in ${rm.label}` };
+      }
       const existing = notes[`${args.roadmapId}::${args.topic}`] || "";
       const newNote  = args.replace ? args.content : (existing ? `${existing}\n\n---\n\n${args.content}` : args.content);
       saveNote({ rmKey: args.roadmapId, topic: args.topic, note: newNote, difficulty: "", timeEst: "", links: [] });
@@ -137,7 +154,17 @@ export function executeTool(name, args, appContext) {
     case "mark_topic_done": {
       const rm = roadmaps[args.roadmapId];
       if (!rm) return { success: false, error: `Roadmap "${args.roadmapId}" not found` };
-      setProgress(prev => ({ ...prev, [`${args.roadmapId}::${args.topic}`]: true }));
+      const knownTopics = Object.values(rm.sections).flatMap(flatTopicNames);
+      if (!knownTopics.includes(args.topic)) {
+        return { success: false, error: `Topic "${args.topic}" was not found in ${rm.label}` };
+      }
+      const progressKey = `${args.roadmapId}::${args.topic}`;
+      const wasDone = !!progress[progressKey];
+      setProgress(prev => ({ ...prev, [progressKey]: true }));
+      if (!wasDone) {
+        recordActivity?.();
+        recordTopicDone?.();
+      }
       return { success: true, message: `Marked "${args.topic}" as done in ${rm.label}` };
     }
 
@@ -163,14 +190,16 @@ export function executeTool(name, args, appContext) {
     }
 
     case "get_due_topics": {
-      const due = [];
-      Object.values(roadmaps).forEach(rm => {
-        Object.values(rm.sections).flat().forEach(t => {
-          const name = typeof t === "string" ? t : t?.name;
-          if (name && progress[`${rm.id}::${name}`]) due.push({ roadmap: rm.label, topic: name });
-        });
-      });
-      return { success: true, data: due.slice(0, 10) };
+      const due = typeof getDueTopics === "function" ? getDueTopics() : [];
+      return {
+        success: true,
+        data: due.map(item => ({
+          roadmap: roadmaps[item.rmKey]?.label || item.rmKey,
+          roadmapId: item.rmKey,
+          topic: item.topic,
+        })),
+        count: due.length,
+      };
     }
 
     case "add_roadmap_topic": {

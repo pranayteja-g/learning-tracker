@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { topicName, isExpanded, allTopicNames } from "../../utils/topics.js";
 
 // ── Build search index from all roadmaps ──────────────────────────────────────
@@ -138,17 +138,17 @@ export function SearchOverlay({ open, onClose, roadmaps, notes, resources,
       .slice(0, 40); // cap results
   }, [query, index]);
 
+  const handleSelect = useCallback((item) => {
+    onNavigate(item);
+    onClose();
+  }, [onClose, onNavigate]);
+
   // Focus input on open
   useEffect(() => {
     if (open) {
       setTimeout(() => inputRef.current?.focus(), 50);
-      setQuery("");
-      setActiveIdx(0);
     }
   }, [open]);
-
-  // Reset active when results change
-  useEffect(() => setActiveIdx(0), [results.length]);
 
   // Keyboard navigation
   useEffect(() => {
@@ -168,18 +168,13 @@ export function SearchOverlay({ open, onClose, roadmaps, notes, resources,
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [open, results, activeIdx]);
+  }, [open, results, activeIdx, handleSelect, onClose]);
 
   // Scroll active item into view
   useEffect(() => {
     const el = listRef.current?.querySelector(`[data-idx="${activeIdx}"]`);
     el?.scrollIntoView({ block: "nearest" });
   }, [activeIdx]);
-
-  const handleSelect = (item) => {
-    onNavigate(item);
-    onClose();
-  };
 
   if (!open) return null;
 
@@ -219,12 +214,12 @@ export function SearchOverlay({ open, onClose, roadmaps, notes, resources,
           display: "flex", gap: 10, alignItems: "center" }}>
           <span style={{ fontSize: 16, color: "#555", flexShrink: 0 }}>🔍</span>
           <input ref={inputRef}
-            value={query} onChange={e => setQuery(e.target.value)}
+            value={query} onChange={e => { setQuery(e.target.value); setActiveIdx(0); }}
             placeholder={`Search ${totalTopics} topics across ${Object.keys(roadmaps).length} roadmap${Object.keys(roadmaps).length !== 1 ? "s" : ""}…`}
             style={{ flex: 1, background: "transparent", border: "none", outline: "none",
               color: "#e8e6e0", fontSize: 15, fontFamily: "inherit" }} />
           {query && (
-            <button onClick={() => setQuery("")}
+            <button onClick={() => { setQuery(""); setActiveIdx(0); }}
               style={{ background: "transparent", border: "none", color: "#555",
                 fontSize: 16, cursor: "pointer", flexShrink: 0 }}>×</button>
           )}

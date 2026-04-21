@@ -54,14 +54,13 @@ export async function callAI({ provider, apiKey, systemPrompt, userPrompt, messa
 }
 
 async function callGemini({ apiKey, systemPrompt, userPrompt, messages = [], temperature = 0.7, maxTokens = 4096 }) {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
   const history = messages.map(m => ({ role: m.role === "assistant" ? "model" : "user", parts: [{ text: m.content }] }));
   const body = {
     system_instruction: { parts: [{ text: systemPrompt }] },
     contents: [...history, { role: "user", parts: [{ text: userPrompt }] }],
     generationConfig: { temperature, maxOutputTokens: maxTokens },
   };
-  const res = await fetch(url, {
+  const res = await fetch("/api/gemini", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -84,11 +83,10 @@ async function callGemini({ apiKey, systemPrompt, userPrompt, messages = [], tem
 
 async function callGroq({ apiKey, systemPrompt, userPrompt, messages = [], temperature = 0.7, maxTokens = 4096 }) {
   const history = messages.map(m => ({ role: m.role, content: m.content }));
-  const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+  const res = await fetch("/api/groq", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "Authorization": `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
       model: "llama-3.3-70b-versatile",
@@ -133,14 +131,13 @@ export async function callAIWithSearch({ provider, apiKey, systemPrompt, userPro
 
 async function callGeminiWithSearch({ apiKey, systemPrompt, userPrompt }) {
   // Gemini supports Google Search grounding natively
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
   const body = {
     system_instruction: { parts: [{ text: systemPrompt }] },
     contents: [{ role: "user", parts: [{ text: userPrompt }] }],
     generationConfig: { temperature: 0.3, maxOutputTokens: 2048 },
     tools: [{ google_search: {} }],
   };
-  const res = await fetch(url, {
+  const res = await fetch("/api/gemini", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -188,9 +185,9 @@ async function callGroqWithSearch({ apiKey, systemPrompt, userPrompt }) {
   ];
 
   // ── Round 1: let model decide what to search ──────────────────────────────
-  const res1 = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+  const res1 = await fetch("/api/groq", {
     method: "POST",
-    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ model: "llama-3.3-70b-versatile", messages, tools, tool_choice: "auto",
       temperature: 0.3, max_tokens: 1024 }),
   });
@@ -249,9 +246,9 @@ async function callGroqWithSearch({ apiKey, systemPrompt, userPrompt }) {
     })),
   ];
 
-  const res2 = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+  const res2 = await fetch("/api/groq", {
     method: "POST",
-    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ model: "llama-3.3-70b-versatile", messages: messages2,
       temperature: 0.3, max_tokens: 2048 }),
   });

@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { idbSet } from "./storage/db.js";
 import { useAppStorage }         from "./storage/hooks.js";
 import { useIsMobile }           from "./hooks/useIsMobile.js";
@@ -43,12 +43,12 @@ import { AITimeoutTester }        from "./components/debug/AITimeoutTester.jsx";
 function CompactTimer({ color }) {
   const PRESETS = [25*60, 15*60, 10*60, 5*60];
   const LABELS  = ["25m", "15m", "10m", "5m"];
-  const [sel,     setSel]     = React.useState(0);
-  const [left,    setLeft]    = React.useState(PRESETS[0]);
-  const [running, setRunning] = React.useState(false);
-  const [done,    setDone]    = React.useState(false);
+  const [sel,     setSel]     = useState(0);
+  const [left,    setLeft]    = useState(PRESETS[0]);
+  const [running, setRunning] = useState(false);
+  const [done,    setDone]    = useState(false);
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (!running) return;
     const t = setInterval(() => setLeft(l => {
       if (l <= 1) { clearInterval(t); setRunning(false); setDone(true);
@@ -122,7 +122,6 @@ export default function App() {
   const [certificate,       setCertificate]       = useState(null);
   const [projectBoardRm,    setProjectBoardRm]    = useState(null);
   const [sageOpen,          setSageOpen]          = useState(false);  // roadmap to show cert for
-  const [showOnboarding,    setShowOnboarding]    = useState(false);
   const [searchOpen,     setSearchOpen]     = useState(false);
   const { streak, recordActivity, studiedToday } = useStreak();
   const { results: quizResults, recordQuizResult, hasPassedTopic, getStars } = useQuizResults();
@@ -130,7 +129,7 @@ export default function App() {
           isOnCooldown, cooldownRemaining, needsNewQuest, getQuest } = useQuest();
   const { xpData, awardQuestXP } = useXP();
   const { goal, todayCount, pct: goalPct, goalMet, goalStreak, setGoal, recordTopicDone } = useDailyGoal();
-  const { getDueTopics, recordReview, getTopicLevel, getNextReview } = useSpacedRepetition();
+  const { getDueTopics } = useSpacedRepetition();
   const { projects, addProjects, toggleMilestone, setStatus: setProjectStatus, deleteProject, getProjects, getStats: getProjectStats } = useProjects();
   const { clippings, addClipping, updateClipping, deleteClipping } = useClippings();
   const importRef = useRef(null);
@@ -344,7 +343,7 @@ export default function App() {
     handleImportBackupData(data);
   };
 
-  const generateQuest = async (rmId) => {
+  const generateQuest = useCallback(async (rmId) => {
     const roadmap = roadmaps[rmId];
     if (!roadmap) return;
     setLoadingQuestRmIds(prev => [...prev, rmId]);
@@ -361,7 +360,7 @@ export default function App() {
       startQuest({ ...data, roadmapId: rmId });
     } catch(e) { console.error("Quest generation failed:", e); }
     finally { setLoadingQuestRmIds(prev => prev.filter(id => id !== rmId)); }
-  };
+  }, [progress, quizResults, roadmaps, startQuest]);
 
   // Auto-generate quests for all roadmaps that need one on load
   useEffect(() => {
@@ -371,7 +370,7 @@ export default function App() {
         generateQuest(rmId);
       }
     });
-  }, [loaded, questLoaded]);
+  }, [generateQuest, loaded, loadingQuestRmIds, needsNewQuest, questLoaded, roadmaps]);
 
   // ── Global style: prevent iOS zoom on input focus ────────────────────────
   const globalStyle = `
@@ -394,6 +393,9 @@ export default function App() {
     roadmaps, progress, notes, clippings, xpData,
     setProgress,
     setRoadmaps,
+    getDueTopics,
+    recordActivity,
+    recordTopicDone,
     saveNote: (args) => {
       setNotes(prev => ({ ...prev, [`${args.rmKey}::${args.topic}`]: args.note }));
     },
@@ -747,9 +749,11 @@ export default function App() {
         </div>
 
               <style>{globalStyle}</style>
-      <SearchOverlay open={searchOpen} onClose={() => setSearchOpen(false)}
-        roadmaps={roadmaps} notes={notes} resources={resources}
-        onNavigate={handleSearchNavigate} isMobile={isMobile} />
+      {searchOpen && (
+        <SearchOverlay open={searchOpen} onClose={() => setSearchOpen(false)}
+          roadmaps={roadmaps} notes={notes} resources={resources}
+          onNavigate={handleSearchNavigate} isMobile={isMobile} />
+      )}
       {projectBoardRm && roadmaps[projectBoardRm] && (
         <ProjectBoard
           rm={roadmaps[projectBoardRm]}
@@ -760,6 +764,7 @@ export default function App() {
           onClose={() => setProjectBoardRm(null)}
         />
       )}
+      <SagePanel open={sageOpen} onClose={() => setSageOpen(false)} appContext={sageAppContext} />
       {certificate && (
         <CompletionCertificate
           roadmap={certificate.rm}
@@ -811,6 +816,14 @@ export default function App() {
             <button onClick={() => setShowManage(true)}
               style={{ padding: "7px 14px", border: "none", borderRadius: 7, cursor: "pointer",
                 fontFamily: "inherit", fontSize: 12, background: "#1e1e24", color: "#888" }}>⚙️ Settings</button>
+            <button onClick={() => setSageOpen(true)}
+              title="Open Sage"
+              style={{ padding: "7px 12px", border: "none", borderRadius: 7, cursor: "pointer",
+                fontFamily: "inherit", fontSize: 12,
+                background: sageOpen ? "#76b90022" : "#1e1e24",
+                color: sageOpen ? "#76b900" : "#888",
+                borderWidth: 1, borderStyle: "solid",
+                borderColor: sageOpen ? "#76b90044" : "transparent" }}>Sage</button>
             <button onClick={() => setView(v => v === "dashboard" ? "sections" : "dashboard")}
               style={{ padding: "7px 14px", border: "none", borderRadius: 7, cursor: "pointer", fontFamily: "inherit", fontSize: 12,
                 background: view === "dashboard" ? "#1e1e2f" : "#1e1e24",
@@ -970,9 +983,11 @@ export default function App() {
       )}
 
             <style>{globalStyle}</style>
-      <SearchOverlay open={searchOpen} onClose={() => setSearchOpen(false)}
-        roadmaps={roadmaps} notes={notes} resources={resources}
-        onNavigate={handleSearchNavigate} isMobile={isMobile} />
+      {searchOpen && (
+        <SearchOverlay open={searchOpen} onClose={() => setSearchOpen(false)}
+          roadmaps={roadmaps} notes={notes} resources={resources}
+          onNavigate={handleSearchNavigate} isMobile={isMobile} />
+      )}
       {projectBoardRm && roadmaps[projectBoardRm] && (
         <ProjectBoard
           rm={roadmaps[projectBoardRm]}
