@@ -1,17 +1,21 @@
-import { useState, useEffect } from "react";
-import { MILESTONE_BADGES, LEVELS, getLevel, getNextLevel } from "../../hooks/useXP.js";
+import { useState, useEffect, useMemo } from "react";
+import { MILESTONE_BADGES, getLevel, getNextLevel } from "../../hooks/useXP.js";
 
 // ── Confetti ──────────────────────────────────────────────────────────────────
 function Confetti() {
-  const pieces = Array.from({ length: 60 }, (_, i) => ({
-    id: i,
-    x: Math.random() * 100,
-    delay: Math.random() * 1.5,
-    dur: 2 + Math.random() * 2,
-    color: ["#7b5ea7","#52b788","#ee9b00","#e05252","#c4b5fd","#7b8cde"][Math.floor(Math.random()*6)],
-    size: 6 + Math.random() * 8,
-    drift: (Math.random() - 0.5) * 120,
-  }));
+  const pieces = useMemo(() => {
+    const colors = ["#7b5ea7", "#52b788", "#ee9b00", "#e05252", "#c4b5fd", "#7b8cde"];
+    return Array.from({ length: 60 }, (_, i) => ({
+      id: i,
+      x: (i * 37) % 100,
+      delay: ((i * 17) % 15) / 10,
+      dur: 2 + (((i * 29) % 20) / 10),
+      color: colors[i % colors.length],
+      size: 6 + ((i * 19) % 8),
+      drift: ((i * 43) % 120) - 60,
+      rounded: i % 2 === 0,
+    }));
+  }, []);
 
   return (
     <div style={{ position: "fixed", inset: 0, pointerEvents: "none", zIndex: 300, overflow: "hidden" }}>
@@ -29,7 +33,7 @@ function Confetti() {
           width: p.size,
           height: p.size,
           background: p.color,
-          borderRadius: Math.random() > 0.5 ? "50%" : "2px",
+          borderRadius: p.rounded ? "50%" : "2px",
           "--drift": `${p.drift}px`,
           animation: `confettiFall ${p.dur}s ${p.delay}s ease-in forwards`,
         }} />
@@ -39,7 +43,7 @@ function Confetti() {
 }
 
 // ── XP Bar ────────────────────────────────────────────────────────────────────
-function XPBar({ prevXP, newXP, color }) {
+function XPBar({ prevXP, newXP }) {
   const [displayed, setDisplayed] = useState(prevXP);
   const prevLevel = getLevel(prevXP);
   const newLevel  = getLevel(newXP);
@@ -55,7 +59,7 @@ function XPBar({ prevXP, newXP, color }) {
   useEffect(() => {
     const t = setTimeout(() => setPct(newPct), 400);
     return () => clearTimeout(t);
-  }, []);
+  }, [newPct]);
 
   useEffect(() => {
     const start = Date.now();
@@ -67,7 +71,7 @@ function XPBar({ prevXP, newXP, color }) {
     };
     const t = setTimeout(() => requestAnimationFrame(step), 300);
     return () => clearTimeout(t);
-  }, []);
+  }, [newXP, prevXP]);
 
   return (
     <div style={{ background: "#16161b", borderRadius: 10, padding: "14px 16px", border: "1px solid #2a2a35" }}>
