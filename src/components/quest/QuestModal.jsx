@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { callAI, loadAIConfig } from "../../ai/providers.js";
 import { buildQuizPrompt, buildCodeChallengePrompt } from "../../ai/prompts.js";
 import { buildQuizContext } from "../../ai/context.js";
@@ -110,7 +110,7 @@ function PhaseResult({ phase, result, onContinue, onClose, color, accent, active
 }
 
 // ── Q&A Phase ────────────────────────────────────────────────────────────────
-function QAPhase({ quest, onComplete }) {
+function QAPhase({ quest, rm, onComplete }) {
   const [questions,  setQuestions]  = useState(null);
   const [answers,    setAnswers]    = useState({});
   const [feedbacks,  setFeedbacks]  = useState({});
@@ -118,7 +118,9 @@ function QAPhase({ quest, onComplete }) {
   const [error,      setError]      = useState("");
   const [generating, setGenerating] = useState(true);
 
-  const generateQuestions = useCallback(async () => {
+  useEffect(() => { generateQuestions(); }, []);
+
+  const generateQuestions = async () => {
     setGenerating(true);
     try {
       const cfg = loadAIConfig();
@@ -138,9 +140,7 @@ Respond ONLY with JSON array:
       setQuestions(safeParseJSON(match ? match[0] : clean));
     } catch(e) { setError(e.message); }
     finally { setGenerating(false); }
-  }, [quest.phases.qa.count, quest.phases.qa.instruction, quest.roadmapLabel, quest.topics]);
-
-  useEffect(() => { generateQuestions(); }, [generateQuestions]);
+  };
 
   const evaluateAnswer = async (idx) => {
     const q = questions[idx];
@@ -286,9 +286,16 @@ export function QuestModal({ quest, rmId, roadmaps, progress, onAdvancePhase, on
   const [error,        setError]        = useState("");
 
   const rm = roadmaps?.[quest.roadmapId];
-  const activePhases = getActivePhases(quest);
+  if (!rm) return null;
 
-  const generatePhaseContent = useCallback(async () => {
+  const activePhases = getActivePhases(quest);
+  const totalPhases  = activePhases.length;
+
+  useEffect(() => {
+    if (quest.phase > 0 && !phaseData && !phaseResult) generatePhaseContent();
+  }, [quest.phase, phaseData, phaseResult, rm, progress, quest]);
+
+  const generatePhaseContent = async () => {
     setLoadingPhase(true); setError("");
     try {
       const cfg    = loadAIConfig();
@@ -315,14 +322,7 @@ export function QuestModal({ quest, rmId, roadmaps, progress, onAdvancePhase, on
       }
     } catch(e) { setError(e.message); }
     finally { setLoadingPhase(false); }
-  }, [activePhases, progress, quest, rm]);
-
-  useEffect(() => {
-    if (!rm) return;
-    if (quest.phase > 0 && !phaseData && !phaseResult) generatePhaseContent();
-  }, [generatePhaseContent, phaseData, phaseResult, quest.phase, rm]);
-
-  if (!rm) return null;
+  };
 
   const handlePhaseComplete = (result) => {
     const currentPhase = quest.phase;
@@ -475,7 +475,7 @@ export function QuestModal({ quest, rmId, roadmaps, progress, onAdvancePhase, on
                     onComplete={(score) => handlePhaseComplete({ score, passed: score >= 70 })} />
                 )}
                 {activePhases[phase]?.key === "qa" && (
-                  <QAPhase quest={quest} onComplete={handlePhaseComplete} />
+                  <QAPhase quest={quest} rm={rm} onComplete={handlePhaseComplete} />
                 )}
               </>
             )}
