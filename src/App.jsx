@@ -5,6 +5,7 @@ import { useIsMobile }           from "./hooks/useIsMobile.js";
 import { validateRoadmap, downloadJSON, getRoadmapStats, getNextUp } from "./utils/roadmap.js";
 import { flatTopicNames, topicName, isExpanded } from "./utils/topics.js";
 import { safeParseJSON } from "./utils/jsonParse.js";
+import { ONBOARDING_COMPLETED_KEY } from "./storage/keys.js";
 import { Toast }                 from "./components/ui/Toast.jsx";
 import { TopicCard }             from "./components/ui/TopicCard.jsx";
 import { RadialProgress }        from "./components/ui/RadialProgress.jsx";
@@ -183,6 +184,12 @@ export default function App() {
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
+  }, []);
+
+  // Load onboarding completion status
+  useEffect(() => {
+    const completed = localStorage.getItem(ONBOARDING_COMPLETED_KEY) === "true";
+    if (completed) setShowOnboarding(false);
   }, []);
 
   // Navigate to a search result
@@ -388,11 +395,23 @@ export default function App() {
   );
 
   // ── Welcome ────────────────────────────────────────────────────────────────
-  if (rmKeys.length === 0) return (
+  const onboardingCompleted = localStorage.getItem(ONBOARDING_COMPLETED_KEY) === "true";
+  if (rmKeys.length === 0 && !onboardingCompleted) return (
     <>
       <style>{globalStyle}</style>
       <OnboardingFlow
-        onComplete={() => {}}
+        onComplete={() => {
+          localStorage.setItem(ONBOARDING_COMPLETED_KEY, "true");
+          // Create an empty roadmap so user can get started without a template
+          const emptyRoadmap = {
+            id: "my-roadmap",
+            label: "My Roadmap",
+            color: "#7b5ea7",
+            accent: "#c4b5fd",
+            sections: {}
+          };
+          handleSaveRoadmap(emptyRoadmap);
+        }}
         onCreate={(tmpl) => {
           if (tmpl) handleSaveRoadmap({ ...tmpl, id: tmpl.id || tmpl.label.toLowerCase().replace(/\s+/g,"-") });
         }}
