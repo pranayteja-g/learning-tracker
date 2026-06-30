@@ -62,5 +62,5 @@ export function useClippings() {
     );
   }, [clippings]);
 
-  return { clippings, loaded, addClipping, updateClipping, deleteClipping, searchClippings };
+  return { clippings, loaded, addClipping, updateClipping, deleteClipping, searchClippings, save };
 }
