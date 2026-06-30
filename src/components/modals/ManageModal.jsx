@@ -117,7 +117,7 @@ export function ManageModal({ roadmaps, onClose, onImportRoadmap, onDelete, onEd
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               <StorageIndicator />
               <div style={{ fontSize: 12, color: "#555", lineHeight: 1.6, marginBottom: 4 }}>
-                Export a full backup of all your roadmaps, progress, notes, resources and clippings.
+                Export a full backup of all your roadmaps, progress, notes and resources.
                 Import to restore on any device.
               </div>
               <button onClick={() => { onExportBackup(); onClose(); }}

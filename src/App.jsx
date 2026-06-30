@@ -131,7 +131,7 @@ export default function App() {
   const { goal, todayCount, pct: goalPct, goalMet, goalStreak, setGoal, recordTopicDone } = useDailyGoal();
   const { getDueTopics, recordReview, getTopicLevel, getNextReview } = useSpacedRepetition();
   const { projects, addProjects, toggleMilestone, setStatus: setProjectStatus, deleteProject, getProjects, getStats: getProjectStats } = useProjects();
-  const { clippings, addClipping, updateClipping, deleteClipping, save: saveClippings } = useClippings();
+  const { clippings, addClipping, updateClipping, deleteClipping } = useClippings();
   const importRef = useRef(null);
 
   const showFeedback = (ok, msg) => {
@@ -290,7 +290,7 @@ export default function App() {
     if (data.topicMeta) setTopicMeta(prev => ({ ...prev,  ...data.topicMeta }));
     // Extended data — restore directly via IDB
     if (data.clippings && Array.isArray(data.clippings)) {
-      saveClippings(data.clippings);
+      idbSet("learning-tracker-clippings-v1", data.clippings);
     }
     if (data.projects && typeof data.projects === "object") {
       idbSet("learning-tracker-projects-v1", data.projects);
