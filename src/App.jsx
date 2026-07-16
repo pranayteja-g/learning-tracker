@@ -1,11 +1,14 @@
-import { useState, useRef, useEffect } from "react";
-import { idbSet } from "./storage/db.js";
+import React, { useState, useRef, useEffect, useCallback } from "react";
+import { idbGet, idbSet } from "./storage/db.js";
+import { useAuth }              from "./hooks/useAuth.js";
+import { useSupabaseSync, loadFromSupabase, saveToSupabase } from "./hooks/useSupabaseSync.js";
+import { AuthModal }            from "./components/auth/AuthModal.jsx";
+import { GuestMigrateModal }    from "./components/auth/GuestMigrateModal.jsx";
 import { useAppStorage }         from "./storage/hooks.js";
 import { useIsMobile }           from "./hooks/useIsMobile.js";
 import { validateRoadmap, downloadJSON, getRoadmapStats, getNextUp } from "./utils/roadmap.js";
 import { flatTopicNames, topicName, isExpanded } from "./utils/topics.js";
 import { safeParseJSON } from "./utils/jsonParse.js";
-import { ONBOARDING_COMPLETED_KEY } from "./storage/keys.js";
 import { Toast }                 from "./components/ui/Toast.jsx";
 import { TopicCard }             from "./components/ui/TopicCard.jsx";
 import { RadialProgress }        from "./components/ui/RadialProgress.jsx";
@@ -31,6 +34,8 @@ import { useSpacedRepetition }    from "./hooks/useSpacedRepetition.js";
 import { useProjects }            from "./hooks/useProjects.js";
 import { useClippings }           from "./hooks/useClippings.js";
 import { ProjectBoard }           from "./components/screens/ProjectBoard.jsx";
+import { LogbookScreen }          from "./components/screens/LogbookScreen.jsx";
+import { useLogbook }             from "./hooks/useLogbook.js";
 
 import { QuestBoard }             from "./components/quest/QuestCard.jsx";
 import { QuestModal }             from "./components/quest/QuestModal.jsx";
@@ -104,6 +109,12 @@ export default function App() {
   const { roadmaps, setRoadmaps, progress, setProgress, notes, setNotes,
           resources, setResources, topicMeta, setTopicMeta, loaded } = useAppStorage();
   const isMobile = useIsMobile();
+  const { user, loading: authLoading, signIn, signUp, signOut } = useAuth();
+  const isGuest = !user;
+  const [guestMode,        setGuestMode]        = useState(false);  // explicitly chosen guest
+  const [showMigrate,      setShowMigrate]       = useState(false);  // guest-data migration prompt
+  const [cloudLoaded,      setCloudLoaded]       = useState(false);  // cloud data has been fetched
+  const [syncStatus,       setSyncStatus]        = useState("idle"); // idle | saving | saved | error
 
   // ── UI state ───────────────────────────────────────────────────────────────
   const [activeRoadmap,  setActiveRoadmap]  = useState(null);
@@ -120,7 +131,7 @@ export default function App() {
   const [loadingQuestRmIds, setLoadingQuestRmIds] = useState([]);
   const [questBoardOpen,    setQuestBoardOpen]    = useState(false);
   const [certificate,       setCertificate]       = useState(null);
-  const [projectBoardRm,    setProjectBoardRm]    = useState(null);  // roadmap to show cert for
+  const [projectBoardRm,    setProjectBoardRm]    = useState(null);
   const [showOnboarding,    setShowOnboarding]    = useState(false);
   const [searchOpen,     setSearchOpen]     = useState(false);
   const { streak, recordActivity, studiedToday } = useStreak();
@@ -132,7 +143,62 @@ export default function App() {
   const { getDueTopics, recordReview, getTopicLevel, getNextReview } = useSpacedRepetition();
   const { projects, addProjects, toggleMilestone, setStatus: setProjectStatus, deleteProject, getProjects, getStats: getProjectStats } = useProjects();
   const { clippings, addClipping, updateClipping, deleteClipping } = useClippings();
+  const logbookMasterTopic = (roadmapId, topic) => {
+    setProgress(prev => ({ ...prev, [`${roadmapId}::${topic}`]: true }));
+  };
+  const { entries: logbookEntries, addEntry: addLogEntry, updateEntry: updateLogEntry,
+    deleteEntry: deleteLogEntry, cycleStatus: cycleLogStatus, getStats: getLogStats,
+    emptyEntry: emptyLogEntry } = useLogbook(logbookMasterTopic);
+  // ── Supabase sync ─────────────────────────────────────────────────────────
+  const getSnapshot = useCallback(() => ({
+    roadmaps, progress, notes, resources, topicMeta,
+    clippings, projects, logbook: logbookEntries,
+    xpData, quests, dailyGoal: {}, srData: {},
+  }), [roadmaps, progress, notes, resources, topicMeta,
+       clippings, projects, logbookEntries, xpData, quests]);
+
+  const { markDirty, flush } = useSupabaseSync(user?.id, getSnapshot);
+
   const importRef = useRef(null);
+
+
+  // Load from Supabase when user signs in
+  useEffect(() => {
+    if (!user || cloudLoaded) return;
+    loadFromSupabase(user.id).then(data => {
+      if (data) {
+        if (data.roadmaps  && Object.keys(data.roadmaps).length)  setRoadmaps(data.roadmaps);
+        if (data.progress  && Object.keys(data.progress).length)  setProgress(data.progress);
+        if (data.notes     && Object.keys(data.notes).length)     setNotes(data.notes);
+        if (data.resources && Object.keys(data.resources).length) setResources(data.resources);
+        if (data.topic_meta)  setTopicMeta(data.topic_meta);
+        if (data.clippings?.length)  idbSet("learning-tracker-clippings-v1", data.clippings);
+        if (data.projects && Object.keys(data.projects).length)   idbSet("learning-tracker-projects-v1", data.projects);
+        if (data.logbook?.length)    idbSet("learning-tracker-logbook-v1", data.logbook);
+        if (data.xp_data)            idbSet("learning-tracker-xp-v1", data.xp_data);
+        if (data.quests)             idbSet("learning-tracker-quests-v2", data.quests);
+      } else {
+        // No cloud row yet — check if there's guest data to migrate
+        const hasGuestData = Object.keys(roadmaps).length > 0;
+        if (hasGuestData) setShowMigrate(true);
+      }
+      setCloudLoaded(true);
+    }).catch(e => {
+      console.error("Failed to load from Supabase:", e);
+      setCloudLoaded(true);
+    });
+  }, [user, cloudLoaded]);
+
+
+  const handleMigrateGuest = async () => {
+    try {
+      await saveToSupabase(user.id, getSnapshot());
+      showFeedback(true, "Guest data imported to your account!");
+    } catch(e) {
+      showFeedback(false, "Import failed: " + e.message);
+    }
+    setShowMigrate(false);
+  };
 
   const showFeedback = (ok, msg) => {
     setFeedback({ ok, msg });
@@ -153,12 +219,14 @@ export default function App() {
     const wasUndone = !progress[`${key}::${topic}`];
     setProgress(p => ({ ...p, [`${key}::${topic}`]: !p[`${key}::${topic}`] }));
     if (wasUndone) { recordActivity(); recordTopicDone(); }
+    if (!isGuest) markDirty();
   };
 
   const openNote = (key, topic) => setNoteModal({ roadmap: key, topic });
 
   const saveNote = ({ rmKey, topic, note, difficulty, timeEst, links }) => {
     setNotes(n => ({ ...n, [`${rmKey}::${topic}`]: note }));
+    if (!isGuest) markDirty();
     setTopicMeta(m => ({ ...m, [`${rmKey}::${topic}`]: { difficulty, timeEst } }));
     setResources(r => ({ ...r, [`${rmKey}::${topic}`]: links }));
     setNoteModal(null);
@@ -184,12 +252,6 @@ export default function App() {
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, []);
-
-  // Load onboarding completion status
-  useEffect(() => {
-    const completed = localStorage.getItem(ONBOARDING_COMPLETED_KEY) === "true";
-    if (completed) setShowOnboarding(false);
   }, []);
 
   // Navigate to a search result
@@ -247,6 +309,7 @@ export default function App() {
   const handleSaveRoadmap = (saved) => {
     setRoadmaps(prev => ({ ...prev, [saved.id]: saved }));
     setActiveRoadmap(saved.id);
+    if (!isGuest) markDirty();
     setActiveSection(null);
     if (isMobile) setMobileScreen("sections"); else setView("sections");
     setEditorModal(null);
@@ -301,6 +364,9 @@ export default function App() {
     if (data.xpData && typeof data.xpData === "object") {
       idbSet("learning-tracker-xp-v1", data.xpData);
     }
+    if (data.logbook && Array.isArray(data.logbook)) {
+      idbSet("learning-tracker-logbook-v1", data.logbook);
+    }
     const firstKey = data.roadmaps ? Object.keys(data.roadmaps)[0] : null;
     if (firstKey) { setActiveRoadmap(firstKey); if (isMobile) setMobileScreen("sections"); }
     showFeedback(true, "Backup restored! Reload the app to see all data.");
@@ -321,7 +387,8 @@ export default function App() {
     e.target.value = "";
   };
 
-  const handleExport = () => {
+  const handleExport = async () => {
+    if (user) { await flush(); }
     downloadJSON(
       {
         version: 3,
@@ -333,6 +400,7 @@ export default function App() {
         projects,
         quests,
         xpData,
+        logbook: logbookEntries,
       },
       `learning-tracker-backup-${new Date().toISOString().slice(0,10)}.json`
     );
@@ -343,6 +411,7 @@ export default function App() {
     exportedAt: new Date().toISOString(),
     roadmaps, progress, notes, resources, topicMeta,
     clippings, projects, quests, xpData,
+    logbook: logbookEntries,
   });
 
   const handleApplySnapshot = async (data) => {
@@ -389,29 +458,37 @@ export default function App() {
   `;
 
   // ── Loading ────────────────────────────────────────────────────────────────
+  // ── Auth gate ──────────────────────────────────────────────────────────────
+  if (authLoading) return (
+    <div style={{ minHeight: "100dvh", background: "#0f0f13", display: "flex",
+      alignItems: "center", justifyContent: "center" }}>
+      <div style={{ fontSize: 32 }}>🌿</div>
+    </div>
+  );
+
+  if (!user && !guestMode) return (
+    <>
+      <AuthModal
+        onSignIn={signIn}
+        onSignUp={signUp}
+        onGuest={() => setGuestMode(true)}
+        loading={authLoading}
+      />
+    </>
+  );
+
   if (!loaded) return (
     <div style={{ minHeight: "100vh", background: "#0f0f13", display: "flex", alignItems: "center",
       justifyContent: "center", color: "#555", fontFamily: "Georgia, serif" }}>Loading…</div>
   );
 
+
   // ── Welcome ────────────────────────────────────────────────────────────────
-  const onboardingCompleted = localStorage.getItem(ONBOARDING_COMPLETED_KEY) === "true";
-  if (rmKeys.length === 0 && !onboardingCompleted) return (
+  if (rmKeys.length === 0) return (
     <>
       <style>{globalStyle}</style>
       <OnboardingFlow
-        onComplete={() => {
-          localStorage.setItem(ONBOARDING_COMPLETED_KEY, "true");
-          // Create an empty roadmap so user can get started without a template
-          const emptyRoadmap = {
-            id: "my-roadmap",
-            label: "My Roadmap",
-            color: "#7b5ea7",
-            accent: "#c4b5fd",
-            sections: {}
-          };
-          handleSaveRoadmap(emptyRoadmap);
-        }}
+        onComplete={() => {}}
         onCreate={(tmpl) => {
           if (tmpl) handleSaveRoadmap({ ...tmpl, id: tmpl.id || tmpl.label.toLowerCase().replace(/\s+/g,"-") });
         }}
@@ -469,7 +546,7 @@ export default function App() {
   // ════════════════════════════════════════════════════════════════════════════
   if (isMobile) {
     const goToRoadmap = (key) => { setActiveRoadmap(key); setActiveSection(null); setMobileScreen("sections"); };
-    const screenTitle = { roadmaps: "Learning Tracker", quests: "🎯 Quests", dashboard: "Dashboard", sections: rm?.label, topics: curSec, nextup: "🎯 Next Up" };
+    const screenTitle = { roadmaps: "Learning Tracker", quests: "🎯 Quests", logbook: "📓 Logbook", dashboard: "Dashboard", sections: rm?.label, topics: curSec, nextup: "🎯 Next Up" };
 
     return (
       <div style={{ fontFamily: "'Georgia', serif", minHeight: "100dvh", background: "#0f0f13", color: "#e8e6e0", display: "flex", flexDirection: "column" }}>
@@ -486,7 +563,9 @@ export default function App() {
             )}
             <div>
               {mobileScreen === "roadmaps" && (
-                <div style={{ fontSize: 11, color: "#555", marginBottom: 1 }}>Learning Tracker</div>
+                <div style={{ fontSize: 11, color: user ? "#52b788" : "#555", marginBottom: 1 }}>
+                  {user ? `☁️ ${user.email?.split("@")[0]}` : "Guest mode"}
+                </div>
               )}
               <h1 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#fff", lineHeight: 1 }}>
                 {screenTitle[mobileScreen]}
@@ -499,6 +578,18 @@ export default function App() {
               style={{ width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center",
                 border: "none", borderRadius: 8, cursor: "pointer", background: "#1e1e24",
                 color: "#888", fontSize: 15 }}>🔍</button>
+            {user
+              ? <button onClick={signOut}
+                  style={{ width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center",
+                    border: "none", borderRadius: 8, cursor: "pointer",
+                    background: "#52b78822", color: "#52b788", fontSize: 14 }}
+                  title="Sign out">↪</button>
+              : <button onClick={() => setGuestMode(false)}
+                  style={{ width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center",
+                    border: "1px solid #7b5ea744", borderRadius: 8, cursor: "pointer",
+                    background: "#7b5ea711", color: "#c4b5fd", fontSize: 13, fontWeight: 700 }}
+                  title="Sign in">👤</button>
+            }
             <button onClick={() => setShowManage(true)}
               style={{ width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center",
                 border: "none", borderRadius: 8, cursor: "pointer", background: "#1e1e24",
@@ -528,6 +619,16 @@ export default function App() {
               singleColumn={true}
               onBegin={(rmId) => setActiveQuestRmId(rmId)}
               onGenerate={generateQuest}
+            />
+          </div>
+        )}
+
+        {mobileScreen === "logbook" && (
+          <div style={{ height: "calc(100dvh - calc(56px + env(safe-area-inset-top)) - calc(56px + env(safe-area-inset-bottom)))" }}>
+            <LogbookScreen
+              entries={logbookEntries} roadmaps={roadmaps}
+              onAdd={addLogEntry} onUpdate={updateLogEntry} onDelete={deleteLogEntry}
+              onCycleStatus={cycleLogStatus} getStats={getLogStats} emptyEntry={emptyLogEntry}
             />
           </div>
         )}
@@ -732,6 +833,19 @@ export default function App() {
               </button>
             );
           })()}
+          {/* Logbook tab */}
+          {(() => {
+            const active = mobileScreen === "logbook";
+            return (
+              <button onClick={() => setMobileScreen("logbook")}
+                style={{ flex: 1, padding: "12px 4px 14px", border: "none", background: "transparent",
+                  color: active ? "#d9a352" : "#444", cursor: "pointer", fontFamily: "inherit",
+                  borderTop: active ? "2px solid #d9a352" : "2px solid transparent" }}>
+                <div style={{ fontSize: 20, marginBottom: 3 }}>📓</div>
+                <div style={{ fontSize: 10, fontWeight: active ? 700 : 400, letterSpacing: 0.3 }}>Logbook</div>
+              </button>
+            );
+          })()}
           {/* Dashboard tab */}
           {(() => {
             const active = mobileScreen === "dashboard";
@@ -809,6 +923,24 @@ export default function App() {
               title="Search (⌘K)"
               style={{ padding: "7px 14px", border: "none", borderRadius: 7, cursor: "pointer",
                 fontFamily: "inherit", fontSize: 12, background: "#1e1e24", color: "#888" }}>🔍 Search</button>
+            {user && (
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ fontSize: 11, color: "#52b788", background: "#52b78822",
+                  border: "1px solid #52b78833", borderRadius: 5, padding: "3px 8px" }}>
+                  ☁️ {user.email?.split("@")[0]}
+                </span>
+                <button onClick={signOut}
+                  style={{ padding: "5px 10px", border: "1px solid #2a2a35", borderRadius: 6,
+                    background: "transparent", color: "#555", fontSize: 11,
+                    cursor: "pointer", fontFamily: "inherit" }}>Sign out</button>
+              </div>
+            )}
+            {!user && guestMode && (
+              <button onClick={() => setGuestMode(false)}
+                style={{ padding: "5px 10px", border: "1px solid #7b5ea744", borderRadius: 6,
+                  background: "#7b5ea711", color: "#c4b5fd", fontSize: 11,
+                  cursor: "pointer", fontFamily: "inherit" }}>Sign in</button>
+            )}
             <button onClick={() => setShowManage(true)}
               style={{ padding: "7px 14px", border: "none", borderRadius: 7, cursor: "pointer",
                 fontFamily: "inherit", fontSize: 12, background: "#1e1e24", color: "#888" }}>⚙️ Settings</button>
@@ -818,6 +950,12 @@ export default function App() {
                 color: view === "dashboard" ? "#c4b5fd" : "#888",
                 borderWidth: 1, borderStyle: "solid",
                 borderColor: view === "dashboard" ? "#7b5ea744" : "transparent" }}>📊 Dashboard</button>
+            <button onClick={() => setView(v => v === "logbook" ? "sections" : "logbook")}
+              style={{ padding: "7px 14px", border: "none", borderRadius: 7, cursor: "pointer", fontFamily: "inherit", fontSize: 12,
+                background: view === "logbook" ? "#2e2410" : "#1e1e24",
+                color: view === "logbook" ? "#d9a352" : "#888",
+                borderWidth: 1, borderStyle: "solid",
+                borderColor: view === "logbook" ? "#d9a35244" : "transparent" }}>📓 Logbook</button>
             <button onClick={() => setPracticeOpen(o => !o)}
               style={{ padding: "7px 16px", border: "none", borderRadius: 7, cursor: "pointer", fontFamily: "inherit", fontSize: 12, fontWeight: 700,
                 background: practiceOpen ? "#7b5ea7" : "linear-gradient(135deg, #7b5ea7, #4361ee)",
@@ -853,7 +991,17 @@ export default function App() {
           clippings={clippings} onAddClipping={addClipping} onUpdateClipping={updateClipping} onDeleteClipping={deleteClipping} />
       )}
 
-      {view !== "dashboard" && rm && (
+      {view === "logbook" && (
+        <div style={{ height: "calc(100vh - 108px)", maxWidth: 760, margin: "0 auto" }}>
+          <LogbookScreen
+            entries={logbookEntries} roadmaps={roadmaps}
+            onAdd={addLogEntry} onUpdate={updateLogEntry} onDelete={deleteLogEntry}
+            onCycleStatus={cycleLogStatus} getStats={getLogStats} emptyEntry={emptyLogEntry}
+          />
+        </div>
+      )}
+
+      {view !== "dashboard" && view !== "logbook" && rm && (
         <div style={{ display: "flex", height: "calc(100vh - 108px)" }}>
           {/* Sidebar */}
           <div style={{ width: 200, borderRight: "1px solid #1e1e24", overflowY: "auto", padding: "14px 0", flexShrink: 0 }}>
@@ -984,7 +1132,13 @@ export default function App() {
           onClose={() => setProjectBoardRm(null)}
         />
       )}
-      {certificate && (
+      {showMigrate && (
+        <GuestMigrateModal
+          onImport={handleMigrateGuest}
+          onSkip={() => setShowMigrate(false)}
+        />
+      )}
+{certificate && (
         <CompletionCertificate
           roadmap={certificate.rm}
           stats={certificate.stats}
