@@ -109,7 +109,7 @@ export default function App() {
   const { roadmaps, setRoadmaps, progress, setProgress, notes, setNotes,
           resources, setResources, topicMeta, setTopicMeta, loaded } = useAppStorage();
   const isMobile = useIsMobile();
-  const { user, loading: authLoading, signIn, signUp, signOut } = useAuth();
+  const { user, loading: authLoading, signIn, signUp, signOut, resetPassword } = useAuth();
   const isGuest = !user;
   const [guestMode,        setGuestMode]        = useState(false);  // explicitly chosen guest
   const [showMigrate,      setShowMigrate]       = useState(false);  // guest-data migration prompt
@@ -157,7 +157,25 @@ export default function App() {
   }), [roadmaps, progress, notes, resources, topicMeta,
        clippings, projects, logbookEntries, xpData, quests]);
 
-  const { markDirty, flush } = useSupabaseSync(user?.id, getSnapshot);
+  // Keep a ref always pointing to latest snapshot so flush never uses stale closure
+  const snapshotRef = useRef(getSnapshot);
+  useEffect(() => { snapshotRef.current = getSnapshot; }, [getSnapshot]);
+
+  // Hydrate state from remote data (called on focus refetch)
+  const onRemoteData = useCallback((data) => {
+    if (data.roadmaps  && Object.keys(data.roadmaps).length)  setRoadmaps(data.roadmaps);
+    if (data.progress  && Object.keys(data.progress).length)  setProgress(data.progress);
+    if (data.notes     && Object.keys(data.notes).length)     setNotes(data.notes);
+    if (data.resources && Object.keys(data.resources).length) setResources(data.resources);
+    if (data.topic_meta)  setTopicMeta(data.topic_meta);
+    if (data.clippings?.length)  idbSet("learning-tracker-clippings-v1", data.clippings);
+    if (data.projects && Object.keys(data.projects || {}).length) idbSet("learning-tracker-projects-v1", data.projects);
+    if (data.logbook?.length)  idbSet("learning-tracker-logbook-v1", data.logbook);
+    if (data.xp_data)  idbSet("learning-tracker-xp-v1", data.xp_data);
+    if (data.quests)   idbSet("learning-tracker-quests-v2", data.quests);
+  }, []);
+
+  const { save, flush } = useSupabaseSync(user?.id, useCallback(() => snapshotRef.current(), []), onRemoteData);
 
   const importRef = useRef(null);
 
@@ -180,7 +198,16 @@ export default function App() {
       } else {
         // No cloud row yet — check if there's guest data to migrate
         const hasGuestData = Object.keys(roadmaps).length > 0;
-        if (hasGuestData) setShowMigrate(true);
+        if (hasGuestData) {
+          setShowMigrate(true);
+        } else {
+          // No guest data either — create an empty row so future saves work
+          saveToSupabase(user.id, {
+            roadmaps: {}, progress: {}, notes: {}, resources: {},
+            topicMeta: {}, clippings: [], projects: {}, logbook: [],
+            xpData: {}, quests: {}, dailyGoal: {}, srData: {},
+          }).catch(e => console.error("Failed to create initial row:", e.message));
+        }
       }
       setCloudLoaded(true);
     }).catch(e => {
@@ -199,6 +226,14 @@ export default function App() {
     }
     setShowMigrate(false);
   };
+
+  // Once cloud is confirmed loaded, do one save to push any local state up
+  // 5s delay gives all IDB hooks (clippings, projects, logbook etc) time to load
+  useEffect(() => {
+    if (!user || !cloudLoaded) return;
+    const t = setTimeout(() => flush(), 5000);
+    return () => clearTimeout(t);
+  }, [cloudLoaded, user]);
 
   const showFeedback = (ok, msg) => {
     setFeedback({ ok, msg });
@@ -219,14 +254,14 @@ export default function App() {
     const wasUndone = !progress[`${key}::${topic}`];
     setProgress(p => ({ ...p, [`${key}::${topic}`]: !p[`${key}::${topic}`] }));
     if (wasUndone) { recordActivity(); recordTopicDone(); }
-    if (!isGuest) markDirty();
+    if (!isGuest) save();
   };
 
   const openNote = (key, topic) => setNoteModal({ roadmap: key, topic });
 
   const saveNote = ({ rmKey, topic, note, difficulty, timeEst, links }) => {
     setNotes(n => ({ ...n, [`${rmKey}::${topic}`]: note }));
-    if (!isGuest) markDirty();
+    if (!isGuest) flush();
     setTopicMeta(m => ({ ...m, [`${rmKey}::${topic}`]: { difficulty, timeEst } }));
     setResources(r => ({ ...r, [`${rmKey}::${topic}`]: links }));
     setNoteModal(null);
@@ -309,7 +344,7 @@ export default function App() {
   const handleSaveRoadmap = (saved) => {
     setRoadmaps(prev => ({ ...prev, [saved.id]: saved }));
     setActiveRoadmap(saved.id);
-    if (!isGuest) markDirty();
+    if (!isGuest) flush();
     setActiveSection(null);
     if (isMobile) setMobileScreen("sections"); else setView("sections");
     setEditorModal(null);
@@ -472,6 +507,7 @@ export default function App() {
         onSignIn={signIn}
         onSignUp={signUp}
         onGuest={() => setGuestMode(true)}
+        onResetPassword={resetPassword}
         loading={authLoading}
       />
     </>

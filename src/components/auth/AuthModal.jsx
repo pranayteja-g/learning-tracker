@@ -1,20 +1,33 @@
 import { useState } from "react";
 
-export function AuthModal({ onSignIn, onSignUp, onGuest, loading }) {
-  const [mode,     setMode]     = useState("login");  // login | signup
+export function AuthModal({ onSignIn, onSignUp, onGuest, onResetPassword, loading }) {
+  const [mode,     setMode]     = useState("login");   // login | signup | reset
   const [email,    setEmail]    = useState("");
   const [password, setPassword] = useState("");
   const [confirm,  setConfirm]  = useState("");
   const [error,    setError]    = useState("");
   const [busy,     setBusy]     = useState(false);
-  const [done,     setDone]     = useState(false);   // email confirmation sent
+  const [done,     setDone]     = useState(false);   // signup confirmation sent
+  const [resetSent,setResetSent]= useState(false);   // reset email sent
+
+  const switchMode = (m) => { setMode(m); setError(""); setDone(false); setResetSent(false); };
 
   const submit = async () => {
     setError("");
+    if (mode === "reset") {
+      if (!email.trim()) { setError("Enter your email address."); return; }
+      setBusy(true);
+      try {
+        await onResetPassword(email.trim());
+        setResetSent(true);
+      } catch (e) {
+        setError(e.message || "Could not send reset email.");
+      } finally { setBusy(false); }
+      return;
+    }
     if (!email.trim() || !password.trim()) { setError("Enter your email and password."); return; }
     if (mode === "signup" && password !== confirm) { setError("Passwords don't match."); return; }
     if (password.length < 6) { setError("Password must be at least 6 characters."); return; }
-
     setBusy(true);
     try {
       if (mode === "login") {
@@ -25,15 +38,13 @@ export function AuthModal({ onSignIn, onSignUp, onGuest, loading }) {
       }
     } catch (e) {
       setError(e.message || "Something went wrong.");
-    } finally {
-      setBusy(false);
-    }
+    } finally { setBusy(false); }
   };
 
   if (loading) return (
     <div style={{ minHeight: "100dvh", background: "#0f0f13", display: "flex",
       alignItems: "center", justifyContent: "center" }}>
-      <div style={{ fontSize: 28 }}>🌿</div>
+      <div style={{ fontSize: 28 }}>📚</div>
     </div>
   );
 
@@ -45,13 +56,32 @@ export function AuthModal({ onSignIn, onSignUp, onGuest, loading }) {
         <h2 style={{ color: "#fff", margin: "0 0 10px", fontSize: 22 }}>Check your email</h2>
         <p style={{ color: "#666", fontSize: 14, lineHeight: 1.7 }}>
           We sent a confirmation link to <strong style={{ color: "#ccc" }}>{email}</strong>.
-          Click it to activate your account then come back and log in.
+          Click it to activate your account, then come back and sign in.
         </p>
-        <button onClick={() => { setDone(false); setMode("login"); }}
+        <button onClick={() => switchMode("login")}
           style={{ marginTop: 20, padding: "11px 28px", background: "#7b5ea7",
             border: "none", borderRadius: 9, color: "#fff", fontSize: 14,
             fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
-          Back to Login
+          Back to Sign In
+        </button>
+      </div>
+    </div>
+  );
+
+  if (resetSent) return (
+    <div style={{ minHeight: "100dvh", background: "#0f0f13", display: "flex",
+      alignItems: "center", justifyContent: "center", padding: 24 }}>
+      <div style={{ maxWidth: 380, width: "100%", textAlign: "center" }}>
+        <div style={{ fontSize: 48, marginBottom: 16 }}>🔑</div>
+        <h2 style={{ color: "#fff", margin: "0 0 10px", fontSize: 22 }}>Reset email sent</h2>
+        <p style={{ color: "#666", fontSize: 14, lineHeight: 1.7 }}>
+          Check your inbox at <strong style={{ color: "#ccc" }}>{email}</strong> for a password reset link.
+        </p>
+        <button onClick={() => switchMode("login")}
+          style={{ marginTop: 20, padding: "11px 28px", background: "#7b5ea7",
+            border: "none", borderRadius: 9, color: "#fff", fontSize: 14,
+            fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+          Back to Sign In
         </button>
       </div>
     </div>
@@ -69,34 +99,46 @@ export function AuthModal({ onSignIn, onSignUp, onGuest, loading }) {
           <p style={{ margin: "6px 0 0", fontSize: 13, color: "#555" }}>Your personal learning companion</p>
         </div>
 
-        {/* Mode toggle */}
-        <div style={{ display: "flex", background: "#16161b", borderRadius: 10,
-          padding: 4, marginBottom: 20, border: "1px solid #1e1e24" }}>
-          {["login", "signup"].map(m => (
-            <button key={m} onClick={() => { setMode(m); setError(""); }}
-              style={{ flex: 1, padding: "9px", border: "none", borderRadius: 7,
-                background: mode === m ? "#7b5ea7" : "transparent",
-                color: mode === m ? "#fff" : "#555",
-                fontSize: 13, fontWeight: mode === m ? 700 : 400,
-                cursor: "pointer", fontFamily: "inherit",
-                textTransform: "capitalize" }}>
-              {m === "login" ? "Sign In" : "Sign Up"}
-            </button>
-          ))}
-        </div>
+        {/* Mode toggle — only for login/signup */}
+        {mode !== "reset" && (
+          <div style={{ display: "flex", background: "#16161b", borderRadius: 10,
+            padding: 4, marginBottom: 20, border: "1px solid #1e1e24" }}>
+            {["login", "signup"].map(m => (
+              <button key={m} onClick={() => switchMode(m)}
+                style={{ flex: 1, padding: "9px", border: "none", borderRadius: 7,
+                  background: mode === m ? "#7b5ea7" : "transparent",
+                  color: mode === m ? "#fff" : "#555",
+                  fontSize: 13, fontWeight: mode === m ? 700 : 400,
+                  cursor: "pointer", fontFamily: "inherit" }}>
+                {m === "login" ? "Sign In" : "Sign Up"}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {mode === "reset" && (
+          <div style={{ marginBottom: 20, display: "flex", alignItems: "center", gap: 8 }}>
+            <button onClick={() => switchMode("login")}
+              style={{ background: "transparent", border: "none", color: "#666",
+                fontSize: 20, cursor: "pointer", padding: 0 }}>‹</button>
+            <div style={{ fontSize: 15, fontWeight: 700, color: "#fff" }}>Reset Password</div>
+          </div>
+        )}
 
         {/* Form */}
         <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 }}>
           <input type="email" value={email} onChange={e => setEmail(e.target.value)}
-            placeholder="Email address"
+            placeholder="Email address" autoFocus
             onKeyDown={e => e.key === "Enter" && submit()}
             style={{ padding: "12px 14px", background: "#16161b", border: "1px solid #2a2a35",
               borderRadius: 9, color: "#fff", fontSize: 14, fontFamily: "inherit", outline: "none" }} />
-          <input type="password" value={password} onChange={e => setPassword(e.target.value)}
-            placeholder="Password"
-            onKeyDown={e => e.key === "Enter" && submit()}
-            style={{ padding: "12px 14px", background: "#16161b", border: "1px solid #2a2a35",
-              borderRadius: 9, color: "#fff", fontSize: 14, fontFamily: "inherit", outline: "none" }} />
+          {mode !== "reset" && (
+            <input type="password" value={password} onChange={e => setPassword(e.target.value)}
+              placeholder="Password"
+              onKeyDown={e => e.key === "Enter" && submit()}
+              style={{ padding: "12px 14px", background: "#16161b", border: "1px solid #2a2a35",
+                borderRadius: 9, color: "#fff", fontSize: 14, fontFamily: "inherit", outline: "none" }} />
+          )}
           {mode === "signup" && (
             <input type="password" value={confirm} onChange={e => setConfirm(e.target.value)}
               placeholder="Confirm password"
@@ -105,6 +147,17 @@ export function AuthModal({ onSignIn, onSignUp, onGuest, loading }) {
                 borderRadius: 9, color: "#fff", fontSize: 14, fontFamily: "inherit", outline: "none" }} />
           )}
         </div>
+
+        {/* Forgot password link */}
+        {mode === "login" && (
+          <div style={{ textAlign: "right", marginTop: -8, marginBottom: 12 }}>
+            <button onClick={() => switchMode("reset")}
+              style={{ background: "transparent", border: "none", color: "#7b5ea7",
+                fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>
+              Forgot password?
+            </button>
+          </div>
+        )}
 
         {error && (
           <div style={{ padding: "10px 14px", background: "#2e1a1a", border: "1px solid #e0525233",
@@ -117,27 +170,31 @@ export function AuthModal({ onSignIn, onSignUp, onGuest, loading }) {
           style={{ width: "100%", padding: "13px", background: busy ? "#2a2a35" : "#7b5ea7",
             border: "none", borderRadius: 10, color: busy ? "#555" : "#fff",
             fontSize: 15, fontWeight: 700, cursor: busy ? "default" : "pointer",
-            fontFamily: "inherit", marginBottom: 12 }}>
-          {busy ? "Please wait…" : mode === "login" ? "Sign In" : "Create Account"}
+            fontFamily: "inherit", marginBottom: mode === "reset" ? 0 : 12 }}>
+          {busy ? "Please wait…"
+            : mode === "login" ? "Sign In"
+            : mode === "signup" ? "Create Account"
+            : "Send Reset Email"}
         </button>
 
-        {/* Divider */}
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
-          <div style={{ flex: 1, height: 1, background: "#1e1e24" }} />
-          <span style={{ fontSize: 11, color: "#444" }}>or</span>
-          <div style={{ flex: 1, height: 1, background: "#1e1e24" }} />
-        </div>
-
-        {/* Guest */}
-        <button onClick={onGuest}
-          style={{ width: "100%", padding: "12px", background: "transparent",
-            border: "1px solid #2a2a35", borderRadius: 10, color: "#666",
-            fontSize: 14, cursor: "pointer", fontFamily: "inherit" }}>
-          Continue as Guest
-        </button>
-        <p style={{ textAlign: "center", fontSize: 11, color: "#333", marginTop: 10 }}>
-          Guest data is stored locally on this device only
-        </p>
+        {mode !== "reset" && (
+          <>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+              <div style={{ flex: 1, height: 1, background: "#1e1e24" }} />
+              <span style={{ fontSize: 11, color: "#444" }}>or</span>
+              <div style={{ flex: 1, height: 1, background: "#1e1e24" }} />
+            </div>
+            <button onClick={onGuest}
+              style={{ width: "100%", padding: "12px", background: "transparent",
+                border: "1px solid #2a2a35", borderRadius: 10, color: "#666",
+                fontSize: 14, cursor: "pointer", fontFamily: "inherit" }}>
+              Continue as Guest
+            </button>
+            <p style={{ textAlign: "center", fontSize: 11, color: "#333", marginTop: 10 }}>
+              Guest data is stored locally on this device only
+            </p>
+          </>
+        )}
       </div>
     </div>
   );

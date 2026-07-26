@@ -1,28 +1,18 @@
-import { useRef, useCallback, useEffect } from "react";
+import { useEffect, useRef, useCallback } from "react";
 import { supabase } from "../lib/supabase.js";
 
 const TABLE = "user_data";
 
-/**
- * Load all user data from Supabase.
- * Returns null if no row exists yet.
- */
 export async function loadFromSupabase(userId) {
   const { data, error } = await supabase
     .from(TABLE)
     .select("*")
     .eq("user_id", userId)
     .single();
-
-  if (error && error.code !== "PGRST116") { // PGRST116 = no rows found
-    throw error;
-  }
+  if (error && error.code !== "PGRST116") throw error;
   return data || null;
 }
 
-/**
- * Save (upsert) all user data to Supabase.
- */
 export async function saveToSupabase(userId, payload) {
   const { error } = await supabase
     .from(TABLE)
@@ -41,66 +31,85 @@ export async function saveToSupabase(userId, payload) {
       daily_goal: payload.dailyGoal  ?? {},
       sr_data:    payload.srData     ?? {},
     }, { onConflict: "user_id" });
-
   if (error) throw error;
 }
 
 /**
- * Hook that provides a debounced save function.
- * Marks dirty on every call, then saves 3s after last change.
- * Also saves on page unload.
+ * Simplified sync:
+ * - save()  → debounced 1.5s, batches rapid changes
+ * - flush() → immediate, for important saves
+ * - onRemoteData fires when window regains focus and Supabase has fresh data
  */
-export function useSupabaseSync(userId, getSnapshot) {
-  const dirtyRef    = useRef(false);
-  const timerRef    = useRef(null);
+export function useSupabaseSync(userId, getSnapshot, onRemoteData) {
   const savingRef   = useRef(false);
+  const snapshotRef = useRef(getSnapshot);
+  const onRemoteRef = useRef(onRemoteData);
+  const timerRef    = useRef(null);
 
+  useEffect(() => { snapshotRef.current = getSnapshot; },  [getSnapshot]);
+  useEffect(() => { onRemoteRef.current = onRemoteData; }, [onRemoteData]);
+
+  // Debounced save — batches rapid toggles
+  const save = useCallback(() => {
+    if (!userId) return;
+    clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(async () => {
+      if (savingRef.current) return;
+      savingRef.current = true;
+      try {
+        await saveToSupabase(userId, snapshotRef.current());
+      } catch (e) {
+        console.error("[Sync] Save failed:", e.message);
+      } finally {
+        savingRef.current = false;
+      }
+    }, 1500);
+  }, [userId]);
+
+  // Immediate flush — for important actions (note saved etc)
   const flush = useCallback(async () => {
-    if (!userId || !dirtyRef.current || savingRef.current) return;
+    if (!userId) return;
+    clearTimeout(timerRef.current);
+    if (savingRef.current) return;
     savingRef.current = true;
-    dirtyRef.current  = false;
     try {
-      await saveToSupabase(userId, getSnapshot());
+      await saveToSupabase(userId, snapshotRef.current());
     } catch (e) {
-      console.error("Supabase save failed:", e.message);
-      dirtyRef.current = true; // retry on next trigger
+      console.error("[Sync] Flush failed:", e.message);
     } finally {
       savingRef.current = false;
     }
-  }, [userId, getSnapshot]);
+  }, [userId]);
 
-  // Debounced mark-and-save
-  const markDirty = useCallback(() => {
-    if (!userId) return;
-    dirtyRef.current = true;
-    clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(flush, 3000);
-  }, [userId, flush]);
-
-  // Periodic save every 60s
+  // Refetch on window focus — cross-device sync
   useEffect(() => {
     if (!userId) return;
-    const interval = setInterval(flush, 60_000);
-    return () => clearInterval(interval);
-  }, [userId, flush]);
+    let lastFetch = 0;
 
-  // Save on tab close / navigation away
-  useEffect(() => {
-    if (!userId) return;
-    const handler = () => {
-      if (dirtyRef.current) {
-        // Use sendBeacon for reliability on page close
-        const payload = JSON.stringify({ userId, data: getSnapshot() });
-        navigator.sendBeacon?.("/api/sync", payload); // fallback, flush is better
-        flush();
+    const handleVisible = async () => {
+      const now = Date.now();
+      if (now - lastFetch < 10_000) return; // throttle to once per 10s
+      lastFetch = now;
+      try {
+        const data = await loadFromSupabase(userId);
+        if (data) onRemoteRef.current?.(data);
+      } catch (e) {
+        console.error("[Sync] Refetch failed:", e.message);
       }
     };
-    window.addEventListener("beforeunload", handler);
-    return () => window.removeEventListener("beforeunload", handler);
-  }, [userId, flush, getSnapshot]);
 
-  // Cleanup timer on unmount
+    const onFocus = () => handleVisible();
+    const onVisibility = () => { if (document.visibilityState === "visible") handleVisible(); };
+
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [userId]);
+
   useEffect(() => () => clearTimeout(timerRef.current), []);
 
-  return { markDirty, flush };
+  return { save, flush };
 }
