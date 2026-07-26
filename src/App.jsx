@@ -202,11 +202,11 @@ export default function App() {
           setShowMigrate(true);
         } else {
           // No guest data either — create an empty row so future saves work
-          await saveToSupabase(user.id, {
+          saveToSupabase(user.id, {
             roadmaps: {}, progress: {}, notes: {}, resources: {},
             topicMeta: {}, clippings: [], projects: {}, logbook: [],
             xpData: {}, quests: {}, dailyGoal: {}, srData: {},
-          });
+          }).catch(e => console.error("Failed to create initial row:", e.message));
         }
       }
       setCloudLoaded(true);
