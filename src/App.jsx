@@ -923,7 +923,8 @@ export default function App() {
                         onExportBackup={handleExport} onImportBackup={handleImportBackup}
                         onGetSnapshot={handleGetSnapshot} onApplySnapshot={handleApplySnapshot}
                         onEdit={r => { setEditorModal({ existing: r }); setShowManage(false); }}
-                        onCreate={() => { setEditorModal({ existing: null }); setShowManage(false); }} />}
+                        onCreate={() => { setEditorModal({ existing: null }); setShowManage(false); }}
+                        user={user} onSignOut={signOut} onResetPassword={resetPassword} isGuest={isGuest} />}
       {editorModal !== null && <RoadmapEditorModal existing={editorModal.existing}
                         onSave={handleSaveRoadmap} onClose={() => setEditorModal(null)} />}
       <PracticePanel open={practiceOpen} onClose={() => setPracticeOpen(false)}
@@ -1186,7 +1187,8 @@ export default function App() {
                         onExportBackup={handleExport} onImportBackup={handleImportBackup}
                         onGetSnapshot={handleGetSnapshot} onApplySnapshot={handleApplySnapshot}
                         onEdit={r => { setEditorModal({ existing: r }); setShowManage(false); }}
-                        onCreate={() => { setEditorModal({ existing: null }); setShowManage(false); }} />}
+                        onCreate={() => { setEditorModal({ existing: null }); setShowManage(false); }}
+                        user={user} onSignOut={signOut} onResetPassword={resetPassword} isGuest={isGuest} />}
       {editorModal !== null && <RoadmapEditorModal existing={editorModal.existing}
                         onSave={handleSaveRoadmap} onClose={() => setEditorModal(null)} />}
       <PracticePanel open={practiceOpen} onClose={() => setPracticeOpen(false)}
