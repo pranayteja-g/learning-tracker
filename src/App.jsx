@@ -185,23 +185,24 @@ export default function App() {
     if (!user || cloudLoaded) return;
     loadFromSupabase(user.id).then(data => {
       if (data) {
-        if (data.roadmaps  && Object.keys(data.roadmaps).length)  setRoadmaps(data.roadmaps);
-        if (data.progress  && Object.keys(data.progress).length)  setProgress(data.progress);
-        if (data.notes     && Object.keys(data.notes).length)     setNotes(data.notes);
-        if (data.resources && Object.keys(data.resources).length) setResources(data.resources);
-        if (data.topic_meta)  setTopicMeta(data.topic_meta);
-        if (data.clippings?.length)  idbSet("learning-tracker-clippings-v1", data.clippings);
-        if (data.projects && Object.keys(data.projects).length)   idbSet("learning-tracker-projects-v1", data.projects);
-        if (data.logbook?.length)    idbSet("learning-tracker-logbook-v1", data.logbook);
-        if (data.xp_data)            idbSet("learning-tracker-xp-v1", data.xp_data);
-        if (data.quests)             idbSet("learning-tracker-quests-v2", data.quests);
+        // Supabase is source of truth for logged-in users — always hydrate
+        if (data.roadmaps)   setRoadmaps(data.roadmaps);
+        if (data.progress)   setProgress(data.progress);
+        if (data.notes)      setNotes(data.notes);
+        if (data.resources)  setResources(data.resources);
+        if (data.topic_meta) setTopicMeta(data.topic_meta);
+        idbSet("learning-tracker-clippings-v1", data.clippings  || []);
+        idbSet("learning-tracker-projects-v1",  data.projects   || {});
+        idbSet("learning-tracker-logbook-v1",   data.logbook    || []);
+        idbSet("learning-tracker-xp-v1",        data.xp_data    || {});
+        idbSet("learning-tracker-quests-v2",    data.quests     || {});
       } else {
-        // No cloud row yet — check if there's guest data to migrate
+        // No cloud row yet — check if there is guest data to migrate
         const hasGuestData = Object.keys(roadmaps).length > 0;
         if (hasGuestData) {
           setShowMigrate(true);
         } else {
-          // No guest data either — create an empty row so future saves work
+          // Brand new account — create empty row
           saveToSupabase(user.id, {
             roadmaps: {}, progress: {}, notes: {}, resources: {},
             topicMeta: {}, clippings: [], projects: {}, logbook: [],
@@ -212,7 +213,7 @@ export default function App() {
       setCloudLoaded(true);
     }).catch(e => {
       console.error("Failed to load from Supabase:", e);
-      setCloudLoaded(true);
+      setCloudLoaded(true); // fall back to local data
     });
   }, [user, cloudLoaded]);
 
@@ -254,7 +255,7 @@ export default function App() {
     const wasUndone = !progress[`${key}::${topic}`];
     setProgress(p => ({ ...p, [`${key}::${topic}`]: !p[`${key}::${topic}`] }));
     if (wasUndone) { recordActivity(); recordTopicDone(); }
-    if (!isGuest) save();
+    if (!isGuest) flush();
   };
 
   const openNote = (key, topic) => setNoteModal({ roadmap: key, topic });
@@ -614,18 +615,13 @@ export default function App() {
               style={{ width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center",
                 border: "none", borderRadius: 8, cursor: "pointer", background: "#1e1e24",
                 color: "#888", fontSize: 15 }}>🔍</button>
-            {user
-              ? <button onClick={signOut}
-                  style={{ width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center",
-                    border: "none", borderRadius: 8, cursor: "pointer",
-                    background: "#52b78822", color: "#52b788", fontSize: 14 }}
-                  title="Sign out">↪</button>
-              : <button onClick={() => setGuestMode(false)}
-                  style={{ width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center",
-                    border: "1px solid #7b5ea744", borderRadius: 8, cursor: "pointer",
-                    background: "#7b5ea711", color: "#c4b5fd", fontSize: 13, fontWeight: 700 }}
-                  title="Sign in">👤</button>
-            }
+            {!user && guestMode && (
+              <button onClick={() => setGuestMode(false)}
+                style={{ width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center",
+                  border: "1px solid #7b5ea744", borderRadius: 8, cursor: "pointer",
+                  background: "#7b5ea711", color: "#c4b5fd", fontSize: 13, fontWeight: 700 }}
+                title="Sign in">👤</button>
+            )}
             <button onClick={() => setShowManage(true)}
               style={{ width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center",
                 border: "none", borderRadius: 8, cursor: "pointer", background: "#1e1e24",
@@ -927,7 +923,8 @@ export default function App() {
                         onExportBackup={handleExport} onImportBackup={handleImportBackup}
                         onGetSnapshot={handleGetSnapshot} onApplySnapshot={handleApplySnapshot}
                         onEdit={r => { setEditorModal({ existing: r }); setShowManage(false); }}
-                        onCreate={() => { setEditorModal({ existing: null }); setShowManage(false); }} />}
+                        onCreate={() => { setEditorModal({ existing: null }); setShowManage(false); }}
+                        user={user} onSignOut={signOut} onResetPassword={resetPassword} isGuest={isGuest} />}
       {editorModal !== null && <RoadmapEditorModal existing={editorModal.existing}
                         onSave={handleSaveRoadmap} onClose={() => setEditorModal(null)} />}
       <PracticePanel open={practiceOpen} onClose={() => setPracticeOpen(false)}
@@ -1190,7 +1187,8 @@ export default function App() {
                         onExportBackup={handleExport} onImportBackup={handleImportBackup}
                         onGetSnapshot={handleGetSnapshot} onApplySnapshot={handleApplySnapshot}
                         onEdit={r => { setEditorModal({ existing: r }); setShowManage(false); }}
-                        onCreate={() => { setEditorModal({ existing: null }); setShowManage(false); }} />}
+                        onCreate={() => { setEditorModal({ existing: null }); setShowManage(false); }}
+                        user={user} onSignOut={signOut} onResetPassword={resetPassword} isGuest={isGuest} />}
       {editorModal !== null && <RoadmapEditorModal existing={editorModal.existing}
                         onSave={handleSaveRoadmap} onClose={() => setEditorModal(null)} />}
       <PracticePanel open={practiceOpen} onClose={() => setPracticeOpen(false)}
