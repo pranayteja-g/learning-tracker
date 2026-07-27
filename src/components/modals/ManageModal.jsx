@@ -7,7 +7,8 @@ import { flatTopicNames } from "../../utils/topics.js";
 import { loadAIConfig, saveAIConfig, PROVIDERS } from "../../ai/providers.js";
 
 export function ManageModal({ roadmaps, onClose, onImportRoadmap, onDelete, onEdit, onCreate,
-  onExportBackup, onImportBackup, onGetSnapshot, onApplySnapshot, defaultTab = "roadmaps" }) {
+  onExportBackup, onImportBackup, onGetSnapshot, onApplySnapshot, defaultTab = "roadmaps",
+  user, onSignOut, onResetPassword, isGuest }) {
 
   const fileRef = useRef(null);
   const backupRef = useRef(null);
@@ -47,6 +48,7 @@ export function ManageModal({ roadmaps, onClose, onImportRoadmap, onDelete, onEd
             <button style={tabStyle("data")} onClick={() => setTab("data")}>Data</button>
             <button style={tabStyle("settings")} onClick={() => setTab("settings")}>AI</button>
             <button style={tabStyle("sync")} onClick={() => setTab("sync")}>Sync</button>
+            <button style={tabStyle("account")} onClick={() => setTab("account")}>Account</button>
           </div>
         </div>
 
@@ -143,6 +145,91 @@ export function ManageModal({ roadmaps, onClose, onImportRoadmap, onDelete, onEd
             <SyncTab onGetSnapshot={onGetSnapshot} onApplySnapshot={onApplySnapshot} />
           )}
 
+          {tab === "account" && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              {/* Account info */}
+              <div style={{ background: "#0f0f13", borderRadius: 10, padding: "14px 16px",
+                border: "1px solid #1e1e24" }}>
+                {user ? (
+                  <>
+                    <div style={{ fontSize: 11, color: "#555", textTransform: "uppercase",
+                      letterSpacing: 1, marginBottom: 6 }}>Signed in as</div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <div style={{ width: 36, height: 36, borderRadius: "50%",
+                        background: "#7b5ea722", border: "1px solid #7b5ea744",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        fontSize: 16 }}>👤</div>
+                      <div>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: "#fff" }}>
+                          {user.email}
+                        </div>
+                        <div style={{ fontSize: 11, color: "#52b788", marginTop: 2 }}>
+                          ☁️ Cloud sync active
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <div style={{ fontSize: 13, color: "#666" }}>
+                    You are in guest mode. Data is stored locally only.
+                  </div>
+                )}
+              </div>
+
+              {/* Reset password */}
+              {user && onResetPassword && (
+                <div>
+                  <div style={{ fontSize: 11, color: "#555", textTransform: "uppercase",
+                    letterSpacing: 1, marginBottom: 8 }}>Password</div>
+                  <button onClick={async () => {
+                    try {
+                      await onResetPassword(user.email);
+                      alert("Password reset email sent to " + user.email);
+                    } catch(e) { alert("Failed: " + e.message); }
+                  }}
+                    style={{ width: "100%", padding: "11px", background: "#1e1e24",
+                      border: "1px solid #2a2a35", borderRadius: 8, color: "#888",
+                      fontSize: 13, cursor: "pointer", fontFamily: "inherit", textAlign: "left" }}>
+                    🔑 Send password reset email
+                  </button>
+                </div>
+              )}
+
+              {/* Sign in (guest) */}
+              {isGuest && (
+                <div>
+                  <div style={{ fontSize: 11, color: "#555", textTransform: "uppercase",
+                    letterSpacing: 1, marginBottom: 8 }}>Account</div>
+                  <button onClick={() => { onClose(); }}
+                    style={{ width: "100%", padding: "11px", background: "#7b5ea722",
+                      border: "1px solid #7b5ea744", borderRadius: 8, color: "#c4b5fd",
+                      fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+                    👤 Sign in or create account
+                  </button>
+                  <div style={{ fontSize: 11, color: "#444", marginTop: 8, lineHeight: 1.6 }}>
+                    Sign in to sync your data across devices and keep it backed up online.
+                  </div>
+                </div>
+              )}
+
+              {/* Sign out */}
+              {user && onSignOut && (
+                <div style={{ marginTop: 8 }}>
+                  <div style={{ fontSize: 11, color: "#555", textTransform: "uppercase",
+                    letterSpacing: 1, marginBottom: 8 }}>Danger zone</div>
+                  <button onClick={() => {
+                    if (window.confirm("Sign out of your account?")) { onSignOut(); onClose(); }
+                  }}
+                    style={{ width: "100%", padding: "11px", background: "#2e1a1a",
+                      border: "1px solid #e0525233", borderRadius: 8, color: "#e05252",
+                      fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+                    ↪ Sign out
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
           {tab === "settings" && (
             <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
               <div>
@@ -150,7 +237,7 @@ export function ManageModal({ roadmaps, onClose, onImportRoadmap, onDelete, onEd
                   AI Provider
                 </div>
                 <div style={{ display: "flex", gap: 6 }}>
-                  {Object.entries(PROVIDERS).map(([id, p]) => (
+                  {Object.entries(PROVIDERS).filter(([,p]) => !p.sageOnly).map(([id, p]) => (
                     <button key={id} onClick={() => setAIConfig(c => ({ ...c, provider: id }))}
                       style={{ flex: 1, padding: "10px 8px", borderRadius: 8, cursor: "pointer",
                         fontFamily: "inherit", border: `1px solid ${aiConfig.provider === id ? p.color : "#2a2a35"}`,
@@ -165,7 +252,7 @@ export function ManageModal({ roadmaps, onClose, onImportRoadmap, onDelete, onEd
                 </div>
               </div>
 
-              {Object.entries(PROVIDERS).map(([id, p]) => (
+              {Object.entries(PROVIDERS).filter(([,p]) => !p.sageOnly).map(([id, p]) => (
                 <div key={id}>
                   <div style={{ fontSize: 11, color: "#555", textTransform: "uppercase",
                     letterSpacing: 1, marginBottom: 6 }}>{p.name} API Key</div>
@@ -190,6 +277,38 @@ export function ManageModal({ roadmaps, onClose, onImportRoadmap, onDelete, onEd
                   </div>
                 </div>
               ))}
+
+              {/* ── Sage / NVIDIA key ── */}
+              <div style={{ background: "#13131a", borderRadius: 10,
+                border: "1px solid #76b90033", padding: "12px 14px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                  <span style={{ fontSize: 16 }}>🌿</span>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "#76b900" }}>Sage AI — NVIDIA NIM</div>
+                  <span style={{ fontSize: 10, background: "#76b90022", color: "#76b900",
+                    padding: "1px 6px", borderRadius: 4, fontWeight: 700 }}>FREE</span>
+                </div>
+                <div style={{ fontSize: 11, color: "#555", marginBottom: 8, lineHeight: 1.6 }}>
+                  Sage uses NVIDIA NIM for intelligent app control — add notes, mark topics, create clippings, read images.
+                  Get a free key at{" "}
+                  <a href="https://build.nvidia.com/settings/api-keys" target="_blank" rel="noopener noreferrer"
+                    style={{ color: "#76b900" }}>build.nvidia.com</a>
+                </div>
+                <div style={{ display: "flex", gap: 6 }}>
+                  <input
+                    type={showKey["nvidia"] ? "text" : "password"}
+                    value={aiConfig.keys?.nvidia || ""}
+                    onChange={e => setAIConfig(c => ({ ...c, keys: { ...c.keys, nvidia: e.target.value } }))}
+                    placeholder="nvapi-..."
+                    style={{ flex: 1, background: "#0f0f13", border: "1px solid #2a2a35",
+                      borderRadius: 7, padding: "9px 12px", color: "#e8e6e0",
+                      fontSize: 13, fontFamily: "inherit", outline: "none" }} />
+                  <button onClick={() => setShowKey(s => ({ ...s, nvidia: !s.nvidia }))}
+                    style={{ padding: "9px 12px", background: "#1e1e24", border: "1px solid #2a2a35",
+                      borderRadius: 7, color: "#666", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>
+                    {showKey["nvidia"] ? "Hide" : "Show"}
+                  </button>
+                </div>
+              </div>
 
               <button onClick={handleSaveAI}
                 style={{ width: "100%", padding: "11px", background: "#7b5ea7", border: "none",
