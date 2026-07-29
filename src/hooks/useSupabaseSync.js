@@ -3,6 +3,8 @@ import { supabase } from "../lib/supabase.js";
 
 const TABLE = "user_data";
 
+// ── Public helpers ────────────────────────────────────────────────────────────
+
 export async function loadFromSupabase(userId) {
   const { data, error } = await supabase
     .from(TABLE)
@@ -35,51 +37,65 @@ export async function saveToSupabase(userId, payload) {
 }
 
 /**
- * Simplified sync:
- * - save()  → debounced 1.5s, batches rapid changes
- * - flush() → immediate, for important saves
- * - onRemoteData fires when window regains focus and Supabase has fresh data
+ * Core sync hook.
+ *
+ * DESIGN:
+ *   - markDirty() is called after React has committed new state.
+ *     It debounces and saves a snapshot taken AFTER the render.
+ *   - The snapshot is always taken fresh at save time, never at mark time.
+ *   - If a save is in flight, we set a "pendingAfterSave" flag so we
+ *     run one final save when the current one completes.
+ *   - On window focus we refetch from Supabase for cross-device sync.
+ *
+ * USAGE in App.jsx:
+ *   const { markDirty } = useSupabaseSync(userId, getSnapshot, onRemoteData);
+ *
+ *   // After ANY state change, call markDirty() from a useEffect:
+ *   useEffect(() => {
+ *     if (!isGuest) markDirty();
+ *   }, [progress, notes, roadmaps, ...]);
  */
 export function useSupabaseSync(userId, getSnapshot, onRemoteData) {
-  const savingRef   = useRef(false);
-  const snapshotRef = useRef(getSnapshot);
-  const onRemoteRef = useRef(onRemoteData);
-  const timerRef    = useRef(null);
+  const savingRef  = useRef(false);
+  const pendingRef = useRef(false);   // a save arrived while one was in flight
+  const timerRef   = useRef(null);
+  const snapRef    = useRef(getSnapshot);
+  const remoteRef  = useRef(onRemoteData);
 
-  useEffect(() => { snapshotRef.current = getSnapshot; },  [getSnapshot]);
-  useEffect(() => { onRemoteRef.current = onRemoteData; }, [onRemoteData]);
+  // Always keep refs current — these are read at save time, not mark time
+  useEffect(() => { snapRef.current  = getSnapshot;  }, [getSnapshot]);
+  useEffect(() => { remoteRef.current = onRemoteData; }, [onRemoteData]);
 
-  // Debounced save — batches rapid toggles
-  const save = useCallback(() => {
+  const doSave = useCallback(async () => {
     if (!userId) return;
-    clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(async () => {
-      if (savingRef.current) return;
-      savingRef.current = true;
-      try {
-        await saveToSupabase(userId, snapshotRef.current());
-      } catch (e) {
-        console.error("[Sync] Save failed:", e.message);
-      } finally {
-        savingRef.current = false;
-      }
-    }, 1500);
-  }, [userId]);
-
-  // Immediate flush — for important actions (note saved etc)
-  const flush = useCallback(async () => {
-    if (!userId) return;
-    clearTimeout(timerRef.current);
-    if (savingRef.current) return;
+    if (savingRef.current) {
+      // A save is already in flight — remember to run again after it finishes
+      pendingRef.current = true;
+      return;
+    }
     savingRef.current = true;
+    pendingRef.current = false;
     try {
-      await saveToSupabase(userId, snapshotRef.current());
+      // Snapshot is taken HERE — after React has committed, so state is fresh
+      await saveToSupabase(userId, snapRef.current());
     } catch (e) {
-      console.error("[Sync] Flush failed:", e.message);
+      console.error("[Sync] Save failed:", e.message);
+      pendingRef.current = true; // retry
     } finally {
       savingRef.current = false;
+      if (pendingRef.current) {
+        // More changes arrived while we were saving — save again
+        timerRef.current = setTimeout(doSave, 500);
+      }
     }
   }, [userId]);
+
+  // markDirty: debounce 1.5s then save
+  const markDirty = useCallback(() => {
+    if (!userId) return;
+    clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(doSave, 1500);
+  }, [userId, doSave]);
 
   // Refetch on window focus — cross-device sync
   useEffect(() => {
@@ -88,28 +104,26 @@ export function useSupabaseSync(userId, getSnapshot, onRemoteData) {
 
     const handleVisible = async () => {
       const now = Date.now();
-      if (now - lastFetch < 10_000) return; // throttle to once per 10s
+      if (now - lastFetch < 15_000) return; // throttle: max once per 15s
       lastFetch = now;
       try {
         const data = await loadFromSupabase(userId);
-        if (data) onRemoteRef.current?.(data);
+        if (data) remoteRef.current?.(data);
       } catch (e) {
         console.error("[Sync] Refetch failed:", e.message);
       }
     };
 
-    const onFocus = () => handleVisible();
-    const onVisibility = () => { if (document.visibilityState === "visible") handleVisible(); };
-
-    window.addEventListener("focus", onFocus);
-    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("focus", handleVisible);
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible") handleVisible();
+    });
     return () => {
-      window.removeEventListener("focus", onFocus);
-      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("focus", handleVisible);
     };
   }, [userId]);
 
   useEffect(() => () => clearTimeout(timerRef.current), []);
 
-  return { save, flush };
+  return { markDirty };
 }
