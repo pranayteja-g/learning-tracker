@@ -150,32 +150,42 @@ export default function App() {
     deleteEntry: deleteLogEntry, cycleStatus: cycleLogStatus, getStats: getLogStats,
     emptyEntry: emptyLogEntry } = useLogbook(logbookMasterTopic);
   // ── Supabase sync ─────────────────────────────────────────────────────────
+  // Snapshot is built from refs so it is always current at save time
+  const syncRefs = useRef({});
+  syncRefs.current = { roadmaps, progress, notes, resources, topicMeta,
+    clippings, projects, logbook: logbookEntries, xpData, quests };
+
   const getSnapshot = useCallback(() => ({
-    roadmaps, progress, notes, resources, topicMeta,
-    clippings, projects, logbook: logbookEntries,
-    xpData, quests, dailyGoal: {}, srData: {},
-  }), [roadmaps, progress, notes, resources, topicMeta,
-       clippings, projects, logbookEntries, xpData, quests]);
+    ...syncRefs.current,
+    dailyGoal: {}, srData: {},
+  }), []);
 
-  // Keep a ref always pointing to latest snapshot so flush never uses stale closure
-  const snapshotRef = useRef(getSnapshot);
-  useEffect(() => { snapshotRef.current = getSnapshot; }, [getSnapshot]);
-
-  // Hydrate state from remote data (called on focus refetch)
+  // Hydrate state when remote data arrives (on login or window focus)
   const onRemoteData = useCallback((data) => {
-    if (data.roadmaps  && Object.keys(data.roadmaps).length)  setRoadmaps(data.roadmaps);
-    if (data.progress  && Object.keys(data.progress).length)  setProgress(data.progress);
-    if (data.notes     && Object.keys(data.notes).length)     setNotes(data.notes);
-    if (data.resources && Object.keys(data.resources).length) setResources(data.resources);
-    if (data.topic_meta)  setTopicMeta(data.topic_meta);
-    if (data.clippings?.length)  idbSet("learning-tracker-clippings-v1", data.clippings);
-    if (data.projects && Object.keys(data.projects || {}).length) idbSet("learning-tracker-projects-v1", data.projects);
-    if (data.logbook?.length)  idbSet("learning-tracker-logbook-v1", data.logbook);
-    if (data.xp_data)  idbSet("learning-tracker-xp-v1", data.xp_data);
-    if (data.quests)   idbSet("learning-tracker-quests-v2", data.quests);
+    // Always apply — empty object/array is valid (user deleted everything)
+    if (data.roadmaps   != null) setRoadmaps(data.roadmaps);
+    if (data.progress   != null) setProgress(data.progress);
+    if (data.notes      != null) setNotes(data.notes);
+    if (data.resources  != null) setResources(data.resources);
+    if (data.topic_meta != null) setTopicMeta(data.topic_meta);
+    idbSet("learning-tracker-clippings-v1", data.clippings ?? []);
+    idbSet("learning-tracker-projects-v1",  data.projects  ?? {});
+    idbSet("learning-tracker-logbook-v1",   data.logbook   ?? []);
+    idbSet("learning-tracker-xp-v1",        data.xp_data   ?? {});
+    idbSet("learning-tracker-quests-v2",    data.quests    ?? {});
   }, []);
 
-  const { save, flush } = useSupabaseSync(user?.id, useCallback(() => snapshotRef.current(), []), onRemoteData);
+  const { markDirty } = useSupabaseSync(user?.id, getSnapshot, onRemoteData);
+
+  // ── Single source of truth for triggering saves ────────────────────────────
+  // Watch every piece of synced state. After React commits, markDirty fires.
+  // This guarantees the snapshot is always fresh — never stale.
+  useEffect(() => {
+    if (isGuest) return;
+    markDirty();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [roadmaps, progress, notes, resources, topicMeta,
+      clippings, projects, logbookEntries, xpData, quests]);
 
   const importRef = useRef(null);
 
@@ -228,13 +238,7 @@ export default function App() {
     setShowMigrate(false);
   };
 
-  // Once cloud is confirmed loaded, do one save to push any local state up
-  // 5s delay gives all IDB hooks (clippings, projects, logbook etc) time to load
-  useEffect(() => {
-    if (!user || !cloudLoaded) return;
-    const t = setTimeout(() => flush(), 5000);
-    return () => clearTimeout(t);
-  }, [cloudLoaded, user]);
+  // Saves are handled by the useEffect watching state above
 
   const showFeedback = (ok, msg) => {
     setFeedback({ ok, msg });
@@ -255,14 +259,12 @@ export default function App() {
     const wasUndone = !progress[`${key}::${topic}`];
     setProgress(p => ({ ...p, [`${key}::${topic}`]: !p[`${key}::${topic}`] }));
     if (wasUndone) { recordActivity(); recordTopicDone(); }
-    if (!isGuest) flush();
   };
 
   const openNote = (key, topic) => setNoteModal({ roadmap: key, topic });
 
   const saveNote = ({ rmKey, topic, note, difficulty, timeEst, links }) => {
     setNotes(n => ({ ...n, [`${rmKey}::${topic}`]: note }));
-    if (!isGuest) flush();
     setTopicMeta(m => ({ ...m, [`${rmKey}::${topic}`]: { difficulty, timeEst } }));
     setResources(r => ({ ...r, [`${rmKey}::${topic}`]: links }));
     setNoteModal(null);
@@ -309,7 +311,12 @@ export default function App() {
     const ts    = roadmaps[key].sections[sectionKey];
     const flat  = flatTopicNames(ts);
     const allDone = flat.every(t => progress[`${key}::${t}`]);
-    flat.forEach(t => setProgress(p => ({ ...p, [`${key}::${t}`]: !allDone })));
+    // Batch into a single state update — not one per topic
+    setProgress(prev => {
+      const next = { ...prev };
+      flat.forEach(t => { next[`${key}::${t}`] = !allDone; });
+      return next;
+    });
   };
 
   // Toggle collapsed state of a parent topic (up to 2 levels)
@@ -345,7 +352,6 @@ export default function App() {
   const handleSaveRoadmap = (saved) => {
     setRoadmaps(prev => ({ ...prev, [saved.id]: saved }));
     setActiveRoadmap(saved.id);
-    if (!isGuest) flush();
     setActiveSection(null);
     if (isMobile) setMobileScreen("sections"); else setView("sections");
     setEditorModal(null);
@@ -424,7 +430,6 @@ export default function App() {
   };
 
   const handleExport = async () => {
-    if (user) { await flush(); }
     downloadJSON(
       {
         version: 3,
