@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-export function AuthModal({ onSignIn, onSignUp, onGuest, onResetPassword, loading }) {
+export function AuthModal({ onSignIn, onSignUp, onResetPassword, loading }) {
   const [mode,     setMode]     = useState("login");   // login | signup | reset
   const [email,    setEmail]    = useState("");
   const [password, setPassword] = useState("");
@@ -177,24 +177,6 @@ export function AuthModal({ onSignIn, onSignUp, onGuest, onResetPassword, loadin
             : "Send Reset Email"}
         </button>
 
-        {mode !== "reset" && (
-          <>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
-              <div style={{ flex: 1, height: 1, background: "#1e1e24" }} />
-              <span style={{ fontSize: 11, color: "#444" }}>or</span>
-              <div style={{ flex: 1, height: 1, background: "#1e1e24" }} />
-            </div>
-            <button onClick={onGuest}
-              style={{ width: "100%", padding: "12px", background: "transparent",
-                border: "1px solid #2a2a35", borderRadius: 10, color: "#666",
-                fontSize: 14, cursor: "pointer", fontFamily: "inherit" }}>
-              Continue as Guest
-            </button>
-            <p style={{ textAlign: "center", fontSize: 11, color: "#333", marginTop: 10 }}>
-              Guest data is stored locally on this device only
-            </p>
-          </>
-        )}
       </div>
     </div>
   );

@@ -1,7 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
-import { idbGet, idbSet } from "../storage/db.js";
-
-const KEY = "learning-tracker-xp-v1";
+import { useCallback } from "react";
+import { useCloudField } from "../lib/cloudField.js";
 
 export const LEVELS = [
   { name: "Novice",      min: 0,    color: "#888",    icon: "🌱" },
@@ -163,18 +161,15 @@ Respond ONLY with JSON:
   }
 }
 
-export function useXP() {
-  const [xpData, setXpData] = useState({
-    xp: 0, badges: [], aiBadges: [],
-    completedQuests: 0, failedQuests: 0,
-    completedRoadmaps: [], hardQuestsCount: 0, highScoreCount: 0,
-    sameQuestFails: {},
-  });
-  const [loaded, setLoaded] = useState(false);
+const DEFAULT_XP_DATA = {
+  xp: 0, badges: [], aiBadges: [],
+  completedQuests: 0, failedQuests: 0,
+  completedRoadmaps: [], hardQuestsCount: 0, highScoreCount: 0,
+  sameQuestFails: {},
+};
 
-  useEffect(() => {
-    idbGet(KEY).then(stored => { if (stored) setXpData(stored); setLoaded(true); });
-  }, []);
+export function useXP(userId) {
+  const [xpData, setXpData, loaded] = useCloudField(userId, "xp_data", DEFAULT_XP_DATA);
 
   const awardQuestXP = useCallback(async (quest, phaseResults, activePhases, passed, apiKey) => {
     const earned = passed ? xpForQuest(phaseResults, activePhases) : 0;
@@ -207,15 +202,18 @@ export function useXP() {
         lastNewBadges:    newMilestoneBadges,
         lastAIBadge:      aiBadge,
       };
-      idbSet(KEY, updated);
       return updated;
     });
 
     return { earned, aiBadge };
-  }, [xpData]);
+  }, [xpData, setXpData]);
+
+  const replaceXpData = useCallback((next) => {
+    setXpData(next && typeof next === "object" ? next : DEFAULT_XP_DATA);
+  }, [setXpData]);
 
   return {
-    xpData, loaded, awardQuestXP,
+    xpData, loaded, awardQuestXP, replaceXpData,
     getLevel:     () => getLevel(xpData.xp),
     getNextLevel: () => getNextLevel(xpData.xp),
   };

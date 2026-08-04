@@ -1,7 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
-import { idbGet, idbSet } from "../storage/db.js";
-
-const KEY = "learning-tracker-sr-v1";
+import { useCallback } from "react";
+import { useCloudField } from "../lib/cloudField.js";
 
 // SM-2 simplified: interval doubles each successful review
 // New topic → review in 1 day
@@ -20,20 +18,15 @@ function isDue(nextReview) {
   return !nextReview || nextReview <= today;
 }
 
-export function useSpacedRepetition() {
-  const [srData, setSrData] = useState({}); // key -> { level, nextReview, lastReview }
-  const [loaded, setLoaded] = useState(false);
-
-  useEffect(() => {
-    idbGet(KEY).then(stored => { if (stored) setSrData(stored); setLoaded(true); });
-  }, []);
+export function useSpacedRepetition(userId) {
+  const [srData, setSrData, loaded] = useCloudField(userId, "sr_data", {}); // key -> { level, nextReview, lastReview }
 
   const recordReview = useCallback((rmId, topic, passed) => {
     const k = `${rmId}::${topic}`;
     setSrData(prev => {
       const cur     = prev[k] || { level: 0 };
       const newLevel = passed ? Math.min(cur.level + 1, INTERVALS.length - 1) : 0;
-      const updated  = {
+      return {
         ...prev,
         [k]: {
           level:      newLevel,
@@ -41,10 +34,8 @@ export function useSpacedRepetition() {
           lastReview: new Date().toISOString().slice(0, 10),
         },
       };
-      idbSet(KEY, updated);
-      return updated;
     });
-  }, []);
+  }, [setSrData]);
 
   const getDueTopics = useCallback((roadmaps, progress) => {
     const due = [];

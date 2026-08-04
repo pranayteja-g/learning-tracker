@@ -1,7 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
-import { idbGet, idbSet } from "../storage/db.js";
-
-const KEY = "learning-tracker-logbook-v1";
+import { useCallback } from "react";
+import { useCloudField } from "../lib/cloudField.js";
 
 export const STATUS_CYCLE = ["not-started", "in-progress", "mastered"];
 
@@ -25,71 +23,46 @@ function emptyEntry() {
   };
 }
 
-export function useLogbook(onMasterTopic) {
-  const [entries, setEntries] = useState([]);
-  const [loaded,  setLoaded]  = useState(false);
-
-  useEffect(() => {
-    idbGet(KEY).then(stored => { if (stored) setEntries(stored); setLoaded(true); });
-  }, []);
+export function useLogbook(userId, onMasterTopic) {
+  const [entries, setEntries, loaded] = useCloudField(userId, "logbook", []);
 
   const addEntry = useCallback((data) => {
     const entry = { ...emptyEntry(), ...data };
-    setEntries(prev => {
-      const updated = [entry, ...prev];
-      idbSet(KEY, updated);
-      return updated;
-    });
+    setEntries(prev => [entry, ...prev]);
     return entry;
-  }, []);
+  }, [setEntries]);
 
   const updateEntry = useCallback((id, changes) => {
-    setEntries(prev => {
-      const updated = prev.map(e => e.id === id ? { ...e, ...changes, updatedAt: Date.now() } : e);
-      idbSet(KEY, updated);
-      return updated;
-    });
-  }, []);
+    setEntries(prev => prev.map(e => e.id === id ? { ...e, ...changes, updatedAt: Date.now() } : e));
+  }, [setEntries]);
 
   const deleteEntry = useCallback((id) => {
-    setEntries(prev => {
-      const updated = prev.filter(e => e.id !== id);
-      idbSet(KEY, updated);
-      return updated;
-    });
-  }, []);
+    setEntries(prev => prev.filter(e => e.id !== id));
+  }, [setEntries]);
 
   // Cycle not-started -> in-progress -> mastered -> not-started
   // Reaching "mastered" on a linked entry auto-checks the roadmap topic.
   const cycleStatus = useCallback((id) => {
-    setEntries(prev => {
-      const updated = prev.map(e => {
-        if (e.id !== id) return e;
-        const idx = STATUS_CYCLE.indexOf(e.status);
-        const nextStatus = STATUS_CYCLE[(idx + 1) % STATUS_CYCLE.length];
-        if (nextStatus === "mastered" && e.roadmapId && e.topic && onMasterTopic) {
-          onMasterTopic(e.roadmapId, e.topic);
-        }
-        return { ...e, status: nextStatus, updatedAt: Date.now() };
-      });
-      idbSet(KEY, updated);
-      return updated;
-    });
-  }, [onMasterTopic]);
+    setEntries(prev => prev.map(e => {
+      if (e.id !== id) return e;
+      const idx = STATUS_CYCLE.indexOf(e.status);
+      const nextStatus = STATUS_CYCLE[(idx + 1) % STATUS_CYCLE.length];
+      if (nextStatus === "mastered" && e.roadmapId && e.topic && onMasterTopic) {
+        onMasterTopic(e.roadmapId, e.topic);
+      }
+      return { ...e, status: nextStatus, updatedAt: Date.now() };
+    }));
+  }, [setEntries, onMasterTopic]);
 
   const setStatus = useCallback((id, status) => {
-    setEntries(prev => {
-      const updated = prev.map(e => {
-        if (e.id !== id) return e;
-        if (status === "mastered" && e.roadmapId && e.topic && onMasterTopic) {
-          onMasterTopic(e.roadmapId, e.topic);
-        }
-        return { ...e, status, updatedAt: Date.now() };
-      });
-      idbSet(KEY, updated);
-      return updated;
-    });
-  }, [onMasterTopic]);
+    setEntries(prev => prev.map(e => {
+      if (e.id !== id) return e;
+      if (status === "mastered" && e.roadmapId && e.topic && onMasterTopic) {
+        onMasterTopic(e.roadmapId, e.topic);
+      }
+      return { ...e, status, updatedAt: Date.now() };
+    }));
+  }, [setEntries, onMasterTopic]);
 
   const getCategories = useCallback(() => {
     return [...new Set(entries.map(e => e.category).filter(Boolean))].sort();
@@ -106,10 +79,14 @@ export function useLogbook(onMasterTopic) {
     notStarted: entries.filter(e => e.status === "not-started").length,
   }), [entries]);
 
+  const replaceEntries = useCallback((nextEntries) => {
+    setEntries(Array.isArray(nextEntries) ? nextEntries : []);
+  }, [setEntries]);
+
   return {
     entries, loaded,
     addEntry, updateEntry, deleteEntry, cycleStatus, setStatus,
-    getCategories, getEntryForTopic, getStats,
+    getCategories, getEntryForTopic, getStats, replaceEntries,
     emptyEntry,
   };
 }
