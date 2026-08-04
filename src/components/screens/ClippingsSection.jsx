@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { loadAIConfig } from "../../ai/providers.js";
+import { loadAIConfig, callVisionAI } from "../../ai/providers.js";
 
 // ── Voice transcription ───────────────────────────────────────────────────────
 function useVoiceRecorder(onTranscript) {
@@ -34,19 +34,7 @@ function useVoiceRecorder(onTranscript) {
 
 // ── AI helpers ────────────────────────────────────────────────────────────────
 async function generateFromImage(base64, mimeType, title) {
-  const apiKey = loadAIConfig().keys?.groq?.trim();
-  if (!apiKey) throw new Error("Requires a Groq API key.");
-
-  const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
-    body: JSON.stringify({
-      model: "meta-llama/llama-4-scout-17b-16e-instruct",
-      max_tokens: 2048,
-      messages: [{
-        role: "user",
-        content: [
-          { type: "text", text: `Analyse this image and create comprehensive, well-structured study notes.
+  const prompt = `Analyse this image and create comprehensive, well-structured study notes.
 
 Identify the content type and adapt accordingly:
 - Code/programming → explain concepts + annotated code examples in same language
@@ -57,15 +45,10 @@ Identify the content type and adapt accordingly:
 
 Format with markdown (## headings, bullet points, code blocks).
 End with a "## Key Takeaways" section.
-Be thorough — these are notes the user will study from.` },
-          { type: "image_url", image_url: { url: `data:${mimeType};base64,${base64}` } }
-        ]
-      }]
-    })
-  });
-  if (!res.ok) { const e = await res.json(); throw new Error(e.error?.message || "API error"); }
-  const data = await res.json();
-  return data.choices?.[0]?.message?.content?.trim() || "";
+Be thorough — these are notes the user will study from.`;
+
+  const { text } = await callVisionAI({ prompt, base64, mimeType, maxTokens: 2048 });
+  return text.trim();
 }
 
 async function generateFromUrl(url) {
@@ -103,7 +86,7 @@ Format with markdown headings and bullet points.`;
   // Fallback: Gemini
   const geminiKey = loadAIConfig().keys?.gemini?.trim();
   if (!geminiKey) throw new Error("No API key configured.");
-  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`, {
+  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${geminiKey}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
