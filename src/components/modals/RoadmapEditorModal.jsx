@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { COLOR_PALETTE } from "../../constants/templates.js";
 import { slugify } from "../../utils/roadmap.js";
-import { callAI, loadAIConfig, PROVIDERS } from "../../ai/providers.js";
+import { callAI, loadAIConfig, PROVIDERS, callVisionAI } from "../../ai/providers.js";
 import { ROADMAP_SYSTEM_PROMPT, buildRoadmapPrompt, ROADMAP_CATEGORIES, buildTopicExpansionPrompt } from "../../ai/prompts.js";
 import { topicName, isExpanded, expandTopic, expandSubtopic } from "../../utils/topics.js";
 import { safeParseJSON } from "../../utils/jsonParse.js";
@@ -222,7 +222,7 @@ function AIGeneratePanel({ onGenerated, defaultColor, defaultAccent }) {
 // ── Image Import Panel ────────────────────────────────────────────────────────
 function ImageImportPanel({ onGenerated, defaultColor, defaultAccent }) {
   const aiConfig = loadAIConfig();
-  const hasKey   = !!aiConfig.keys?.[aiConfig.provider]?.trim();
+  const hasKey   = !!(aiConfig.keys?.gemini?.trim() || aiConfig.keys?.groq?.trim());
 
   const [image,   setImage]   = useState(null);  // { base64, mimeType, preview }
   const [loading, setLoading] = useState(false);
@@ -246,8 +246,6 @@ function ImageImportPanel({ onGenerated, defaultColor, defaultAccent }) {
     reader.readAsDataURL(file);
     e.target.value = "";
   };
-
-  const isPDF = image?.mimeType === "application/pdf";
 
   const analyse = async () => {
     if (!image) return;
@@ -275,64 +273,10 @@ Rules:
 - Minimum 2 sections, minimum 3 topics per section`;
 
     try {
-      let text = "";
-
-      if (isPDF) {
-        // PDFs → Gemini (supports PDF natively)
-        const apiKey = aiConfig.keys?.gemini?.trim();
-        if (!apiKey) throw new Error("PDF import requires a Gemini API key. Add one in Settings → AI.");
-
-        const response = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              contents: [{
-                parts: [
-                  { text: PROMPT },
-                  { inline_data: { mime_type: "application/pdf", data: image.base64 } }
-                ]
-              }],
-              generationConfig: { responseMimeType: "application/json", maxOutputTokens: 4096 }
-            })
-          }
-        );
-        if (!response.ok) {
-          const err = await response.json();
-          throw new Error(err.error?.message || `Gemini API error ${response.status}`);
-        }
-        const data = await response.json();
-        text = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
-
-      } else {
-        // Images → Groq vision
-        const apiKey = aiConfig.keys?.groq?.trim();
-        if (!apiKey) throw new Error("Image import requires a Groq API key. Add one in Settings → AI.");
-
-        const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
-          body: JSON.stringify({
-            model: "meta-llama/llama-4-scout-17b-16e-instruct",
-            max_tokens: 4096,
-            response_format: { type: "json_object" },
-            messages: [{
-              role: "user",
-              content: [
-                { type: "text", text: PROMPT },
-                { type: "image_url", image_url: { url: `data:${image.mimeType};base64,${image.base64}` } }
-              ]
-            }]
-          })
-        });
-        if (!response.ok) {
-          const err = await response.json();
-          throw new Error(err.error?.message || `Groq API error ${response.status}`);
-        }
-        const data = await response.json();
-        text = data.choices?.[0]?.message?.content || "";
-      }
+      const { text } = await callVisionAI({
+        prompt: PROMPT, base64: image.base64, mimeType: image.mimeType,
+        jsonMode: true, maxTokens: 4096,
+      });
 
       const parsed = safeParseJSON(text);
       if (!parsed.label || !parsed.sections) throw new Error("Could not extract roadmap structure. Try a clearer file.");
@@ -355,8 +299,8 @@ Rules:
   if (!hasKey) return (
     <div style={{ textAlign: "center", padding: "24px 0" }}>
       <div style={{ fontSize: 28, marginBottom: 10 }}>🔑</div>
-      <div style={{ fontSize: 13, color: "#ccc", marginBottom: 6 }}>Groq API key required</div>
-      <div style={{ fontSize: 12, color: "#555" }}>Images use Groq vision · PDFs use Gemini. Add the relevant key in Settings → AI.</div>
+      <div style={{ fontSize: 13, color: "#ccc", marginBottom: 6 }}>API key required</div>
+      <div style={{ fontSize: 12, color: "#555" }}>Add a free Groq or Gemini key in Settings → AI. (PDF import needs Gemini specifically.)</div>
     </div>
   );
 

@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { isValidUrl } from "../../utils/roadmap.js";
-import { callAIWithSearch, loadAIConfig } from "../../ai/providers.js";
+import { callAIWithSearch, loadAIConfig, callVisionAI } from "../../ai/providers.js";
 import { RESOURCES_SYSTEM_PROMPT, buildFindResourcesPrompt, buildTopicCheatSheetPrompt, INTERVIEW_SYSTEM_PROMPT } from "../../ai/prompts.js";
 import { useUsage } from "../../ai/useUsage.js";
 import { safeParseJSON } from "../../utils/jsonParse.js";
@@ -75,21 +75,7 @@ export function NoteModal({ noteModal, roadmaps, notes, resources, topicMeta, on
     if (!genImage) return;
     setGenLoading(true); setGenError(""); setGenResult(null);
     try {
-      const apiKey = loadAIConfig().keys?.groq?.trim();
-      if (!apiKey) throw new Error("Image analysis requires a Groq API key. Add one in Settings → AI.");
-
-      const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
-        body: JSON.stringify({
-          model: "meta-llama/llama-4-scout-17b-16e-instruct",
-          max_tokens: 2048,
-          messages: [{
-            role: "user",
-            content: [
-              {
-                type: "text",
-                text: `You are an expert study note creator. Analyse this image and create detailed, well-structured study notes.
+      const prompt = `You are an expert study note creator. Analyse this image and create detailed, well-structured study notes.
 
 Topic context: "${topic}" from ${rm?.label || "a learning roadmap"}
 
@@ -105,24 +91,12 @@ Instructions:
 4. Include practical examples relevant to the topic
 5. Add a "Key Takeaways" section at the end
 
-Write thorough, useful notes a student would actually want to study from.`
-              },
-              {
-                type: "image_url",
-                image_url: { url: `data:${genImage.mimeType};base64,${genImage.base64}` }
-              }
-            ]
-          }]
-        })
+Write thorough, useful notes a student would actually want to study from.`;
+
+      const { text } = await callVisionAI({
+        prompt, base64: genImage.base64, mimeType: genImage.mimeType, maxTokens: 2048,
       });
 
-      if (!response.ok) {
-        const err = await response.json();
-        throw new Error(err.error?.message || `API error ${response.status}`);
-      }
-
-      const data = await response.json();
-      const text = data.choices?.[0]?.message?.content || "";
       if (!text.trim()) throw new Error("No notes generated. Try a clearer image.");
       setGenResult(text.trim());
     } catch(e) {

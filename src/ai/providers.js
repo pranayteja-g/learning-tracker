@@ -50,7 +50,7 @@ async function withRetry(fn, maxAttempts = 2, initialDelayMs = 1000) {
 export const PROVIDERS = {
   gemini: {
     name: "Google Gemini",
-    model: "gemini-2.0-flash",
+    model: "gemini-2.5-flash-lite",
     keyPlaceholder: "AIza...",
     keyUrl: "https://aistudio.google.com/app/apikey",
     keyHint: "Get a free key at aistudio.google.com — no credit card needed",
@@ -107,7 +107,7 @@ export async function callAI({ provider, apiKey, systemPrompt, userPrompt, messa
 
 async function callGemini({ apiKey, systemPrompt, userPrompt, messages = [], temperature = 0.7, maxTokens = 4096 }) {
   return withRetry(async () => {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${apiKey}`;
     const history = messages.map(m => ({ role: m.role === "assistant" ? "model" : "user", parts: [{ text: m.content }] }));
     const body = {
       system_instruction: { parts: [{ text: systemPrompt }] },
@@ -139,6 +139,82 @@ async function callGemini({ apiKey, systemPrompt, userPrompt, messages = [], tem
   }, AI_SETTINGS.retryAttempts, AI_SETTINGS.retryDelayMs);
 }
 
+// ── Vision (image/PDF) calls ─────────────────────────────────────────────────
+// Used for image-to-notes and image/PDF-to-roadmap import.
+// Respects the user's chosen provider (Settings → AI), falling back to
+// whichever provider they do have a key for. PDFs always go to Gemini —
+// Groq's vision models don't accept PDF input directly.
+export async function callVisionAI({ prompt, base64, mimeType, jsonMode = false, maxTokens = 2048 }) {
+  const config = loadAIConfig();
+  const isPDF  = mimeType === "application/pdf";
+  const order  = isPDF ? ["gemini"] : (config.provider === "gemini" ? ["gemini", "groq"] : ["groq", "gemini"]);
+
+  for (const provider of order) {
+    const apiKey = config.keys?.[provider]?.trim();
+    if (!apiKey) continue;
+    if (provider === "gemini") return callGeminiVision({ apiKey, prompt, base64, mimeType, jsonMode, maxTokens });
+    return callGroqVision({ apiKey, prompt, base64, mimeType, jsonMode, maxTokens });
+  }
+
+  throw new Error(isPDF
+    ? "PDF import requires a Gemini API key (Groq doesn't support PDFs). Add one free in Settings → AI."
+    : "Add a free Groq or Gemini API key in Settings → AI to use image analysis.");
+}
+
+async function callGeminiVision({ apiKey, prompt, base64, mimeType, jsonMode, maxTokens }) {
+  return withRetry(async () => {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${apiKey}`;
+    const body = {
+      contents: [{ parts: [{ text: prompt }, { inline_data: { mime_type: mimeType, data: base64 } }] }],
+      generationConfig: {
+        maxOutputTokens: maxTokens,
+        ...(jsonMode ? { responseMimeType: "application/json" } : {}),
+      },
+    };
+    const res = await withTimeout(
+      fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }),
+      AI_SETTINGS.timeoutMs
+    );
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err?.error?.message || `Gemini error ${res.status}`);
+    }
+    const data = await res.json();
+    return { text: data.candidates?.[0]?.content?.parts?.[0]?.text || "", provider: "gemini" };
+  }, AI_SETTINGS.retryAttempts, AI_SETTINGS.retryDelayMs);
+}
+
+async function callGroqVision({ apiKey, prompt, base64, mimeType, jsonMode, maxTokens }) {
+  return withRetry(async () => {
+    const res = await withTimeout(
+      fetch("https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
+        body: JSON.stringify({
+          model: "qwen/qwen3.6-27b",
+          max_tokens: maxTokens,
+          ...(jsonMode ? { response_format: { type: "json_object" } } : {}),
+          messages: [{
+            role: "user",
+            content: [
+              { type: "text", text: prompt },
+              { type: "image_url", image_url: { url: `data:${mimeType};base64,${base64}` } }
+            ]
+          }]
+        })
+      }),
+      AI_SETTINGS.timeoutMs
+    );
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err?.error?.message || `Groq error ${res.status}`);
+    }
+    const data = await res.json();
+    return { text: data.choices?.[0]?.message?.content || "", provider: "groq" };
+  }, AI_SETTINGS.retryAttempts, AI_SETTINGS.retryDelayMs);
+}
+
+// ── Text completion calls ────────────────────────────────────────────────────
 async function callGroq({ apiKey, systemPrompt, userPrompt, messages = [], temperature = 0.7, maxTokens = 4096 }) {
   return withRetry(async () => {
     const history = messages.map(m => ({ role: m.role, content: m.content }));
@@ -200,7 +276,7 @@ export async function callAIWithSearch({ provider, apiKey, systemPrompt, userPro
 
 async function callGeminiWithSearch({ apiKey, systemPrompt, userPrompt }) {
   return withRetry(async () => {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${apiKey}`;
     const body = {
       system_instruction: { parts: [{ text: systemPrompt }] },
       contents: [{ role: "user", parts: [{ text: userPrompt }] }],
