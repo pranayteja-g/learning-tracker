@@ -1,22 +1,10 @@
-import { useState, useEffect, useCallback } from "react";
-import { idbGet, idbSet } from "../storage/db.js";
-
-const KEY = "learning-tracker-projects-v1";
+import { useCallback } from "react";
+import { useCloudField } from "../lib/cloudField.js";
 
 // status: "idea" | "inprogress" | "completed"
 
-export function useProjects() {
-  const [projects, setProjects] = useState({}); // { [rmId]: [project, ...] }
-  const [loaded,   setLoaded]   = useState(false);
-
-  useEffect(() => {
-    idbGet(KEY).then(stored => { if (stored) setProjects(stored); setLoaded(true); });
-  }, []);
-
-  const save = useCallback((updated) => {
-    setProjects(updated);
-    idbSet(KEY, updated);
-  }, []);
+export function useProjects(userId) {
+  const [projects, setProjects, loaded] = useCloudField(userId, "projects", {}); // { [rmId]: [project, ...] }
 
   const addProjects = useCallback((rmId, newProjects) => {
     setProjects(prev => {
@@ -30,21 +18,16 @@ export function useProjects() {
         startedAt:   null,
         completedAt: null,
       }));
-      const updated = { ...prev, [rmId]: [...existing, ...stamped] };
-      idbSet(KEY, updated);
-      return updated;
+      return { ...prev, [rmId]: [...existing, ...stamped] };
     });
-  }, []);
+  }, [setProjects]);
 
   const updateProject = useCallback((rmId, projId, changes) => {
     setProjects(prev => {
-      const list    = prev[rmId] || [];
-      const updated = list.map(p => p.id === projId ? { ...p, ...changes } : p);
-      const next    = { ...prev, [rmId]: updated };
-      idbSet(KEY, next);
-      return next;
+      const list = prev[rmId] || [];
+      return { ...prev, [rmId]: list.map(p => p.id === projId ? { ...p, ...changes } : p) };
     });
-  }, []);
+  }, [setProjects]);
 
   const toggleMilestone = useCallback((rmId, projId, milestoneIdx) => {
     setProjects(prev => {
@@ -56,11 +39,9 @@ export function useProjects() {
         );
         return { ...p, milestones };
       });
-      const next = { ...prev, [rmId]: updated };
-      idbSet(KEY, next);
-      return next;
+      return { ...prev, [rmId]: updated };
     });
-  }, []);
+  }, [setProjects]);
 
   const setStatus = useCallback((rmId, projId, status) => {
     const changes = {
@@ -72,12 +53,8 @@ export function useProjects() {
   }, [updateProject]);
 
   const deleteProject = useCallback((rmId, projId) => {
-    setProjects(prev => {
-      const next = { ...prev, [rmId]: (prev[rmId] || []).filter(p => p.id !== projId) };
-      idbSet(KEY, next);
-      return next;
-    });
-  }, []);
+    setProjects(prev => ({ ...prev, [rmId]: (prev[rmId] || []).filter(p => p.id !== projId) }));
+  }, [setProjects]);
 
   const getProjects = useCallback((rmId) => projects[rmId] || [], [projects]);
 
@@ -91,5 +68,9 @@ export function useProjects() {
     };
   }, [projects]);
 
-  return { projects, loaded, addProjects, updateProject, toggleMilestone, setStatus, deleteProject, getProjects, getStats };
+  const replaceProjects = useCallback((nextProjects) => {
+    setProjects(nextProjects && typeof nextProjects === "object" ? nextProjects : {});
+  }, [setProjects]);
+
+  return { projects, loaded, addProjects, updateProject, toggleMilestone, setStatus, deleteProject, getProjects, getStats, replaceProjects };
 }

@@ -1,7 +1,5 @@
-import { useState, useEffect, useCallback, useRef } from "react";
-import { idbGet, idbSet } from "../storage/db.js";
-
-const KEY = "learning-tracker-quiz-results-v1";
+import { useCallback } from "react";
+import { useCloudField } from "../lib/cloudField.js";
 
 /**
  * Proficiency system:
@@ -46,23 +44,8 @@ function calcProficiency(history) {
   return Math.min(100, Math.round(weightedSum / totalWeight));
 }
 
-export function useQuizResults() {
-  const [results, setResults] = useState({});
-  const [loaded,  setLoaded]  = useState(false);
-  const skipSave = useRef(true);
-
-  useEffect(() => {
-    idbGet(KEY).then(stored => {
-      if (stored) setResults(stored);
-      setLoaded(true);
-      skipSave.current = false;
-    });
-  }, []);
-
-  useEffect(() => {
-    if (!loaded) return;
-    idbSet(KEY, results);
-  }, [results, loaded]);
+export function useQuizResults(userId) {
+  const [results, setResults, loaded] = useCloudField(userId, "quiz_results", {});
 
   const recordQuizResult = useCallback((rmId, topics, score, total, difficulty = "mixed") => {
     const pct   = Math.round((score / total) * 100);
@@ -89,7 +72,7 @@ export function useQuizResults() {
     });
 
     return { pct, passed: pct >= 70 };
-  }, []);
+  }, [setResults]);
 
   const getTopicResult = useCallback((rmId, topic) => {
     return results[`${rmId}::${topic}`] || null;
@@ -108,13 +91,11 @@ export function useQuizResults() {
   }, [results]);
 
   const replaceResults = useCallback((nextResults) => {
-    const safeResults = nextResults && typeof nextResults === "object" ? nextResults : {};
-    setResults(safeResults);
-    idbSet(KEY, safeResults);
-  }, []);
+    setResults(nextResults && typeof nextResults === "object" ? nextResults : {});
+  }, [setResults]);
 
   return {
-    results,
+    results, loaded,
     recordQuizResult,
     getTopicResult,
     hasPassedTopic,
