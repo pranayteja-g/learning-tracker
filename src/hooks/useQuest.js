@@ -1,7 +1,6 @@
-import { useState, useEffect, useCallback } from "react";
-import { idbGet, idbSet } from "../storage/db.js";
+import { useCallback } from "react";
+import { useCloudField } from "../lib/cloudField.js";
 
-const KEY = "learning-tracker-quests-v2"; // v2 = per-roadmap
 const COOLDOWN_MS = 4 * 60 * 60 * 1000;  // 4 hours
 
 /**
@@ -9,40 +8,28 @@ const COOLDOWN_MS = 4 * 60 * 60 * 1000;  // 4 hours
  * Each quest: { rmId, title, topics, section, phases, status, phase,
  *               phaseResults, startedAt, completedAt, cooldownUntil }
  */
-export function useQuest() {
-  const [quests, setQuests] = useState({});  // rmId -> quest
-  const [loaded, setLoaded] = useState(false);
-
-  useEffect(() => {
-    idbGet(KEY).then(stored => {
-      if (stored) setQuests(stored);
-      setLoaded(true);
-    });
-  }, []);
+export function useQuest(userId) {
+  const [quests, setQuests, loaded] = useCloudField(userId, "quests", {});
 
   const startQuest = useCallback((questData) => {
-    setQuests(prev => {
-      const updated = {
-        ...prev,
-        [questData.roadmapId]: {
-          ...questData,
-          status: "active",
-          phase: 0,
-          phaseResults: {},
-          startedAt: Date.now(),
-          cooldownUntil: null,
-        },
-      };
-      idbSet(KEY, updated);
-      return updated;
-    });
-  }, []);
+    setQuests(prev => ({
+      ...prev,
+      [questData.roadmapId]: {
+        ...questData,
+        status: "active",
+        phase: 0,
+        phaseResults: {},
+        startedAt: Date.now(),
+        cooldownUntil: null,
+      },
+    }));
+  }, [setQuests]);
 
   const advancePhase = useCallback((rmId, phaseResult) => {
     setQuests(prev => {
       const q = prev[rmId];
       if (!q) return prev;
-      const updated = {
+      return {
         ...prev,
         [rmId]: {
           ...q,
@@ -50,16 +37,14 @@ export function useQuest() {
           phase: q.phase + 1,
         },
       };
-      idbSet(KEY, updated);
-      return updated;
     });
-  }, []);
+  }, [setQuests]);
 
   const completeQuest = useCallback((rmId, passed) => {
     setQuests(prev => {
       const q = prev[rmId];
       if (!q) return prev;
-      const updated = {
+      return {
         ...prev,
         [rmId]: {
           ...q,
@@ -68,19 +53,16 @@ export function useQuest() {
           completedAt: Date.now(),
         },
       };
-      idbSet(KEY, updated);
-      return updated;
     });
-  }, []);
+  }, [setQuests]);
 
   const clearQuest = useCallback((rmId) => {
     setQuests(prev => {
       const updated = { ...prev };
       delete updated[rmId];
-      idbSet(KEY, updated);
       return updated;
     });
-  }, []);
+  }, [setQuests]);
 
   const getQuest = useCallback((rmId) => quests[rmId] || null, [quests]);
 
@@ -102,10 +84,8 @@ export function useQuest() {
   }, [quests, isOnCooldown]);
 
   const replaceQuests = useCallback((nextQuests) => {
-    const safeQuests = nextQuests && typeof nextQuests === "object" ? nextQuests : {};
-    setQuests(safeQuests);
-    idbSet(KEY, safeQuests);
-  }, []);
+    setQuests(nextQuests && typeof nextQuests === "object" ? nextQuests : {});
+  }, [setQuests]);
 
   return {
     quests, loaded,

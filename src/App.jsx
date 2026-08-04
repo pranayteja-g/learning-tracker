@@ -1,9 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
-import { idbGet, idbSet } from "./storage/db.js";
 import { useAuth }              from "./hooks/useAuth.js";
-import { useSupabaseSync, loadFromSupabase, saveToSupabase } from "./hooks/useSupabaseSync.js";
 import { AuthModal }            from "./components/auth/AuthModal.jsx";
-import { GuestMigrateModal }    from "./components/auth/GuestMigrateModal.jsx";
 import { useAppStorage }         from "./storage/hooks.js";
 import { useIsMobile }           from "./hooks/useIsMobile.js";
 import { validateRoadmap, downloadJSON, getRoadmapStats, getNextUp } from "./utils/roadmap.js";
@@ -106,15 +103,12 @@ function CompactTimer({ color }) {
 }
 
 export default function App() {
-  const { roadmaps, setRoadmaps, progress, setProgress, notes, setNotes,
-          resources, setResources, topicMeta, setTopicMeta, loaded } = useAppStorage();
-  const isMobile = useIsMobile();
   const { user, loading: authLoading, signIn, signUp, signOut, resetPassword } = useAuth();
-  const isGuest = !user;
-  const [guestMode,        setGuestMode]        = useState(false);  // explicitly chosen guest
-  const [showMigrate,      setShowMigrate]       = useState(false);  // guest-data migration prompt
-  const [cloudLoaded,      setCloudLoaded]       = useState(false);  // cloud data has been fetched
-  const [syncStatus,       setSyncStatus]        = useState("idle"); // idle | saving | saved | error
+  const userId = user?.id;
+  const { roadmaps, setRoadmaps, progress, setProgress, notes, setNotes,
+          resources, setResources, topicMeta, setTopicMeta, loaded } = useAppStorage(userId);
+  const isMobile = useIsMobile();
+  const isGuest = false; // sign-in is required — kept only for components that still take this prop
 
   // ── UI state ───────────────────────────────────────────────────────────────
   const [activeRoadmap,  setActiveRoadmap]  = useState(null);
@@ -134,111 +128,27 @@ export default function App() {
   const [projectBoardRm,    setProjectBoardRm]    = useState(null);
   const [showOnboarding,    setShowOnboarding]    = useState(false);
   const [searchOpen,     setSearchOpen]     = useState(false);
-  const { streak, recordActivity, studiedToday } = useStreak();
-  const { results: quizResults, recordQuizResult, hasPassedTopic, getStars } = useQuizResults();
+  const { streak, recordActivity, studiedToday } = useStreak(userId);
+  const { results: quizResults, recordQuizResult, hasPassedTopic, getStars, replaceResults } = useQuizResults(userId);
   const { quests, loaded: questLoaded, startQuest, advancePhase, completeQuest,
-          isOnCooldown, cooldownRemaining, needsNewQuest, getQuest } = useQuest();
-  const { xpData, awardQuestXP } = useXP();
-  const { goal, todayCount, pct: goalPct, goalMet, goalStreak, setGoal, recordTopicDone } = useDailyGoal();
-  const { getDueTopics, recordReview, getTopicLevel, getNextReview } = useSpacedRepetition();
-  const { projects, addProjects, toggleMilestone, setStatus: setProjectStatus, deleteProject, getProjects, getStats: getProjectStats } = useProjects();
-  const { clippings, addClipping, updateClipping, deleteClipping } = useClippings();
+          isOnCooldown, cooldownRemaining, needsNewQuest, getQuest, replaceQuests } = useQuest(userId);
+  const { xpData, awardQuestXP, replaceXpData } = useXP(userId);
+  const { goal, todayCount, pct: goalPct, goalMet, goalStreak, setGoal, recordTopicDone } = useDailyGoal(userId);
+  const { getDueTopics, recordReview, getTopicLevel, getNextReview } = useSpacedRepetition(userId);
+  const { projects, addProjects, toggleMilestone, setStatus: setProjectStatus, deleteProject, getProjects, getStats: getProjectStats, replaceProjects } = useProjects(userId);
+  const { clippings, addClipping, updateClipping, deleteClipping, replaceClippings } = useClippings(userId);
   const logbookMasterTopic = (roadmapId, topic) => {
     setProgress(prev => ({ ...prev, [`${roadmapId}::${topic}`]: true }));
   };
   const { entries: logbookEntries, addEntry: addLogEntry, updateEntry: updateLogEntry,
     deleteEntry: deleteLogEntry, cycleStatus: cycleLogStatus, getStats: getLogStats,
-    emptyEntry: emptyLogEntry } = useLogbook(logbookMasterTopic);
-  // ── Supabase sync ─────────────────────────────────────────────────────────
-  // Snapshot is built from refs so it is always current at save time
-  const syncRefs = useRef({});
-  syncRefs.current = { roadmaps, progress, notes, resources, topicMeta,
-    clippings, projects, logbook: logbookEntries, xpData, quests };
-
-  const getSnapshot = useCallback(() => ({
-    ...syncRefs.current,
-    dailyGoal: {}, srData: {},
-  }), []);
-
-  // Hydrate state when remote data arrives (on login or window focus)
-  const onRemoteData = useCallback((data) => {
-    // Always apply — empty object/array is valid (user deleted everything)
-    if (data.roadmaps   != null) setRoadmaps(data.roadmaps);
-    if (data.progress   != null) setProgress(data.progress);
-    if (data.notes      != null) setNotes(data.notes);
-    if (data.resources  != null) setResources(data.resources);
-    if (data.topic_meta != null) setTopicMeta(data.topic_meta);
-    idbSet("learning-tracker-clippings-v1", data.clippings ?? []);
-    idbSet("learning-tracker-projects-v1",  data.projects  ?? {});
-    idbSet("learning-tracker-logbook-v1",   data.logbook   ?? []);
-    idbSet("learning-tracker-xp-v1",        data.xp_data   ?? {});
-    idbSet("learning-tracker-quests-v2",    data.quests    ?? {});
-  }, []);
-
-  const { markDirty } = useSupabaseSync(user?.id, getSnapshot, onRemoteData);
-
-  // ── Single source of truth for triggering saves ────────────────────────────
-  // Watch every piece of synced state. After React commits, markDirty fires.
-  // This guarantees the snapshot is always fresh — never stale.
-  useEffect(() => {
-    if (isGuest) return;
-    markDirty();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [roadmaps, progress, notes, resources, topicMeta,
-      clippings, projects, logbookEntries, xpData, quests]);
+    emptyEntry: emptyLogEntry, replaceEntries: replaceLogbookEntries } = useLogbook(userId, logbookMasterTopic);
+  // ── Cloud sync ─────────────────────────────────────────────────────────────
+  // Every piece of state above is backed by its own Supabase column via
+  // useCloudField — each writes through on change independently, so there's
+  // no combined snapshot step and no local cache that can go stale.
 
   const importRef = useRef(null);
-
-
-  // Load from Supabase when user signs in
-  useEffect(() => {
-    if (!user || cloudLoaded) return;
-    loadFromSupabase(user.id).then(data => {
-      if (data) {
-        // Supabase is source of truth for logged-in users — always hydrate
-        if (data.roadmaps)   setRoadmaps(data.roadmaps);
-        if (data.progress)   setProgress(data.progress);
-        if (data.notes)      setNotes(data.notes);
-        if (data.resources)  setResources(data.resources);
-        if (data.topic_meta) setTopicMeta(data.topic_meta);
-        idbSet("learning-tracker-clippings-v1", data.clippings  || []);
-        idbSet("learning-tracker-projects-v1",  data.projects   || {});
-        idbSet("learning-tracker-logbook-v1",   data.logbook    || []);
-        idbSet("learning-tracker-xp-v1",        data.xp_data    || {});
-        idbSet("learning-tracker-quests-v2",    data.quests     || {});
-      } else {
-        // No cloud row yet — check if there is guest data to migrate
-        const hasGuestData = Object.keys(roadmaps).length > 0;
-        if (hasGuestData) {
-          setShowMigrate(true);
-        } else {
-          // Brand new account — create empty row
-          saveToSupabase(user.id, {
-            roadmaps: {}, progress: {}, notes: {}, resources: {},
-            topicMeta: {}, clippings: [], projects: {}, logbook: [],
-            xpData: {}, quests: {}, dailyGoal: {}, srData: {},
-          }).catch(e => console.error("Failed to create initial row:", e.message));
-        }
-      }
-      setCloudLoaded(true);
-    }).catch(e => {
-      console.error("Failed to load from Supabase:", e);
-      setCloudLoaded(true); // fall back to local data
-    });
-  }, [user, cloudLoaded]);
-
-
-  const handleMigrateGuest = async () => {
-    try {
-      await saveToSupabase(user.id, getSnapshot());
-      showFeedback(true, "Guest data imported to your account!");
-    } catch(e) {
-      showFeedback(false, "Import failed: " + e.message);
-    }
-    setShowMigrate(false);
-  };
-
-  // Saves are handled by the useEffect watching state above
 
   const showFeedback = (ok, msg) => {
     setFeedback({ ok, msg });
@@ -393,25 +303,29 @@ export default function App() {
     if (data.notes)     setNotes(prev     => ({ ...prev,  ...data.notes }));
     if (data.resources) setResources(prev => ({ ...prev,  ...data.resources }));
     if (data.topicMeta) setTopicMeta(prev => ({ ...prev,  ...data.topicMeta }));
-    // Extended data — restore directly via IDB
+    // Extended data — restored through each hook's setter, so it's live
+    // immediately and synced to Supabase, no reload required.
     if (data.clippings && Array.isArray(data.clippings)) {
-      idbSet("learning-tracker-clippings-v1", data.clippings);
+      replaceClippings(data.clippings);
     }
     if (data.projects && typeof data.projects === "object") {
-      idbSet("learning-tracker-projects-v1", data.projects);
+      replaceProjects(data.projects);
     }
     if (data.quests && typeof data.quests === "object") {
-      idbSet("learning-tracker-quests-v2", data.quests);
+      replaceQuests(data.quests);
     }
     if (data.xpData && typeof data.xpData === "object") {
-      idbSet("learning-tracker-xp-v1", data.xpData);
+      replaceXpData(data.xpData);
     }
     if (data.logbook && Array.isArray(data.logbook)) {
-      idbSet("learning-tracker-logbook-v1", data.logbook);
+      replaceLogbookEntries(data.logbook);
+    }
+    if (data.quizResults && typeof data.quizResults === "object") {
+      replaceResults(data.quizResults);
     }
     const firstKey = data.roadmaps ? Object.keys(data.roadmaps)[0] : null;
     if (firstKey) { setActiveRoadmap(firstKey); if (isMobile) setMobileScreen("sections"); }
-    showFeedback(true, "Backup restored! Reload the app to see all data.");
+    showFeedback(true, "Backup restored!");
   };
 
   const handleImportBackup = (e) => {
@@ -442,6 +356,7 @@ export default function App() {
         quests,
         xpData,
         logbook: logbookEntries,
+        quizResults,
       },
       `learning-tracker-backup-${new Date().toISOString().slice(0,10)}.json`
     );
@@ -453,6 +368,7 @@ export default function App() {
     roadmaps, progress, notes, resources, topicMeta,
     clippings, projects, quests, xpData,
     logbook: logbookEntries,
+    quizResults,
   });
 
   const handleApplySnapshot = async (data) => {
@@ -507,12 +423,11 @@ export default function App() {
     </div>
   );
 
-  if (!user && !guestMode) return (
+  if (!user) return (
     <>
       <AuthModal
         onSignIn={signIn}
         onSignUp={signUp}
-        onGuest={() => setGuestMode(true)}
         onResetPassword={resetPassword}
         loading={authLoading}
       />
@@ -620,13 +535,6 @@ export default function App() {
               style={{ width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center",
                 border: "none", borderRadius: 8, cursor: "pointer", background: "#1e1e24",
                 color: "#888", fontSize: 15 }}>🔍</button>
-            {!user && guestMode && (
-              <button onClick={() => setGuestMode(false)}
-                style={{ width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center",
-                  border: "1px solid #7b5ea744", borderRadius: 8, cursor: "pointer",
-                  background: "#7b5ea711", color: "#c4b5fd", fontSize: 13, fontWeight: 700 }}
-                title="Sign in">👤</button>
-            )}
             <button onClick={() => setShowManage(true)}
               style={{ width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center",
                 border: "none", borderRadius: 8, cursor: "pointer", background: "#1e1e24",
@@ -973,12 +881,6 @@ export default function App() {
                     cursor: "pointer", fontFamily: "inherit" }}>Sign out</button>
               </div>
             )}
-            {!user && guestMode && (
-              <button onClick={() => setGuestMode(false)}
-                style={{ padding: "5px 10px", border: "1px solid #7b5ea744", borderRadius: 6,
-                  background: "#7b5ea711", color: "#c4b5fd", fontSize: 11,
-                  cursor: "pointer", fontFamily: "inherit" }}>Sign in</button>
-            )}
             <button onClick={() => setShowManage(true)}
               style={{ padding: "7px 14px", border: "none", borderRadius: 7, cursor: "pointer",
                 fontFamily: "inherit", fontSize: 12, background: "#1e1e24", color: "#888" }}>⚙️ Settings</button>
@@ -1168,12 +1070,6 @@ export default function App() {
           onToggleMilestone={toggleMilestone}
           onDelete={deleteProject}
           onClose={() => setProjectBoardRm(null)}
-        />
-      )}
-      {showMigrate && (
-        <GuestMigrateModal
-          onImport={handleMigrateGuest}
-          onSkip={() => setShowMigrate(false)}
         />
       )}
 {certificate && (

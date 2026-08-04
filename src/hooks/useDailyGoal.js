@@ -1,31 +1,24 @@
-import { useState, useEffect, useCallback } from "react";
-import { idbGet, idbSet } from "../storage/db.js";
+import { useCallback } from "react";
+import { useCloudField } from "../lib/cloudField.js";
 
-const KEY = "learning-tracker-daily-goal-v1";
+const DEFAULT_DATA = { goal: 5, history: {} }; // goal = topics per day
 
-export function useDailyGoal() {
-  const [data, setData] = useState({ goal: 5, history: {} }); // goal = topics per day
-
-  useEffect(() => {
-    idbGet(KEY).then(stored => { if (stored) setData(stored); });
-  }, []);
+export function useDailyGoal(userId) {
+  const [data, setData, loaded] = useCloudField(userId, "daily_goal", DEFAULT_DATA);
 
   const today = new Date().toISOString().slice(0, 10);
 
-  const save = useCallback((updated) => {
-    setData(updated);
-    idbSet(KEY, updated);
-  }, []);
-
   const setGoal = useCallback((n) => {
-    save({ ...data, goal: n });
-  }, [data, save]);
+    setData(prev => ({ ...prev, goal: n }));
+  }, [setData]);
 
   const recordTopicDone = useCallback(() => {
-    const hist = { ...data.history };
-    hist[today] = (hist[today] || 0) + 1;
-    save({ ...data, history: hist });
-  }, [data, today, save]);
+    setData(prev => {
+      const hist = { ...prev.history };
+      hist[today] = (hist[today] || 0) + 1;
+      return { ...prev, history: hist };
+    });
+  }, [setData, today]);
 
   const todayCount  = data.history?.[today] || 0;
   const goalCount   = data.goal || 5;
@@ -44,5 +37,5 @@ export function useDailyGoal() {
     return streak;
   })();
 
-  return { goal: goalCount, todayCount, pct, goalMet, goalStreak, setGoal, recordTopicDone };
+  return { goal: goalCount, todayCount, pct, goalMet, goalStreak, setGoal, recordTopicDone, loaded };
 }

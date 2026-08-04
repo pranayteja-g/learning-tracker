@@ -1,20 +1,8 @@
-import { useState, useEffect, useCallback } from "react";
-import { idbGet, idbSet } from "../storage/db.js";
+import { useCallback } from "react";
+import { useCloudField } from "../lib/cloudField.js";
 
-const KEY = "learning-tracker-clippings-v1";
-
-export function useClippings() {
-  const [clippings, setClippings] = useState([]);
-  const [loaded,    setLoaded]    = useState(false);
-
-  useEffect(() => {
-    idbGet(KEY).then(stored => { if (stored) setClippings(stored); setLoaded(true); });
-  }, []);
-
-  const save = useCallback((updated) => {
-    setClippings(updated);
-    idbSet(KEY, updated);
-  }, []);
+export function useClippings(userId) {
+  const [clippings, setClippings, loaded] = useCloudField(userId, "clippings", []);
 
   const addClipping = useCallback((clipping) => {
     const item = {
@@ -26,31 +14,19 @@ export function useClippings() {
       createdAt: Date.now(),
       updatedAt: Date.now(),
     };
-    setClippings(prev => {
-      const updated = [item, ...prev];
-      idbSet(KEY, updated);
-      return updated;
-    });
+    setClippings(prev => [item, ...prev]);
     return item;
-  }, []);
+  }, [setClippings]);
 
   const updateClipping = useCallback((id, changes) => {
-    setClippings(prev => {
-      const updated = prev.map(c => c.id === id
-        ? { ...c, ...changes, updatedAt: Date.now() }
-        : c);
-      idbSet(KEY, updated);
-      return updated;
-    });
-  }, []);
+    setClippings(prev => prev.map(c => c.id === id
+      ? { ...c, ...changes, updatedAt: Date.now() }
+      : c));
+  }, [setClippings]);
 
   const deleteClipping = useCallback((id) => {
-    setClippings(prev => {
-      const updated = prev.filter(c => c.id !== id);
-      idbSet(KEY, updated);
-      return updated;
-    });
-  }, []);
+    setClippings(prev => prev.filter(c => c.id !== id));
+  }, [setClippings]);
 
   const searchClippings = useCallback((query) => {
     if (!query.trim()) return clippings;
@@ -62,5 +38,9 @@ export function useClippings() {
     );
   }, [clippings]);
 
-  return { clippings, loaded, addClipping, updateClipping, deleteClipping, searchClippings };
+  const replaceClippings = useCallback((nextClippings) => {
+    setClippings(Array.isArray(nextClippings) ? nextClippings : []);
+  }, [setClippings]);
+
+  return { clippings, loaded, addClipping, updateClipping, deleteClipping, searchClippings, replaceClippings };
 }
