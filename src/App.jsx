@@ -6,6 +6,7 @@ import { useIsMobile }           from "./hooks/useIsMobile.js";
 import { validateRoadmap, downloadJSON, getRoadmapStats, getNextUp } from "./utils/roadmap.js";
 import { flatTopicNames, topicName, isExpanded } from "./utils/topics.js";
 import { safeParseJSON } from "./utils/jsonParse.js";
+import { ONBOARDING_COMPLETED_KEY } from "./storage/keys.js";
 import { Toast }                 from "./components/ui/Toast.jsx";
 import { TopicCard }             from "./components/ui/TopicCard.jsx";
 import { RadialProgress }        from "./components/ui/RadialProgress.jsx";
@@ -106,7 +107,8 @@ export default function App() {
   const { user, loading: authLoading, signIn, signUp, signOut, resetPassword } = useAuth();
   const userId = user?.id;
   const { roadmaps, setRoadmaps, progress, setProgress, notes, setNotes,
-          resources, setResources, topicMeta, setTopicMeta, loaded } = useAppStorage(userId);
+          resources, setResources, topicMeta, setTopicMeta, loaded,
+          hasLoadError, hasSaveError } = useAppStorage(userId);
   const isMobile = useIsMobile();
   const isGuest = false; // sign-in is required — kept only for components that still take this prop
 
@@ -126,7 +128,21 @@ export default function App() {
   const [questBoardOpen,    setQuestBoardOpen]    = useState(false);
   const [certificate,       setCertificate]       = useState(null);
   const [projectBoardRm,    setProjectBoardRm]    = useState(null);
-  const [showOnboarding,    setShowOnboarding]    = useState(false);
+  // Whether the user has explicitly finished/skipped onboarding — without
+  // this, "Start Learning" (which doesn't create a roadmap) had nothing to
+  // dismiss the onboarding screen with, since it's otherwise shown any time
+  // there are zero roadmaps. Scoped per-account since it's a browser-local
+  // localStorage flag, not a synced Supabase field.
+  const [onboardingDismissed, setOnboardingDismissed] = useState(
+    () => userId ? localStorage.getItem(`${ONBOARDING_COMPLETED_KEY}:${userId}`) === "1" : false
+  );
+  // Re-check when the signed-in user changes (e.g. sign out → sign in as a
+  // different account in the same tab, no full page reload in between).
+  useEffect(() => {
+    setOnboardingDismissed(
+      userId ? localStorage.getItem(`${ONBOARDING_COMPLETED_KEY}:${userId}`) === "1" : false
+    );
+  }, [userId]);
   const [searchOpen,     setSearchOpen]     = useState(false);
   const { streak, recordActivity, studiedToday } = useStreak(userId);
   const { results: quizResults, recordQuizResult, hasPassedTopic, getStars, replaceResults } = useQuizResults(userId);
@@ -189,6 +205,17 @@ export default function App() {
     });
     showFeedback(true, `Explanation saved to "${topic}" notes`);
   };
+
+  // Let the user know if a save is actually failing (e.g. a permissions or
+  // schema issue on the Supabase side) instead of letting it retry silently
+  // forever in the background — that silence is exactly what made previous
+  // save failures look like "my data just disappeared".
+  useEffect(() => {
+    if (hasSaveError) {
+      showFeedback(false, "Couldn't save to the server — retrying. Your changes are kept locally until it succeeds.");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasSaveError]);
 
   // Global Cmd+K / Ctrl+K to open search
   useEffect(() => {
@@ -435,17 +462,29 @@ export default function App() {
   );
 
   if (!loaded) return (
-    <div style={{ minHeight: "100vh", background: "#0f0f13", display: "flex", alignItems: "center",
-      justifyContent: "center", color: "#555", fontFamily: "Georgia, serif" }}>Loading…</div>
+    <div style={{ minHeight: "100vh", background: "#0f0f13", display: "flex", flexDirection: "column",
+      alignItems: "center", justifyContent: "center", color: "#555", fontFamily: "Georgia, serif", gap: 10, padding: 24, textAlign: "center" }}>
+      <div>Loading…</div>
+      {hasLoadError && (
+        <div style={{ maxWidth: 360, fontSize: 13, color: "#e0a252", fontFamily: "system-ui, sans-serif" }}>
+          Having trouble reaching the server. Retrying in the background — your
+          data is safe and won't be touched until this succeeds. If this
+          persists, check your connection and reload.
+        </div>
+      )}
+    </div>
   );
 
 
   // ── Welcome ────────────────────────────────────────────────────────────────
-  if (rmKeys.length === 0) return (
+  if (rmKeys.length === 0 && !onboardingDismissed) return (
     <>
       <style>{globalStyle}</style>
       <OnboardingFlow
-        onComplete={() => {}}
+        onComplete={() => {
+          if (userId) localStorage.setItem(`${ONBOARDING_COMPLETED_KEY}:${userId}`, "1");
+          setOnboardingDismissed(true);
+        }}
         onCreate={(tmpl) => {
           if (tmpl) handleSaveRoadmap({ ...tmpl, id: tmpl.id || tmpl.label.toLowerCase().replace(/\s+/g,"-") });
         }}
