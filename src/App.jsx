@@ -106,7 +106,8 @@ export default function App() {
   const { user, loading: authLoading, signIn, signUp, signOut, resetPassword } = useAuth();
   const userId = user?.id;
   const { roadmaps, setRoadmaps, progress, setProgress, notes, setNotes,
-          resources, setResources, topicMeta, setTopicMeta, loaded } = useAppStorage(userId);
+          resources, setResources, topicMeta, setTopicMeta, loaded,
+          hasLoadError, hasSaveError } = useAppStorage(userId);
   const isMobile = useIsMobile();
   const isGuest = false; // sign-in is required — kept only for components that still take this prop
 
@@ -189,6 +190,17 @@ export default function App() {
     });
     showFeedback(true, `Explanation saved to "${topic}" notes`);
   };
+
+  // Let the user know if a save is actually failing (e.g. a permissions or
+  // schema issue on the Supabase side) instead of letting it retry silently
+  // forever in the background — that silence is exactly what made previous
+  // save failures look like "my data just disappeared".
+  useEffect(() => {
+    if (hasSaveError) {
+      showFeedback(false, "Couldn't save to the server — retrying. Your changes are kept locally until it succeeds.");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasSaveError]);
 
   // Global Cmd+K / Ctrl+K to open search
   useEffect(() => {
@@ -435,8 +447,17 @@ export default function App() {
   );
 
   if (!loaded) return (
-    <div style={{ minHeight: "100vh", background: "#0f0f13", display: "flex", alignItems: "center",
-      justifyContent: "center", color: "#555", fontFamily: "Georgia, serif" }}>Loading…</div>
+    <div style={{ minHeight: "100vh", background: "#0f0f13", display: "flex", flexDirection: "column",
+      alignItems: "center", justifyContent: "center", color: "#555", fontFamily: "Georgia, serif", gap: 10, padding: 24, textAlign: "center" }}>
+      <div>Loading…</div>
+      {hasLoadError && (
+        <div style={{ maxWidth: 360, fontSize: 13, color: "#e0a252", fontFamily: "system-ui, sans-serif" }}>
+          Having trouble reaching the server. Retrying in the background — your
+          data is safe and won't be touched until this succeeds. If this
+          persists, check your connection and reload.
+        </div>
+      )}
+    </div>
   );
 
 

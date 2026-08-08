@@ -24,11 +24,12 @@ import { supabase } from "./supabase.js";
 
 const TABLE = "user_data";
 const SAVE_DEBOUNCE_MS = 300;
+const LOAD_RETRY_MS = 2000;
 
 export function useCloudField(userId, column, defaultValue) {
   const [value, setValue] = useState(defaultValue);
   const [loaded, setLoaded] = useState(false);
-  const [status, setStatus] = useState("idle"); // idle | saving | saved | error
+  const [status, setStatus] = useState("idle"); // idle | loading | load-error | saving | saved | error
 
   const valueRef = useRef(value);
   valueRef.current = value;
@@ -42,25 +43,43 @@ export function useCloudField(userId, column, defaultValue) {
   useEffect(() => {
     if (!userId) { setLoaded(false); return; }
     let cancelled = false;
+    let retryTimer = null;
     skipNextSaveRef.current = true;
     setLoaded(false);
+    setStatus("loading");
 
-    supabase
-      .from(TABLE)
-      .select(column)
-      .eq("user_id", userId)
-      .maybeSingle()
-      .then(({ data, error }) => {
-        if (cancelled) return;
-        if (error) {
-          console.error(`[cloud] load "${column}" failed:`, error.message);
-        } else if (data && data[column] != null) {
-          setValue(data[column]);
-        }
-        setLoaded(true);
-      });
+    const load = () => {
+      supabase
+        .from(TABLE)
+        .select(column)
+        .eq("user_id", userId)
+        .maybeSingle()
+        .then(({ data, error }) => {
+          if (cancelled) return;
+          if (error) {
+            // IMPORTANT: do NOT mark this field as loaded on a failed fetch.
+            // If we did, `value` would still be sitting at its default, and
+            // the very next edit anywhere in this field would debounce-save
+            // that default straight over whatever is actually in Supabase —
+            // silently wiping real data. Instead, keep retrying and leave
+            // `loaded` false so nothing can save until we truly have the
+            // real value in hand.
+            console.error(`[cloud] load "${column}" failed, retrying:`, error.message);
+            setStatus("load-error");
+            retryTimer = setTimeout(load, LOAD_RETRY_MS);
+            return;
+          }
+          if (data && data[column] != null) {
+            setValue(data[column]);
+          }
+          setStatus("idle");
+          setLoaded(true);
+        });
+    };
 
-    return () => { cancelled = true; };
+    load();
+
+    return () => { cancelled = true; clearTimeout(retryTimer); };
   }, [userId, column]);
 
   const doSave = useCallback(async () => {
