@@ -9,7 +9,8 @@ A progressive web app (PWA) for managing learning roadmaps, tracking progress, a
 - **✏️ Notes & Resources**: Attach notes and links to topics
 - **📝 AI-Powered Learning**: Get AI explanations, code reviews, and practice problems
 - **🎯 Quizzes & Challenges**: Test your knowledge with interactive quizzes
-- **🔗 Network Sync**: Sync progress across devices on your local network
+- **☁️ Cloud Sync**: All data is synced live to Supabase — signed in on any device, it's there
+- **📋 Manual Backup / Transfer**: Export your data as compressed text or a QR code (Settings → Sync) to move it to another device without the cloud, or as a full JSON backup file
 - **💾 Backup & Restore**: Export and import your entire learning data
 
 ## Getting Started
@@ -29,90 +30,42 @@ Open [http://localhost:5173](http://localhost:5173)
 npm run build
 ```
 
-### Frontend Sync Server URL
+### Supabase Configuration
 
-Set `VITE_SYNC_SERVER_URL` so the frontend auto-connects to your hosted sync server.
-
-Example:
-
-```bash
-VITE_SYNC_SERVER_URL=wss://learning-tracker-production-0996.up.railway.app
-```
-
-Use `.env.local` for local development and add the same variable in your frontend hosting provider before building for production.
-
-## Network Sync (Multi-Device)
-
-Sync your learning progress across multiple devices on the same network.
-
-### Quick Setup
-
-1. **Start the sync server** on your network:
-   ```bash
-   npm run sync-server
-   ```
-   
-   Displays: `📡 Local network: ws://192.168.1.100:3001`
-
-2. **On each device**, open Settings → Sync tab:
-   - Generate a pairing code (6 digits)
-   - Enter the server URL from step 1
-   - Click Connect
-
-3. **All changes sync automatically** to paired devices
-
-📖 **[Full Documentation](./SYNC_SERVER.md)**
-
-### How It Works
-
-- Devices connect via WebSocket on your local network
-- Pairing codes ensure only wanted devices can connect
-- Changes (roadmaps, progress, notes, resources) sync in real-time
-- Latest change wins for conflict resolution
-- Works offline; syncs when devices reconnect
+The app talks directly to Supabase (`src/lib/supabase.js`) for auth and data storage — every signed-in user's roadmaps, progress, notes, resources, and other app state live in the `user_data` table, one row per user, synced on every change.
 
 ## Architecture
 
 ```
 src/
 ├── components/          # React components
-│   ├── ai/             # AI features (explain, code review, etc)
-│   ├── sync/           # Network sync UI
-│   ├── interview/      # Interview mode components
-│   ├── modals/         # Modals for editing and settings
-│   ├── practice/       # Practice mode
-│   ├── screens/        # Main screens
-│   └── ui/             # Shared UI components
-├── hooks/              # Custom React hooks
-│   ├── useSync.js      # Network sync state management
-│   └── ...
-├── storage/            # Data persistence (IndexedDB)
-├── sync/               # Sync infrastructure
-│   └── syncService.js  # WebSocket client and sync logic
-├── ai/                 # AI provider integrations
-├── utils/              # Utility functions
-└── constants/          # Configuration and templates
+│   ├── ai/               # AI features (explain, code review, etc)
+│   ├── interview/         # Interview mode components
+│   ├── modals/            # Modals for editing and settings (incl. SyncTab — manual QR/text transfer)
+│   ├── practice/          # Practice mode
+│   ├── screens/           # Main screens
+│   └── ui/                 # Shared UI components
+├── hooks/                 # Custom React hooks
+├── lib/                   # Supabase client + cloudField (per-column cloud sync)
+├── ai/                    # AI provider integrations
+├── utils/                 # Utility functions
+└── constants/             # Configuration and templates
 ```
 
 ## AI Features
 
-Requires API keys from supported providers:
+Requires a free API key from one of the supported providers (Settings → AI):
 
-- **Claude (Anthropic)** - For detailed explanations and code analysis
-- **GPT (OpenAI)** - Alternative AI provider
-- **Gemini (Google)** - Another alternative
+- **Groq** — https://console.groq.com/keys
+- **Google Gemini** — https://aistudio.google.com/app/apikey
 
-Get free API keys from:
-- https://console.anthropic.com/
-- https://platform.openai.com/
-- https://aistudio.google.com/
+Both are free with no credit card required. The key is stored only on your device (localStorage) and sent directly from your browser to the provider.
 
 ## Data Storage
 
-- **Local Storage**: IndexedDB (primary) with localStorage fallback
-- **No cloud synchronization**: All data stays on your devices
-- **Export/Backup**: Download your data as JSON anytime
-- **Network Sync**: Optional local network sync via sync server
+- **Cloud (primary)**: Supabase — every field syncs independently and live as you use the app
+- **AI keys**: localStorage only, never sent to Supabase
+- **Export/Backup**: Download your data as a JSON file anytime, or use the in-app manual sync (Settings → Sync) to move data between devices via a compressed text code / QR
 
 ## Browser Support
 
@@ -124,14 +77,12 @@ Get free API keys from:
 ## PWA Features
 
 - Installable as app on mobile and desktop
-- Works offline
-- Background sync
+- Works offline for the app shell; live data requires a connection to Supabase
 
 ## Development
 
 - **Lint**: `npm run lint`
 - **Preview**: `npm run preview`
-- **Sync Server**: `npm run sync-server`
 
 ## Project Structure
 
@@ -140,4 +91,3 @@ See [Architecture](#architecture) above for detailed breakdown.
 ## License
 
 MIT
-

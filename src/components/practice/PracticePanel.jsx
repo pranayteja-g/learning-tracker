@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, lazy, Suspense } from "react";
 import { callAI, loadAIConfig, saveAIConfig, PROVIDERS } from "../../ai/providers.js";
 import { useUsage } from "../../ai/useUsage.js";
 import { allTopicNames, flatTopicNames } from "../../utils/topics.js";
@@ -14,7 +14,11 @@ import {
 } from "../../ai/prompts.js";
 import { buildQuizContext, buildQuestionnaireContext, buildExplainContext, buildStudyPlanContext } from "../../ai/context.js";
 import { QuizView }          from "../ai/QuizView.jsx";
-import { CodeWriteView }     from "../ai/CodeWriteView.jsx";
+// Lazy: pulls in CodeMirror + language grammars, only needed when the
+// "code" study mode actually renders.
+const CodeWriteView = lazy(() =>
+  import("../ai/CodeWriteView.jsx").then(m => ({ default: m.CodeWriteView }))
+);
 import { QuestionnaireView } from "../ai/QuestionnaireView.jsx";
 import { ExplainView }       from "../ai/ExplainView.jsx";
 import { StudyPlanView }     from "../ai/StudyPlanView.jsx";
@@ -471,8 +475,10 @@ export function PracticePanel({ open, onClose, onOpenSettings, onSaveProjects, r
                 <QuizView questions={result.data} rm={rm}
                   onQuizComplete={(score, total) => onQuizComplete?.(rm?.id, result.data.map(q=>q.topic).filter(Boolean), score, total, difficulty)} />}
               {result.tab === "study" && result.studyMode === "code" &&
-                <CodeWriteView questions={result.data} rm={rm}
-                  onComplete={(score) => onQuizComplete?.(rm?.id, result.data.map(q=>q.topic).filter(Boolean), score, 100, difficulty)} />}
+                <Suspense fallback={<div style={{ padding: 24, color: "#666" }}>Loading editor…</div>}>
+                  <CodeWriteView questions={result.data} rm={rm}
+                    onComplete={(score) => onQuizComplete?.(rm?.id, result.data.map(q=>q.topic).filter(Boolean), score, 100, difficulty)} />
+                </Suspense>}
               {result.tab === "study" && result.studyMode === "questionnaire" && <QuestionnaireView questions={result.data} rm={rm} />}
               {result.tab === "study" && result.studyMode === "explain" &&
                 <ExplainView data={result.data} rm={rm} topic={explainTopic}
