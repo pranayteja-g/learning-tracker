@@ -54,11 +54,23 @@ export default defineConfig({
             handler: 'NetworkOnly',
           },
           {
+            // Supabase (auth + user data) — network only. This MUST come
+            // before the catch-all below: user rows were previously being
+            // served from the CacheFirst cache, so a save would succeed but
+            // a refresh (or a different account's SELECT hitting the same
+            // cache) would show stale/wrong data instead of hitting the DB.
+            urlPattern: /^https:\/\/zhkidmfhromlbqwzjije\.supabase\.co\/.*/i,
+            handler: 'NetworkOnly',
+          },
+          {
             // Everything else (CDN fonts, images etc.) — cache first
             urlPattern: /^https:\/\/.*/i,
             handler: 'CacheFirst',
             options: {
-              cacheName: 'external-cache',
+              // Renamed (was 'external-cache') so any already-installed
+              // service workers drop the old cache — which may still hold
+              // stale/cross-account Supabase responses — instead of reusing it.
+              cacheName: 'external-cache-v2',
               expiration: {
                 maxEntries: 50,
                 maxAgeSeconds: 60 * 60 * 24 * 30, // 30 days
