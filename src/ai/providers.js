@@ -193,6 +193,14 @@ async function callGroqVision({ apiKey, prompt, base64, mimeType, jsonMode, maxT
         body: JSON.stringify({
           model: "qwen/qwen3.6-27b",
           max_tokens: maxTokens,
+          // qwen3 is a reasoning model — without this it prepends a
+          // <think>...</think> block to `content` (burning tokens and
+          // showing up as the "note" itself), and can eat the whole
+          // max_tokens budget on reasoning before ever reaching the
+          // actual answer, leaving nothing for the title-heading
+          // extraction downstream to find. We don't need step-by-step
+          // reasoning for note generation, so skip it entirely.
+          reasoning_effort: "none",
           ...(jsonMode ? { response_format: { type: "json_object" } } : {}),
           messages: [{
             role: "user",
@@ -210,7 +218,12 @@ async function callGroqVision({ apiKey, prompt, base64, mimeType, jsonMode, maxT
       throw new Error(err?.error?.message || `Groq error ${res.status}`);
     }
     const data = await res.json();
-    return { text: data.choices?.[0]?.message?.content || "", provider: "groq" };
+    // Defensive: strip any <think>...</think> block that slips through even
+    // with reasoning disabled — some reasoning models don't fully honor
+    // reasoning_effort/reasoning_format and still leak it into `content`.
+    const raw = data.choices?.[0]?.message?.content || "";
+    const text = raw.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
+    return { text, provider: "groq" };
   }, AI_SETTINGS.retryAttempts, AI_SETTINGS.retryDelayMs);
 }
 
