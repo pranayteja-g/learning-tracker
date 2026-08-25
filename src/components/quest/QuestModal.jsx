@@ -1,17 +1,11 @@
-import { useState, useEffect, lazy, Suspense } from "react";
+import { useState, useEffect } from "react";
 import { callAI, loadAIConfig } from "../../ai/providers.js";
 import { buildQuizPrompt, buildCodeChallengePrompt } from "../../ai/prompts.js";
 import { buildQuizContext } from "../../ai/context.js";
 import { safeParseJSON } from "../../utils/jsonParse.js";
 import { QuizView }           from "../ai/QuizView.jsx";
+import { CodeWriteView }      from "../ai/CodeWriteView.jsx";
 import { QuestRewardScreen }  from "./QuestRewardScreen.jsx";
-
-// Lazy: pulls in CodeMirror + language grammars (Java/Python/JS/SQL), only
-// needed when a quest's "code" phase actually renders — keeps that weight
-// out of the initial bundle for everyone else.
-const CodeWriteView = lazy(() =>
-  import("../ai/CodeWriteView.jsx").then(m => ({ default: m.CodeWriteView }))
-);
 
 const ALL_PHASES = [
   { name: "📖 Read", key: "read",  pass: null, next: "MCQ Quiz"          },
@@ -477,10 +471,8 @@ export function QuestModal({ quest, rmId, roadmaps, progress, onAdvancePhase, on
                     })} />
                 )}
                 {activePhases[phase]?.key === "code" && phaseData && (
-                  <Suspense fallback={<div style={{ padding: 24, color: "#666" }}>Loading editor…</div>}>
-                    <CodeWriteView questions={phaseData} rm={rm}
-                      onComplete={(score) => handlePhaseComplete({ score, passed: score >= 70 })} />
-                  </Suspense>
+                  <CodeWriteView questions={phaseData} rm={rm}
+                    onComplete={(score) => handlePhaseComplete({ score, passed: score >= 70 })} />
                 )}
                 {activePhases[phase]?.key === "qa" && (
                   <QAPhase quest={quest} rm={rm} onComplete={handlePhaseComplete} />

@@ -6,7 +6,6 @@ import { useIsMobile }           from "./hooks/useIsMobile.js";
 import { validateRoadmap, downloadJSON, getRoadmapStats, getNextUp } from "./utils/roadmap.js";
 import { flatTopicNames, topicName, isExpanded } from "./utils/topics.js";
 import { safeParseJSON } from "./utils/jsonParse.js";
-import { ONBOARDING_COMPLETED_KEY } from "./storage/keys.js";
 import { Toast }                 from "./components/ui/Toast.jsx";
 import { TopicCard }             from "./components/ui/TopicCard.jsx";
 import { RadialProgress }        from "./components/ui/RadialProgress.jsx";
@@ -128,21 +127,7 @@ export default function App() {
   const [questBoardOpen,    setQuestBoardOpen]    = useState(false);
   const [certificate,       setCertificate]       = useState(null);
   const [projectBoardRm,    setProjectBoardRm]    = useState(null);
-  // Whether the user has explicitly finished/skipped onboarding — without
-  // this, "Start Learning" (which doesn't create a roadmap) had nothing to
-  // dismiss the onboarding screen with, since it's otherwise shown any time
-  // there are zero roadmaps. Scoped per-account since it's a browser-local
-  // localStorage flag, not a synced Supabase field.
-  const [onboardingDismissed, setOnboardingDismissed] = useState(
-    () => userId ? localStorage.getItem(`${ONBOARDING_COMPLETED_KEY}:${userId}`) === "1" : false
-  );
-  // Re-check when the signed-in user changes (e.g. sign out → sign in as a
-  // different account in the same tab, no full page reload in between).
-  useEffect(() => {
-    setOnboardingDismissed(
-      userId ? localStorage.getItem(`${ONBOARDING_COMPLETED_KEY}:${userId}`) === "1" : false
-    );
-  }, [userId]);
+  const [showOnboarding,    setShowOnboarding]    = useState(false);
   const [searchOpen,     setSearchOpen]     = useState(false);
   const { streak, recordActivity, studiedToday } = useStreak(userId);
   const { results: quizResults, recordQuizResult, hasPassedTopic, getStars, replaceResults } = useQuizResults(userId);
@@ -477,14 +462,11 @@ export default function App() {
 
 
   // ── Welcome ────────────────────────────────────────────────────────────────
-  if (rmKeys.length === 0 && !onboardingDismissed) return (
+  if (rmKeys.length === 0) return (
     <>
       <style>{globalStyle}</style>
       <OnboardingFlow
-        onComplete={() => {
-          if (userId) localStorage.setItem(`${ONBOARDING_COMPLETED_KEY}:${userId}`, "1");
-          setOnboardingDismissed(true);
-        }}
+        onComplete={() => {}}
         onCreate={(tmpl) => {
           if (tmpl) handleSaveRoadmap({ ...tmpl, id: tmpl.id || tmpl.label.toLowerCase().replace(/\s+/g,"-") });
         }}

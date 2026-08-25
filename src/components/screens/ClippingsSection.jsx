@@ -136,14 +136,9 @@ function AddClippingModal({ onSave, onClose }) {
       if (!text) throw new Error("Nothing generated. Please try again.");
       setPreview(text);
       if (!title) {
-        // Prefer the first markdown heading; fall back to the first
-        // non-empty line so a title always gets populated even if the
-        // model didn't emit a heading.
-        const lines = text.split("\n").map(l => l.trim()).filter(Boolean);
-        const headingLine = lines.find(l => l.startsWith("#"));
-        const fallbackLine = lines[0];
-        const raw = (headingLine || fallbackLine || "").replace(/^#+\s*/, "").trim();
-        if (raw) setTitle(raw.length > 80 ? raw.slice(0, 80).trim() + "…" : raw);
+        // Extract title from first line of markdown
+        const firstLine = text.split("\n").find(l => l.startsWith("#"));
+        if (firstLine) setTitle(firstLine.replace(/^#+\s*/, "").trim());
       }
     } catch(e) { setError(e.message); }
     finally { setLoading(false); }

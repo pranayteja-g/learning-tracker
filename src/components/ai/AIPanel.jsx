@@ -42,10 +42,10 @@ export function AIPanel({ open, onClose, roadmap, progress, notes, resources, to
 
   useEffect(() => { setResult(null); setError(""); }, [mode, scope, qCount, difficulty, explainTopic]);
 
-  const handleSaveConfig = (cfg) => {
+  const handleSaveConfig = (cfg, keepOpen) => {
     saveAIConfig(cfg);
     setAIConfig(cfg);
-    setShowSetup(false);
+    if (!keepOpen) setShowSetup(false);
   };
 
   const handleGenerate = async () => {
@@ -317,7 +317,7 @@ export function AIPanel({ open, onClose, roadmap, progress, notes, resources, to
               )}
               {!lastUsed && !loading && (
                 <div style={{ textAlign: "center", marginTop: 8, fontSize: 10, color: "#333" }}>
-                  via {PROVIDERS[aiConfig.provider]?.name} · {PROVIDERS[aiConfig.provider]?.model}
+                  via {PROVIDERS[aiConfig.provider]?.name} · {aiConfig.models?.[aiConfig.provider] || PROVIDERS[aiConfig.provider]?.model}
                 </div>
               )}
             </div>
