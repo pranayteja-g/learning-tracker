@@ -59,7 +59,7 @@ export const PROVIDERS = {
   },
   groq: {
     name: "Groq",
-    model: "llama-3.3-70b-versatile",
+    model: "openai/gpt-oss-120b",
     keyPlaceholder: "gsk_...",
     keyUrl: "https://console.groq.com/keys",
     keyHint: "Get a free key at console.groq.com — no credit card needed",
@@ -73,14 +73,65 @@ export const AI_STORAGE_KEY = "learning-tracker-ai-config-v1";
 export function loadAIConfig() {
   try {
     const raw = localStorage.getItem(AI_STORAGE_KEY);
-    return raw ? JSON.parse(raw) : { provider: "groq", keys: {} };
+    return raw ? JSON.parse(raw) : { provider: "groq", keys: {}, models: {} };
   } catch {
-    return { provider: "groq", keys: {} };
+    return { provider: "groq", keys: {}, models: {} };
   }
 }
 
 export function saveAIConfig(config) {
   localStorage.setItem(AI_STORAGE_KEY, JSON.stringify(config));
+}
+
+// The model actually in use for a provider: whatever the user picked in
+// Settings, falling back to our built-in default. Providers periodically
+// retire model IDs (this is exactly what broke "llama-3.3-70b-versatile"),
+// so every call site should go through this instead of reading
+// PROVIDERS[provider].model directly.
+export function getModelForProvider(provider) {
+  const config = loadAIConfig();
+  return config.models?.[provider] || PROVIDERS[provider]?.model;
+}
+
+// ── Fetch the live list of models available to this API key ─────────────────
+// Lets the Settings screen show real, currently-active models instead of a
+// hardcoded string that silently goes stale when a provider retires a model.
+export async function fetchAvailableModels(provider, apiKey) {
+  if (!apiKey?.trim()) throw new Error("Add an API key first.");
+
+  if (provider === "groq") {
+    const res = await fetch("https://api.groq.com/openai/v1/models", {
+      headers: { "Authorization": `Bearer ${apiKey.trim()}` },
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err?.error?.message || `Groq error ${res.status}`);
+    }
+    const data = await res.json();
+    // Groq's /models list also includes speech-to-text, text-to-speech, and
+    // safety-classifier models that don't take chat messages — filter those
+    // out so the picker only shows models this app can actually call.
+    const EXCLUDE = /whisper|tts|orpheus|guard|moderation/i;
+    return (data.data || [])
+      .filter(m => m.active !== false && !EXCLUDE.test(m.id))
+      .map(m => ({ id: m.id, contextWindow: m.context_window }))
+      .sort((a, b) => a.id.localeCompare(b.id));
+  }
+
+  if (provider === "gemini") {
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey.trim()}`);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err?.error?.message || `Gemini error ${res.status}`);
+    }
+    const data = await res.json();
+    return (data.models || [])
+      .filter(m => (m.supportedGenerationMethods || []).includes("generateContent"))
+      .map(m => ({ id: m.name.replace(/^models\//, ""), contextWindow: m.inputTokenLimit }))
+      .sort((a, b) => a.id.localeCompare(b.id));
+  }
+
+  throw new Error("Unknown provider: " + provider);
 }
 
 // ── Call the AI ───────────────────────────────────────────────────────────────
@@ -107,7 +158,8 @@ export async function callAI({ provider, apiKey, systemPrompt, userPrompt, messa
 
 async function callGemini({ apiKey, systemPrompt, userPrompt, messages = [], temperature = 0.7, maxTokens = 4096 }) {
   return withRetry(async () => {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${apiKey}`;
+    const model = getModelForProvider("gemini");
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
     const history = messages.map(m => ({ role: m.role === "assistant" ? "model" : "user", parts: [{ text: m.content }] }));
     const body = {
       system_instruction: { parts: [{ text: systemPrompt }] },
@@ -193,14 +245,6 @@ async function callGroqVision({ apiKey, prompt, base64, mimeType, jsonMode, maxT
         body: JSON.stringify({
           model: "qwen/qwen3.6-27b",
           max_tokens: maxTokens,
-          // qwen3 is a reasoning model — without this it prepends a
-          // <think>...</think> block to `content` (burning tokens and
-          // showing up as the "note" itself), and can eat the whole
-          // max_tokens budget on reasoning before ever reaching the
-          // actual answer, leaving nothing for the title-heading
-          // extraction downstream to find. We don't need step-by-step
-          // reasoning for note generation, so skip it entirely.
-          reasoning_effort: "none",
           ...(jsonMode ? { response_format: { type: "json_object" } } : {}),
           messages: [{
             role: "user",
@@ -218,18 +262,14 @@ async function callGroqVision({ apiKey, prompt, base64, mimeType, jsonMode, maxT
       throw new Error(err?.error?.message || `Groq error ${res.status}`);
     }
     const data = await res.json();
-    // Defensive: strip any <think>...</think> block that slips through even
-    // with reasoning disabled — some reasoning models don't fully honor
-    // reasoning_effort/reasoning_format and still leak it into `content`.
-    const raw = data.choices?.[0]?.message?.content || "";
-    const text = raw.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
-    return { text, provider: "groq" };
+    return { text: data.choices?.[0]?.message?.content || "", provider: "groq" };
   }, AI_SETTINGS.retryAttempts, AI_SETTINGS.retryDelayMs);
 }
 
 // ── Text completion calls ────────────────────────────────────────────────────
 async function callGroq({ apiKey, systemPrompt, userPrompt, messages = [], temperature = 0.7, maxTokens = 4096 }) {
   return withRetry(async () => {
+    const model = getModelForProvider("groq");
     const history = messages.map(m => ({ role: m.role, content: m.content }));
     const res = await withTimeout(
       fetch("https://api.groq.com/openai/v1/chat/completions", {
@@ -239,7 +279,7 @@ async function callGroq({ apiKey, systemPrompt, userPrompt, messages = [], tempe
           "Authorization": `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
-          model: "llama-3.3-70b-versatile",
+          model,
           messages: [
             { role: "system", content: systemPrompt },
             ...history,
@@ -324,6 +364,7 @@ async function callGeminiWithSearch({ apiKey, systemPrompt, userPrompt }) {
 
 async function callGroqWithSearch({ apiKey, systemPrompt, userPrompt }) {
   return withRetry(async () => {
+    const model = getModelForProvider("groq");
     const tools = [{
       type: "function",
       function: {
@@ -349,7 +390,7 @@ async function callGroqWithSearch({ apiKey, systemPrompt, userPrompt }) {
       fetch("https://api.groq.com/openai/v1/chat/completions", {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
-        body: JSON.stringify({ model: "llama-3.3-70b-versatile", messages, tools, tool_choice: "auto",
+        body: JSON.stringify({ model, messages, tools, tool_choice: "auto",
           temperature: 0.3, max_tokens: 1024 }),
       }),
       AI_SETTINGS.timeoutMs
@@ -413,7 +454,7 @@ async function callGroqWithSearch({ apiKey, systemPrompt, userPrompt }) {
       fetch("https://api.groq.com/openai/v1/chat/completions", {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
-        body: JSON.stringify({ model: "llama-3.3-70b-versatile", messages: messages2,
+        body: JSON.stringify({ model, messages: messages2,
           temperature: 0.3, max_tokens: 2048 }),
       }),
       AI_SETTINGS.timeoutMs

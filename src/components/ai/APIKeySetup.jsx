@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { PROVIDERS } from "../../ai/providers.js";
+import { PROVIDERS, fetchAvailableModels } from "../../ai/providers.js";
 import { formatNumber } from "../../utils/format.js";
 
 const LIMIT_PRESETS = [25000, 50000, 100000, 200000];
@@ -69,18 +69,43 @@ function UsageBar({ usage, limit, pct, onReset }) {
 export function APIKeySetup({ config, onSave, usage = {}, limit = {}, pct = 0, onResetUsage, onSaveLimit }) {
   const [provider,   setProvider]   = useState(config.provider || "groq");
   const [keys,       setKeys]       = useState(config.keys || {});
+  const [models,     setModels]     = useState(config.models || {});
   const [visible,    setVisible]    = useState({});
   const [limitOn,    setLimitOn]    = useState(limit.enabled ?? false);
   const [limitVal,   setLimitVal]   = useState(limit.dailyTokenLimit ?? 100000);
   const [customVal,  setCustomVal]  = useState("");
   const [showCustom, setShowCustom] = useState(false);
+  const [modelLists, setModelLists] = useState({});   // provider -> fetched model array
+  const [modelState, setModelState] = useState({});   // provider -> "loading" | "error" | error message
 
   const p = PROVIDERS[provider];
-  const currentKey = keys[provider] || "";
+  const currentKey   = keys[provider] || "";
+  const currentModel = models[provider] || p.model;
+  const fetchedList  = modelLists[provider];
 
   const handleSave = () => {
     if (!currentKey.trim()) return;
-    onSave({ provider, keys: { ...keys, [provider]: currentKey.trim() } });
+    onSave({ provider, keys: { ...keys, [provider]: currentKey.trim() }, models });
+  };
+
+  const handleFetchModels = async () => {
+    if (!currentKey.trim()) return;
+    setModelState(s => ({ ...s, [provider]: "loading" }));
+    try {
+      const list = await fetchAvailableModels(provider, currentKey);
+      setModelLists(m => ({ ...m, [provider]: list }));
+      setModelState(s => ({ ...s, [provider]: "idle" }));
+    } catch (e) {
+      setModelState(s => ({ ...s, [provider]: e.message || "Couldn't fetch models" }));
+    }
+  };
+
+  const handleSelectModel = (id) => {
+    const updated = { ...models, [provider]: id };
+    setModels(updated);
+    // Keep the setup panel open — picking a model shouldn't feel like
+    // finishing the whole setup flow the way saving a key does.
+    onSave({ provider, keys, models: updated }, true);
   };
 
   const handleLimitSave = () => {
@@ -210,6 +235,58 @@ export function APIKeySetup({ config, onSave, usage = {}, limit = {}, pct = 0, o
         </div>
       </div>
 
+      {/* Model picker — providers periodically retire model IDs (this is
+          why the app broke before), so let the user see and choose from
+          whatever's actually live for their key instead of trusting a
+          hardcoded string. */}
+      <div>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+          <div style={{ fontSize: 11, color: "#555", textTransform: "uppercase", letterSpacing: 1 }}>
+            Model
+          </div>
+          <button onClick={handleFetchModels} disabled={!currentKey.trim() || modelState[provider] === "loading"}
+            style={{ fontSize: 10, padding: "4px 8px", background: "transparent",
+              border: "1px solid #2a2a35", borderRadius: 5,
+              color: currentKey.trim() ? "#7b8cde" : "#444",
+              cursor: currentKey.trim() ? "pointer" : "default", fontFamily: "inherit" }}>
+            {modelState[provider] === "loading" ? "Fetching…" : "Fetch available models"}
+          </button>
+        </div>
+
+        {fetchedList ? (
+          <select value={currentModel} onChange={e => handleSelectModel(e.target.value)}
+            style={{ width: "100%", background: "#0f0f13", border: "1px solid #2a2a35", borderRadius: 7,
+              padding: "9px 12px", color: "#e8e6e0", fontSize: 13, fontFamily: "monospace",
+              outline: "none", boxSizing: "border-box" }}>
+            {!fetchedList.some(m => m.id === currentModel) && (
+              <option value={currentModel}>{currentModel} (saved, not in fetched list)</option>
+            )}
+            {fetchedList.map(m => (
+              <option key={m.id} value={m.id}>
+                {m.id}{m.contextWindow ? ` — ${formatNumber(m.contextWindow)} ctx` : ""}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <div style={{ background: "#0f0f13", border: "1px solid #2a2a35", borderRadius: 7,
+            padding: "9px 12px", color: "#888", fontSize: 13, fontFamily: "monospace" }}>
+            {currentModel}
+          </div>
+        )}
+
+        {modelState[provider] && modelState[provider] !== "loading" && modelState[provider] !== "idle" && (
+          <div style={{ fontSize: 11, color: "#e05252", marginTop: 6 }}>
+            ⚠️ {modelState[provider]}
+          </div>
+        )}
+        {!fetchedList && (!modelState[provider] || modelState[provider] === "idle") && (
+          <div style={{ fontSize: 11, color: "#444", marginTop: 6 }}>
+            Currently set to the built-in default. Fetch the live list to pick a different one —
+            useful if this one ever stops working.
+          </div>
+        )}
+      </div>
+
       {/* Save / Clear */}
       <div style={{ display: "flex", gap: 8 }}>
         <button onClick={handleSave} disabled={!currentKey.trim()}
@@ -224,7 +301,7 @@ export function APIKeySetup({ config, onSave, usage = {}, limit = {}, pct = 0, o
           <button onClick={() => {
               const updated = { ...keys, [provider]: "" };
               setKeys(updated);
-              onSave({ provider, keys: updated });
+              onSave({ provider, keys: updated, models });
             }}
             style={{ padding: "10px 14px", background: "#1f1212", border: "1px solid #3a2020",
               borderRadius: 8, color: "#e05252", fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}
