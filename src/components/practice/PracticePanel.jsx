@@ -74,6 +74,17 @@ export function PracticePanel({ open, onClose, onOpenSettings, onSaveProjects, r
   }, [open]);
   const [aiConfig,     setAIConfig]     = useState(loadAIConfig);
 
+  // This panel never fully unmounts (it just renders null while closed), so
+  // the state above was only ever read from localStorage once, at the very
+  // first time the app loaded. Saving a key in the separate main Settings
+  // modal (which does mount fresh each time) wrote to localStorage fine, but
+  // this panel kept showing whatever it saw on that very first load — "No
+  // key" forever, even after saving one. Re-read on every open so this
+  // always reflects whatever was most recently saved.
+  useEffect(() => {
+    if (open) setAIConfig(loadAIConfig());
+  }, [open]);
+
   const { usage, limit, recordUsage, saveLimit, resetUsage, isOverLimit, pct } = useUsage();
   const rm      = roadmap;
   const hasKey  = !!aiConfig.keys?.[aiConfig.provider]?.trim();

@@ -4,7 +4,7 @@ import { StorageIndicator } from "../ui/StorageIndicator.jsx";
 import { TEMPLATES } from "../../constants/templates.js";
 import { downloadJSON } from "../../utils/roadmap.js";
 import { flatTopicNames } from "../../utils/topics.js";
-import { loadAIConfig, saveAIConfig, PROVIDERS } from "../../ai/providers.js";
+import { loadAIConfig, saveAIConfig, PROVIDERS, fetchAvailableModels } from "../../ai/providers.js";
 
 export function ManageModal({ roadmaps, onClose, onImportRoadmap, onDelete, onEdit, onCreate,
   onExportBackup, onImportBackup, onGetSnapshot, onApplySnapshot, defaultTab = "roadmaps",
@@ -15,10 +15,25 @@ export function ManageModal({ roadmaps, onClose, onImportRoadmap, onDelete, onEd
   const [tab, setTab] = useState(defaultTab);
   const [aiConfig, setAIConfig] = useState(loadAIConfig);
   const [showKey, setShowKey] = useState({});
+  const [modelLists, setModelLists] = useState({});   // provider -> fetched model array
+  const [modelState, setModelState] = useState({});   // provider -> "loading" | "idle" | error message
 
   const handleSaveAI = () => {
     saveAIConfig(aiConfig);
     setTab("roadmaps");
+  };
+
+  const handleFetchModels = async (id) => {
+    const key = aiConfig.keys?.[id];
+    if (!key?.trim()) return;
+    setModelState(s => ({ ...s, [id]: "loading" }));
+    try {
+      const list = await fetchAvailableModels(id, key);
+      setModelLists(m => ({ ...m, [id]: list }));
+      setModelState(s => ({ ...s, [id]: "idle" }));
+    } catch (e) {
+      setModelState(s => ({ ...s, [id]: e.message || "Couldn't fetch models" }));
+    }
   };
 
   const tabStyle = (t) => ({
@@ -275,6 +290,53 @@ export function ManageModal({ roadmaps, onClose, onImportRoadmap, onDelete, onEd
                     <a href={p.keyUrl} target="_blank" rel="noopener noreferrer"
                       style={{ color: "#4361ee" }}>Get a free {p.name} key -&gt;</a>
                   </div>
+
+                  {/* Model picker — providers periodically retire model IDs
+                      (this is what broke Groq before), so let the user see
+                      and pick from whatever's actually live for their key
+                      instead of trusting a string baked into the app. */}
+                  {aiConfig.keys?.[id]?.trim() && (
+                    <div style={{ marginTop: 8 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                        <div style={{ fontSize: 10, color: "#555", textTransform: "uppercase", letterSpacing: 1 }}>
+                          Model
+                        </div>
+                        <button onClick={() => handleFetchModels(id)} disabled={modelState[id] === "loading"}
+                          style={{ fontSize: 10, padding: "3px 7px", background: "transparent",
+                            border: "1px solid #2a2a35", borderRadius: 5, color: "#7b8cde",
+                            cursor: "pointer", fontFamily: "inherit" }}>
+                          {modelState[id] === "loading" ? "Fetching…" : "Fetch available models"}
+                        </button>
+                      </div>
+
+                      {modelLists[id] ? (
+                        <select
+                          value={aiConfig.models?.[id] || p.model}
+                          onChange={e => setAIConfig(c => ({ ...c, models: { ...c.models, [id]: e.target.value } }))}
+                          style={{ width: "100%", background: "#0f0f13", border: "1px solid #2a2a35",
+                            borderRadius: 7, padding: "9px 12px", color: "#e8e6e0", fontSize: 12,
+                            fontFamily: "monospace", outline: "none", boxSizing: "border-box" }}>
+                          {!modelLists[id].some(m => m.id === (aiConfig.models?.[id] || p.model)) && (
+                            <option value={aiConfig.models?.[id] || p.model}>
+                              {aiConfig.models?.[id] || p.model} (saved, not in fetched list)
+                            </option>
+                          )}
+                          {modelLists[id].map(m => (
+                            <option key={m.id} value={m.id}>{m.id}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <div style={{ background: "#0f0f13", border: "1px solid #2a2a35", borderRadius: 7,
+                          padding: "9px 12px", color: "#888", fontSize: 12, fontFamily: "monospace" }}>
+                          {aiConfig.models?.[id] || p.model}
+                        </div>
+                      )}
+
+                      {modelState[id] && modelState[id] !== "loading" && modelState[id] !== "idle" && (
+                        <div style={{ fontSize: 10, color: "#e05252", marginTop: 4 }}>⚠️ {modelState[id]}</div>
+                      )}
+                    </div>
+                  )}
                 </div>
               ))}
 
