@@ -47,9 +47,6 @@ export function useCloudField(userId, column, defaultValue) {
     skipNextSaveRef.current = true;
     setLoaded(false);
     setStatus("loading");
-    // Reset immediately so a stale value from a previous signed-in user
-    // never lingers in state while the new user's row is being fetched.
-    setValue(defaultValue);
 
     const load = () => {
       supabase
@@ -72,10 +69,9 @@ export function useCloudField(userId, column, defaultValue) {
             retryTimer = setTimeout(load, LOAD_RETRY_MS);
             return;
           }
-          // Always set explicitly (never leave the previous user's value
-          // sitting in state) — fall back to defaultValue for a brand-new
-          // account that has no row/column yet.
-          setValue(data && data[column] != null ? data[column] : defaultValue);
+          if (data && data[column] != null) {
+            setValue(data[column]);
+          }
           setStatus("idle");
           setLoaded(true);
         });
