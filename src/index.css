@@ -7,5 +7,33 @@
 }
 
 body {
-    background: #0f0f13;
+    background: #0d0d11;
+    color: #e9e4d9;
+}
+
+/* Visible keyboard focus everywhere — buttons/inputs that set outline:none
+   inline still get this since it's the browser default being restored for
+   anything that doesn't otherwise specify one. */
+:focus-visible {
+    outline: 2px solid #d9a441;
+    outline-offset: 2px;
+}
+
+::selection {
+    background: #d9a44144;
+    color: #e9e4d9;
+}
+
+/* Slim, quiet scrollbar matching the new palette (WebKit) */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #252329; border-radius: 6px; border: 2px solid #0d0d11; }
+::-webkit-scrollbar-thumb:hover { background: #322f38; }
+
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
 }
