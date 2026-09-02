@@ -46,6 +46,24 @@ async function withRetry(fn, maxAttempts = 2, initialDelayMs = 1000) {
   throw lastError;
 }
 
+// Some Groq reasoning models (Qwen, DeepSeek-style) default to embedding
+// their internal reasoning directly in the response as literal
+// `<think>...</think>` text instead of keeping it in a separate field. We
+// ask those models for `reasoning_format: "hidden"` below, but Groq's own
+// docs note this doesn't 100% guarantee nothing leaks through — so strip
+// any stray <think> block as a belt-and-suspenders backstop.
+function stripThinkTags(text) {
+  return (text || "").replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
+}
+
+// gpt-oss models reject `reasoning_format` outright (400 error) and already
+// keep reasoning out of the main content by default, so there's nothing to
+// fix there. Qwen/DeepSeek-family reasoning models are the ones that need
+// to be told explicitly to hide it.
+function groqReasoningFormat(model) {
+  return /qwen|deepseek/i.test(model || "") ? "hidden" : undefined;
+}
+
 // ── Provider configs ──────────────────────────────────────────────────────────
 export const PROVIDERS = {
   gemini: {
@@ -245,6 +263,7 @@ async function callGroqVision({ apiKey, prompt, base64, mimeType, jsonMode, maxT
         body: JSON.stringify({
           model: "qwen/qwen3.6-27b",
           max_tokens: maxTokens,
+          reasoning_format: "hidden",
           ...(jsonMode ? { response_format: { type: "json_object" } } : {}),
           messages: [{
             role: "user",
@@ -262,7 +281,7 @@ async function callGroqVision({ apiKey, prompt, base64, mimeType, jsonMode, maxT
       throw new Error(err?.error?.message || `Groq error ${res.status}`);
     }
     const data = await res.json();
-    return { text: data.choices?.[0]?.message?.content || "", provider: "groq" };
+    return { text: stripThinkTags(data.choices?.[0]?.message?.content), provider: "groq" };
   }, AI_SETTINGS.retryAttempts, AI_SETTINGS.retryDelayMs);
 }
 
@@ -270,6 +289,7 @@ async function callGroqVision({ apiKey, prompt, base64, mimeType, jsonMode, maxT
 async function callGroq({ apiKey, systemPrompt, userPrompt, messages = [], temperature = 0.7, maxTokens = 4096 }) {
   return withRetry(async () => {
     const model = getModelForProvider("groq");
+    const reasoningFormat = groqReasoningFormat(model);
     const history = messages.map(m => ({ role: m.role, content: m.content }));
     const res = await withTimeout(
       fetch("https://api.groq.com/openai/v1/chat/completions", {
@@ -287,6 +307,7 @@ async function callGroq({ apiKey, systemPrompt, userPrompt, messages = [], tempe
           ],
           temperature,
           max_tokens: maxTokens,
+          ...(reasoningFormat ? { reasoning_format: reasoningFormat } : {}),
         }),
       }),
       AI_SETTINGS.timeoutMs
@@ -297,7 +318,7 @@ async function callGroq({ apiKey, systemPrompt, userPrompt, messages = [], tempe
     }
     const data = await res.json();
     const choice = data.choices?.[0];
-    const text = choice?.message?.content || "";
+    const text = stripThinkTags(choice?.message?.content);
     if (choice?.finish_reason && choice.finish_reason !== "stop") {
       console.warn("[Groq] finish_reason:", choice.finish_reason, "| completion_tokens:", data.usage?.completion_tokens, "| max_tokens sent:", maxTokens);
     }
@@ -365,6 +386,7 @@ async function callGeminiWithSearch({ apiKey, systemPrompt, userPrompt }) {
 async function callGroqWithSearch({ apiKey, systemPrompt, userPrompt }) {
   return withRetry(async () => {
     const model = getModelForProvider("groq");
+    const reasoningFormat = groqReasoningFormat(model);
     const tools = [{
       type: "function",
       function: {
@@ -391,7 +413,7 @@ async function callGroqWithSearch({ apiKey, systemPrompt, userPrompt }) {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
         body: JSON.stringify({ model, messages, tools, tool_choice: "auto",
-          temperature: 0.3, max_tokens: 1024 }),
+          temperature: 0.3, max_tokens: 1024, ...(reasoningFormat ? { reasoning_format: reasoningFormat } : {}) }),
       }),
       AI_SETTINGS.timeoutMs
     );
@@ -435,7 +457,7 @@ async function callGroqWithSearch({ apiKey, systemPrompt, userPrompt }) {
 
     // If no tool calls were made, just return what we have
     if (!toolResults.length) {
-      const text = msg1?.content || "";
+      const text = stripThinkTags(msg1?.content);
       return { text, usage: { promptTokens: usage1.prompt_tokens || 0, completionTokens: usage1.completion_tokens || 0 } };
     }
 
@@ -455,7 +477,7 @@ async function callGroqWithSearch({ apiKey, systemPrompt, userPrompt }) {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
         body: JSON.stringify({ model, messages: messages2,
-          temperature: 0.3, max_tokens: 2048 }),
+          temperature: 0.3, max_tokens: 2048, ...(reasoningFormat ? { reasoning_format: reasoningFormat } : {}) }),
       }),
       AI_SETTINGS.timeoutMs
     );
@@ -464,7 +486,7 @@ async function callGroqWithSearch({ apiKey, systemPrompt, userPrompt }) {
       throw new Error(err?.error?.message || `Groq error ${res2.status}`);
     }
     const data2 = await res2.json();
-    const text  = data2.choices?.[0]?.message?.content || "";
+    const text  = stripThinkTags(data2.choices?.[0]?.message?.content);
     const usage2 = data2.usage || {};
 
     return {
