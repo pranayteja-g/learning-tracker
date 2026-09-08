@@ -1,5 +1,7 @@
 import { useState, useRef } from "react";
 import { loadAIConfig, callVisionAI } from "../../ai/providers.js";
+import { Prose } from "../ui/Prose.jsx";
+import { color, radius, space, font } from "../../styles/theme.js";
 
 // ── Voice transcription ───────────────────────────────────────────────────────
 function useVoiceRecorder(onTranscript) {
@@ -350,64 +352,66 @@ function ClippingDetail({ clipping, onUpdate, onDelete, onClose }) {
   const save = () => { onUpdate(clipping.id, { title, content }); setEditing(false); };
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "#0f0f13", zIndex: 300,
+    <div style={{ position: "fixed", inset: 0, background: color.ink, zIndex: 300,
       display: "flex", flexDirection: "column",
       paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)" }}>
-      <div style={{ padding: "14px 16px", borderBottom: "1px solid #1e1e24",
-        background: "#13131a", display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
+      <div style={{ padding: "14px 16px", borderBottom: `1px solid ${color.rule}`,
+        background: color.surface, display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
         <button onClick={onClose} style={{ background: "transparent", border: "none",
-          color: "#666", fontSize: 20, cursor: "pointer", padding: 0 }}>‹</button>
+          color: color.textMuted, fontSize: 20, cursor: "pointer", padding: 0 }}>‹</button>
         {editing
           ? <input value={title} onChange={e => setTitle(e.target.value)}
               style={{ flex: 1, background: "transparent", border: "none", outline: "none",
-                color: "#fff", fontSize: 14, fontWeight: 700, fontFamily: "inherit" }} />
-          : <div style={{ flex: 1, fontSize: 14, fontWeight: 700, color: "#fff",
+                color: color.text, fontSize: 14, fontWeight: 700, fontFamily: "inherit", minWidth: 0 }} />
+          : <div style={{ flex: 1, fontSize: 14, fontWeight: 700, color: color.text,
               overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{title}</div>
         }
         <button onClick={() => editing ? save() : setEditing(true)}
-          style={{ padding: "5px 12px", background: editing ? "#52b788" : "#7b5ea722",
-            border: `1px solid ${editing ? "#52b788" : "#7b5ea744"}`,
-            borderRadius: 6, color: editing ? "#fff" : "#c4b5fd",
+          style={{ padding: "5px 12px", background: editing ? color.successSoft : color.accentSoft,
+            border: `1px solid ${editing ? color.successBorder : color.accentBorder}`,
+            borderRadius: radius.sm, color: editing ? color.success : color.accent,
             fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
-          {editing ? "✓ Save" : "✏️ Edit"}
+          {editing ? "Save" : "Edit"}
         </button>
         <button onClick={() => { if (confirm("Delete this clipping?")) { onDelete(clipping.id); onClose(); }}}
-          style={{ background: "transparent", border: "none", color: "#444",
+          style={{ background: "transparent", border: "none", color: color.textFaint,
             fontSize: 14, cursor: "pointer", padding: "4px" }}>🗑️</button>
       </div>
 
-      <div style={{ flex: 1, overflowY: "auto", padding: "16px" }}>
-        {/* Meta */}
-        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 14 }}>
-          {clipping.tags?.map(t => (
-            <span key={t} style={{ fontSize: 10, padding: "2px 8px", borderRadius: 4,
-              background: "#7b5ea722", color: "#c4b5fd", border: "1px solid #7b5ea733" }}>
-              #{t}
+      <div style={{ flex: 1, overflowY: "auto", padding: "20px 20px 40px" }}>
+        {/* Content column is capped for line length — this view is a
+            full-viewport overlay, so on a wide desktop window unconstrained
+            text would stretch edge to edge and be hard to read. */}
+        <div style={{ maxWidth: 680, margin: "0 auto" }}>
+          {/* Meta */}
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 18 }}>
+            {clipping.tags?.map(t => (
+              <span key={t} style={{ fontSize: 11, padding: "2px 8px", borderRadius: 4,
+                background: color.accentSoft, color: color.accent, border: `1px solid ${color.accentBorder}` }}>
+                #{t}
+              </span>
+            ))}
+            {clipping.sourceUrl && (
+              <a href={clipping.sourceUrl} target="_blank" rel="noopener noreferrer"
+                style={{ fontSize: 11, padding: "2px 8px", borderRadius: 4,
+                  background: color.surfaceAlt, color: color.accent, textDecoration: "none" }}>
+                🔗 Source
+              </a>
+            )}
+            <span style={{ fontSize: 11, color: color.textFaint }}>
+              {new Date(clipping.createdAt).toLocaleDateString()}
             </span>
-          ))}
-          {clipping.sourceUrl && (
-            <a href={clipping.sourceUrl} target="_blank" rel="noopener noreferrer"
-              style={{ fontSize: 10, padding: "2px 8px", borderRadius: 4,
-                background: "#1e1e24", color: "#7b8cde", textDecoration: "none" }}>
-              🔗 Source
-            </a>
-          )}
-          <span style={{ fontSize: 10, color: "#333" }}>
-            {new Date(clipping.createdAt).toLocaleDateString()}
-          </span>
-        </div>
+          </div>
 
-        {editing
-          ? <textarea value={content} onChange={e => setContent(e.target.value)}
-              style={{ width: "100%", minHeight: 400, padding: "12px", background: "#0f0f13",
-                border: "1px solid #2a2a35", borderRadius: 8, color: "#ccc",
-                fontSize: 14, fontFamily: "inherit", lineHeight: 1.8,
-                resize: "none", outline: "none", boxSizing: "border-box" }} />
-          : <div style={{ fontSize: 14, color: "#aaa", lineHeight: 1.8,
-              whiteSpace: "pre-wrap", fontFamily: "inherit" }}>
-              {content}
-            </div>
-        }
+          {editing
+            ? <textarea value={content} onChange={e => setContent(e.target.value)}
+                style={{ width: "100%", minHeight: 400, padding: "14px 16px", background: color.surfaceAlt,
+                  border: `1px solid ${color.rule}`, borderRadius: radius.md, color: color.text,
+                  fontSize: 15, fontFamily: font.body, lineHeight: 1.8,
+                  resize: "none", outline: "none", boxSizing: "border-box" }} />
+            : <Prose content={content} size={16} />
+          }
+        </div>
       </div>
     </div>
   );
@@ -523,16 +527,16 @@ export function ClippingsSection({ clippings, onAdd, onUpdate, onDelete, isMobil
             onMouseLeave={e => e.currentTarget.style.borderColor = "#1e1e24"}>
             <div style={{ display: "flex", justifyContent: "space-between",
               alignItems: "flex-start", marginBottom: 5 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: "#ccc", flex: 1,
+              <div style={{ fontSize: 13.5, fontWeight: 700, color: color.text, flex: 1,
                 marginRight: 8, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {c.title}
               </div>
-              <span style={{ fontSize: 10, color: "#333", flexShrink: 0 }}>↗</span>
+              <span style={{ fontSize: 10, color: color.textFaint, flexShrink: 0 }}>↗</span>
             </div>
-            <div style={{ fontSize: 12, color: "#444", overflow: "hidden",
+            <div style={{ fontSize: 12.5, color: color.textMuted, overflow: "hidden",
               display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical",
-              lineHeight: 1.5, marginBottom: c.tags?.length ? 8 : 0 }}>
-              {c.content}
+              lineHeight: 1.6, marginBottom: c.tags?.length ? 8 : 0 }}>
+              {c.content.replace(/^#+\s+|\*\*/g, "")}
             </div>
             {c.tags?.length > 0 && (
               <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>

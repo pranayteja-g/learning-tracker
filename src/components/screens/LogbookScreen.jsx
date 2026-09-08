@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { STATUS_CYCLE } from "../../hooks/useLogbook.js";
+import { Prose } from "../ui/Prose.jsx";
+import { color as theme } from "../../styles/theme.js";
 
 const STATUS_CONFIG = {
   "not-started": { label: "Not started", icon: "○", color: "#444" },
@@ -277,18 +279,18 @@ function EntryDetail({ entry, roadmaps, onEdit, onDelete, onCycleStatus, onBack,
 
         {entry.notes && (
           <section style={{ marginBottom: 22 }}>
-            <div style={{ fontSize: 11, color: "#555", textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>📖 Notes</div>
-            <div style={{ fontSize: 14, color: "#ccc", lineHeight: 1.8, whiteSpace: "pre-wrap" }}>{entry.notes}</div>
+            <div style={{ fontSize: 12, color: theme.textMuted, marginBottom: 8 }}>Notes</div>
+            <Prose content={entry.notes} accentColor={accent} size={16} />
           </section>
         )}
 
         {entry.keyPoints?.length > 0 && (
           <section style={{ marginBottom: 22 }}>
-            <div style={{ fontSize: 11, color: "#555", textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>⭐ Key Points</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+            <div style={{ fontSize: 12, color: theme.textMuted, marginBottom: 8 }}>Key points</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
               {entry.keyPoints.map((p, i) => (
-                <div key={i} style={{ display: "flex", gap: 8, fontSize: 13, color: "#ccc", lineHeight: 1.6 }}>
-                  <span style={{ marginTop: 7, width: 4, height: 4, borderRadius: "50%", background: accent, flexShrink: 0 }} />
+                <div key={i} style={{ display: "flex", gap: 8, fontSize: 14.5, color: theme.text, lineHeight: 1.7 }}>
+                  <span style={{ marginTop: 8, width: 4, height: 4, borderRadius: "50%", background: accent, flexShrink: 0 }} />
                   {p}
                 </div>
               ))}
@@ -298,17 +300,17 @@ function EntryDetail({ entry, roadmaps, onEdit, onDelete, onCycleStatus, onBack,
 
         {entry.codeExamples?.length > 0 && (
           <section style={{ marginBottom: 22 }}>
-            <div style={{ fontSize: 11, color: "#555", textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>💻 Code Examples</div>
+            <div style={{ fontSize: 12, color: theme.textMuted, marginBottom: 8 }}>Code examples</div>
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               {entry.codeExamples.map(c => (
-                <div key={c.id} style={{ background: "#0f0f13", border: "1px solid #1e1e24", borderRadius: 9, overflow: "hidden" }}>
+                <div key={c.id} style={{ background: theme.surfaceAlt, border: `1px solid ${theme.rule}`, borderRadius: 9, overflow: "hidden" }}>
                   {c.title && (
-                    <div style={{ padding: "8px 12px", borderBottom: "1px solid #1e1e24", fontSize: 12, color: "#888" }}>
+                    <div style={{ padding: "8px 12px", borderBottom: `1px solid ${theme.rule}`, fontSize: 12.5, color: theme.textMuted }}>
                       {c.title}
                     </div>
                   )}
-                  <pre style={{ margin: 0, padding: "12px", fontSize: 12, color: "#a8d8b9",
-                    fontFamily: "monospace", lineHeight: 1.6, overflowX: "auto", whiteSpace: "pre" }}>
+                  <pre style={{ margin: 0, padding: "13px", fontSize: 13.5, color: theme.text,
+                    fontFamily: "'SF Mono','Roboto Mono',monospace", lineHeight: 1.65, overflowX: "auto", whiteSpace: "pre" }}>
                     {c.code}
                   </pre>
                 </div>
@@ -319,19 +321,19 @@ function EntryDetail({ entry, roadmaps, onEdit, onDelete, onCycleStatus, onBack,
 
         {entry.qa?.length > 0 && (
           <section style={{ marginBottom: 22 }}>
-            <div style={{ fontSize: 11, color: "#555", textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>💬 Interview Q&A</div>
+            <div style={{ fontSize: 12, color: theme.textMuted, marginBottom: 8 }}>Interview Q&A</div>
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               {entry.qa.map(item => (
-                <div key={item.id} style={{ background: "#0f0f13", border: "1px solid #1e1e24", borderRadius: 9, padding: 12 }}>
-                  <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
-                    <span style={{ width: 18, height: 18, borderRadius: 4, background: "#7b5ea722", color: "#c4b5fd",
+                <div key={item.id} style={{ background: theme.surfaceAlt, border: `1px solid ${theme.rule}`, borderRadius: 9, padding: 14 }}>
+                  <div style={{ display: "flex", gap: 8, marginBottom: 9 }}>
+                    <span style={{ width: 18, height: 18, borderRadius: 4, background: theme.accentSoft, color: theme.accent,
                       fontSize: 11, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>Q</span>
-                    <div style={{ fontSize: 13, color: "#fff", fontWeight: 600, lineHeight: 1.6 }}>{item.question}</div>
+                    <div style={{ fontSize: 14.5, color: theme.text, fontWeight: 600, lineHeight: 1.65 }}>{item.question}</div>
                   </div>
                   <div style={{ display: "flex", gap: 8 }}>
-                    <span style={{ width: 18, height: 18, borderRadius: 4, background: "#52b78822", color: "#52b788",
+                    <span style={{ width: 18, height: 18, borderRadius: 4, background: theme.successSoft, color: theme.success,
                       fontSize: 11, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>A</span>
-                    <div style={{ fontSize: 13, color: "#aaa", lineHeight: 1.6 }}>{item.answer}</div>
+                    <div style={{ fontSize: 14.5, color: theme.textMuted, lineHeight: 1.7 }}>{item.answer}</div>
                   </div>
                 </div>
               ))}
