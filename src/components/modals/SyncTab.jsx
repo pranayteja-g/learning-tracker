@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { color, radius, space, font, button } from "../../styles/theme.js";
 
 // ── Compression ───────────────────────────────────────────────────────────────
 async function compress(str) {
@@ -90,18 +91,18 @@ function QRDisplay({ code }) {
   }, [code]);
 
   if (err) return (
-    <div style={{ padding: 16, textAlign: "center", color: "#e05252", fontSize: 12, lineHeight: 1.6 }}>
+    <div style={{ padding: 16, textAlign: "center", color: color.danger, fontSize: 12, lineHeight: 1.6 }}>
       Could not generate QR code.<br/>Use the Text Code option instead.
     </div>
   );
 
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
-      <div style={{ padding: 14, background: "#fff", borderRadius: 12,
+      <div style={{ padding: 14, background: "#fff", borderRadius: radius.md,
         boxShadow: "0 4px 20px rgba(0,0,0,0.4)", display: "inline-block" }}>
         <canvas ref={canvasRef} style={{ display: "block", borderRadius: 4 }} />
       </div>
-      <div style={{ fontSize: 11, color: "#555", textAlign: "center" }}>
+      <div style={{ fontSize: 12, color: color.textFaint, textAlign: "center" }}>
         Scan with Device 2's camera app
       </div>
     </div>
@@ -170,12 +171,11 @@ function QRScanner({ onScan, onCancel }) {
   };
 
   if (error) return (
-    <div style={{ padding: 16, background: "#2e1a1a", borderRadius: 8,
-      color: "#e05252", fontSize: 13, lineHeight: 1.6, textAlign: "center" }}>
+    <div style={{ padding: 16, background: color.dangerSoft, borderRadius: radius.md,
+      color: color.danger, fontSize: 13, lineHeight: 1.6, textAlign: "center" }}>
       {error}
-      <button onClick={onCancel} style={{ display: "block", margin: "10px auto 0",
-        padding: "6px 14px", background: "#1e1e24", border: "1px solid #2a2a35",
-        borderRadius: 6, color: "#888", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>
+      <button onClick={onCancel} style={{ ...button("default"), display: "block",
+        margin: "10px auto 0", padding: "6px 14px", fontSize: 12 }}>
         Close
       </button>
     </div>
@@ -183,19 +183,17 @@ function QRScanner({ onScan, onCancel }) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
-      <div style={{ position: "relative", borderRadius: 10, overflow: "hidden", border: "2px solid #7b5ea7" }}>
+      <div style={{ position: "relative", borderRadius: radius.md, overflow: "hidden", border: `2px solid ${color.accent}` }}>
         <video ref={videoRef} muted playsInline style={{ width: 240, height: 240, objectFit: "cover", display: "block" }} />
         <canvas ref={canvasRef} style={{ display: "none" }} />
         <div style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
           <div style={{ position: "absolute", top: "20%", left: "20%", right: "20%", bottom: "20%",
-            border: "2px solid #7b5ea7", borderRadius: 4,
+            border: `2px solid ${color.accent}`, borderRadius: 4,
             boxShadow: "0 0 0 9999px rgba(0,0,0,0.45)" }} />
         </div>
       </div>
-      <div style={{ fontSize: 12, color: "#888" }}>Point camera at the QR code</div>
-      <button onClick={onCancel} style={{ padding: "6px 16px", background: "transparent",
-        border: "1px solid #2a2a35", borderRadius: 6, color: "#666",
-        fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>
+      <div style={{ fontSize: 12, color: color.textMuted }}>Point camera at the QR code</div>
+      <button onClick={onCancel} style={{ ...button("ghost"), padding: "6px 16px", fontSize: 12 }}>
         Cancel
       </button>
     </div>
@@ -260,32 +258,33 @@ export function SyncTab({ onGetSnapshot, onApplySnapshot }) {
 
   const btnSend = (label, onClick) => (
     <button onClick={onClick} disabled={generating}
-      style={{ flex: 1, padding: "11px 8px", background: "#7b5ea722",
-        border: "1px solid #7b5ea744", borderRadius: 8, color: "#c4b5fd",
-        fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+      style={{ ...button("primary"), flex: 1, padding: "11px 8px", fontSize: 12.5 }}>
       {generating ? "Generating…" : label}
     </button>
   );
 
   const btnReceive = (label, onClick) => (
     <button onClick={onClick}
-      style={{ flex: 1, padding: "11px 8px", background: "#1e2e1e",
-        border: "1px solid #52b78844", borderRadius: 8, color: "#52b788",
-        fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+      style={{ ...button("success"), flex: 1, padding: "11px 8px", fontSize: 12.5 }}>
       {label}
     </button>
   );
 
   const backBtn = () => (
-    <button onClick={reset} style={{ width: "100%", padding: "9px",
-      background: "transparent", border: "1px solid #2a2a35", borderRadius: 7,
-      color: "#666", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>
+    <button onClick={reset} style={{ ...button("ghost"), width: "100%", padding: "9px", fontSize: 12.5 }}>
       ← Back
     </button>
   );
 
+  const codeBoxStyle = (borderColor) => ({
+    width: "100%", height: 90, padding: 10, background: color.surfaceAlt,
+    border: `1px solid ${borderColor}`, borderRadius: radius.sm, color: color.textMuted,
+    fontFamily: font.mono, fontSize: 11.5, resize: "none",
+    lineHeight: 1.4, boxSizing: "border-box", wordBreak: "break-all", outline: "none",
+  });
+
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: space.md }}>
 
       {/* QR Scanner */}
       {mode === "import-qr" && (
@@ -300,18 +299,10 @@ export function SyncTab({ onGetSnapshot, onApplySnapshot }) {
       {/* Text export */}
       {mode === "export-text" && code && (
         <>
-          <textarea id="sync-code-out" readOnly value={code}
-            style={{ width: "100%", height: 90, padding: 10, background: "#0d1117",
-              border: "1px solid #2a2a35", borderRadius: 8, color: "#888",
-              fontFamily: "monospace", fontSize: 11, resize: "none",
-              lineHeight: 1.4, boxSizing: "border-box", wordBreak: "break-all" }} />
+          <textarea id="sync-code-out" readOnly value={code} style={codeBoxStyle(color.rule)} />
           <button onClick={copyCode}
-            style={{ width: "100%", padding: 10,
-              background: copied ? "#1a2e1a" : "#1e1e24",
-              border: `1px solid ${copied ? "#52b78844" : "#2a2a35"}`, borderRadius: 8,
-              color: copied ? "#52b788" : "#888", fontSize: 13, fontWeight: 600,
-              cursor: "pointer", fontFamily: "inherit" }}>
-            {copied ? "✓ Copied!" : "Copy Code"}
+            style={{ ...button(copied ? "success" : "default"), width: "100%", padding: 10, fontSize: 13 }}>
+            {copied ? "✓ Copied!" : "Copy code"}
           </button>
           {backBtn()}
         </>
@@ -322,24 +313,16 @@ export function SyncTab({ onGetSnapshot, onApplySnapshot }) {
         <>
           <textarea value={pasted} onChange={e => { setPasted(e.target.value); setApplyMsg(null); }}
             placeholder="Paste sync code here…"
-            style={{ width: "100%", height: 90, padding: 10, background: "#0d1117",
-              border: `1px solid ${applyMsg ? (applyMsg.ok ? "#52b78844" : "#e0525244") : "#2a2a35"}`,
-              borderRadius: 8, color: "#ccc", fontFamily: "monospace", fontSize: 11,
-              resize: "none", lineHeight: 1.4, boxSizing: "border-box",
-              wordBreak: "break-all", outline: "none" }} />
+            style={codeBoxStyle(applyMsg ? (applyMsg.ok ? color.successBorder : color.dangerBorder) : color.rule)} />
           {applyMsg && (
-            <div style={{ fontSize: 12, color: applyMsg.ok ? "#52b788" : "#e05252" }}>
-              {applyMsg.ok ? "✓" : "✗"} {applyMsg.text}
+            <div style={{ fontSize: 12, color: applyMsg.ok ? color.success : color.danger }}>
+              {applyMsg.text}
             </div>
           )}
           <button onClick={() => applyCode()} disabled={!pasted.trim() || applying}
-            style={{ width: "100%", padding: 12,
-              background: pasted.trim() ? "#1a2e1a" : "#1e1e24",
-              border: `1px solid ${pasted.trim() ? "#52b78844" : "#2a2a35"}`,
-              borderRadius: 8, color: pasted.trim() ? "#52b788" : "#444",
-              fontSize: 13, fontWeight: 600,
-              cursor: pasted.trim() ? "pointer" : "default", fontFamily: "inherit" }}>
-            {applying ? "Applying…" : "📥 Apply Sync Code"}
+            style={{ ...button(pasted.trim() ? "success" : "default"), width: "100%", padding: 12, fontSize: 13,
+              cursor: pasted.trim() ? "pointer" : "default" }}>
+            {applying ? "Applying…" : "Apply sync code"}
           </button>
           {backBtn()}
         </>
@@ -348,41 +331,38 @@ export function SyncTab({ onGetSnapshot, onApplySnapshot }) {
       {/* Default menu */}
       {!mode && (
         <>
-          <div style={{ background: "#0f0f13", borderRadius: 8, padding: "12px 14px",
-            border: "1px solid #1e1e24", fontSize: 12, color: "#666", lineHeight: 1.7 }}>
-            <span style={{ fontWeight: 700, color: "#c4b5fd" }}>📱 How to sync</span><br/>
+          <div style={{ fontSize: 12.5, color: color.textMuted, lineHeight: 1.7 }}>
+            <span style={{ fontWeight: 600, color: color.text }}>How to sync</span><br/>
             Generate a code or QR on Device 1 → send to yourself → receive on Device 2.
           </div>
 
-          <div style={{ fontSize: 11, color: "#555", textTransform: "uppercase", letterSpacing: 1 }}>
-            This device → send to other
-          </div>
-          <div style={{ display: "flex", gap: 8 }}>
-            {btnSend("📋 Text Code", () => generateCode(false))}
-            {btnSend("📷 QR Code",   () => generateCode(true))}
+          <div>
+            <div style={{ fontSize: 12.5, color: color.textFaint, marginBottom: space.xs }}>This device → send to other</div>
+            <div style={{ display: "flex", gap: space.xs }}>
+              {btnSend("Text code", () => generateCode(false))}
+              {btnSend("QR code",   () => generateCode(true))}
+            </div>
           </div>
 
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div style={{ flex: 1, height: 1, background: "#1e1e24" }} />
-            <span style={{ fontSize: 11, color: "#444" }}>other device → this one</span>
-            <div style={{ flex: 1, height: 1, background: "#1e1e24" }} />
+            <div style={{ flex: 1, height: 1, background: color.rule }} />
+            <span style={{ fontSize: 12, color: color.textFaint }}>other device → this one</span>
+            <div style={{ flex: 1, height: 1, background: color.rule }} />
           </div>
 
-          <div style={{ display: "flex", gap: 8 }}>
-            {btnReceive("📋 Paste Code", () => setMode("import-text"))}
-            {btnReceive("📷 Scan QR",    () => setMode("import-qr"))}
+          <div style={{ display: "flex", gap: space.xs }}>
+            {btnReceive("Paste code", () => setMode("import-text"))}
+            {btnReceive("Scan QR",    () => setMode("import-qr"))}
           </div>
 
           {applyMsg && (
-            <div style={{ fontSize: 12, color: applyMsg.ok ? "#52b788" : "#e05252",
-              padding: "8px 10px", background: "#0f0f13", borderRadius: 6 }}>
-              {applyMsg.ok ? "✓" : "✗"} {applyMsg.text}
+            <div style={{ fontSize: 12, color: applyMsg.ok ? color.success : color.danger }}>
+              {applyMsg.text}
             </div>
           )}
 
-          <div style={{ fontSize: 11, color: "#333", padding: "8px 10px",
-            background: "#0f0f13", borderRadius: 6, lineHeight: 1.6 }}>
-            ⚠️ Applying sync merges data — existing data is preserved.
+          <div style={{ fontSize: 12, color: color.textFaint, lineHeight: 1.6 }}>
+            Applying a sync code merges data — your existing data is preserved.
           </div>
         </>
       )}

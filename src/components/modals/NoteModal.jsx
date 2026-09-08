@@ -6,6 +6,7 @@ import { useUsage } from "../../ai/useUsage.js";
 import { safeParseJSON } from "../../utils/jsonParse.js";
 import { CheatSheetView } from "../interview/CheatSheetView.jsx";
 import { TOPIC_DIFFICULTIES, TIME_ESTIMATE_OPTIONS, RESOURCE_TYPES } from "../../constants/config.js";
+import { Prose } from "../ui/Prose.jsx";
 
 const DIFFICULTIES = TOPIC_DIFFICULTIES;
 
@@ -271,11 +272,13 @@ Write thorough, useful notes a student would actually want to study from.`;
                   style={{ width: "100%", minHeight: isMobile ? 0 : 220,
                     flex: isMobile ? 1 : "none",
                     background: "#0f0f13", border: "1px solid #1e1e24",
-                    borderRadius: 7, padding: "14px 16px", color: note ? "#e8e6e0" : "#444",
-                    fontSize: 14, fontFamily: "inherit", lineHeight: 1.8,
-                    whiteSpace: "pre-wrap", wordBreak: "break-word",
-                    cursor: "text", boxSizing: "border-box" }}>
-                  {note || "No notes yet. Tap ✏️ Edit to add notes, key concepts, takeaways…"}
+                    borderRadius: 7, padding: "16px 18px",
+                    cursor: "text", boxSizing: "border-box", overflowY: "auto" }}>
+                  {note
+                    ? <Prose content={note} accentColor={rm?.accent} size={isMobile ? 15 : 16} />
+                    : <div style={{ color: "#444", fontSize: 14, lineHeight: 1.8 }}>
+                        No notes yet. Tap ✏️ Edit to add notes, key concepts, takeaways…
+                      </div>}
                 </div>
               )}
             </div>
@@ -341,10 +344,8 @@ Write thorough, useful notes a student would actually want to study from.`;
               {genResult && (
                 <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                   <div style={{ background: "#0f0f13", border: "1px solid #52b78833",
-                    borderRadius: 8, padding: "12px 14px", maxHeight: 300,
-                    overflowY: "auto", fontSize: 12, color: "#aaa",
-                    lineHeight: 1.7, whiteSpace: "pre-wrap", fontFamily: "inherit" }}>
-                    {genResult}
+                    borderRadius: 8, padding: "14px 16px", maxHeight: 340, overflowY: "auto" }}>
+                    <Prose content={genResult} accentColor={rm?.accent} size={14.5} />
                   </div>
                   <div style={{ display: "flex", gap: 8 }}>
                     <button onClick={saveGeneratedNotes}

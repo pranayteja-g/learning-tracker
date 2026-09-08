@@ -5,6 +5,15 @@ import { TEMPLATES } from "../../constants/templates.js";
 import { downloadJSON } from "../../utils/roadmap.js";
 import { flatTopicNames } from "../../utils/topics.js";
 import { loadAIConfig, saveAIConfig, PROVIDERS, fetchAvailableModels } from "../../ai/providers.js";
+import { color, radius, space, font, input, label, button, divider } from "../../styles/theme.js";
+
+const TABS = [
+  { id: "roadmaps", label: "Roadmaps" },
+  { id: "data",     label: "Data" },
+  { id: "settings", label: "AI" },
+  { id: "sync",     label: "Sync" },
+  { id: "account",  label: "Account" },
+];
 
 export function ManageModal({ roadmaps, onClose, onImportRoadmap, onDelete, onEdit, onCreate,
   onExportBackup, onImportBackup, onGetSnapshot, onApplySnapshot, defaultTab = "roadmaps",
@@ -36,92 +45,87 @@ export function ManageModal({ roadmaps, onClose, onImportRoadmap, onDelete, onEd
     }
   };
 
-  const tabStyle = (t) => ({
-    flex: 1, padding: "8px", border: "none", borderRadius: 6,
-    cursor: "pointer", fontFamily: "inherit", fontSize: 13, fontWeight: tab === t ? 700 : 400,
-    background: tab === t ? "#7b5ea722" : "transparent",
-    color: tab === t ? "#c4b5fd" : "#666",
-    borderBottom: tab === t ? "2px solid #7b5ea7" : "2px solid transparent",
-  });
-
   return (
-    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)",
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)",
       display: "flex", alignItems: "center", justifyContent: "center", zIndex: 200, padding: 16 }}>
-      <div onClick={e => e.stopPropagation()} style={{ background: "#16161b", border: "1px solid #2a2a35",
-        borderRadius: 12, width: "100%", maxWidth: 460,
-        boxShadow: "0 20px 60px rgba(0,0,0,0.6)", maxHeight: "88vh",
-        display: "flex", flexDirection: "column" }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: color.surface,
+        border: `1px solid ${color.rule}`, borderRadius: radius.lg, width: "100%", maxWidth: 460,
+        boxShadow: "0 24px 64px rgba(0,0,0,0.5)", maxHeight: "88vh",
+        display: "flex", flexDirection: "column", fontFamily: font.body }}>
 
-        <div style={{ padding: "18px 20px 0", borderBottom: "1px solid #1e1e24" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-            <div style={{ fontSize: 15, fontWeight: 700, color: "#fff" }}>Settings</div>
-            <button onClick={onClose} style={{ background: "transparent", border: "none",
-              color: "#666", fontSize: 20, cursor: "pointer", lineHeight: 1 }}>x</button>
+        {/* Header */}
+        <div style={{ padding: `${space.lg}px ${space.xl}px 0` }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: space.md }}>
+            <div style={{ fontSize: 19, fontFamily: font.display, color: color.text }}>Settings</div>
+            <button onClick={onClose} aria-label="Close" style={{ background: "transparent", border: "none",
+              color: color.textFaint, fontSize: 20, cursor: "pointer", lineHeight: 1, padding: 4 }}>×</button>
           </div>
-          <div style={{ display: "flex", gap: 4, marginBottom: 0 }}>
-            <button style={tabStyle("roadmaps")} onClick={() => setTab("roadmaps")}>Roadmaps</button>
-            <button style={tabStyle("data")} onClick={() => setTab("data")}>Data</button>
-            <button style={tabStyle("settings")} onClick={() => setTab("settings")}>AI</button>
-            <button style={tabStyle("sync")} onClick={() => setTab("sync")}>Sync</button>
-            <button style={tabStyle("account")} onClick={() => setTab("account")}>Account</button>
+          {/* Underline tabs — one row, no per-tab background/border chrome */}
+          <div style={{ display: "flex", gap: space.lg, borderBottom: `1px solid ${color.rule}` }}>
+            {TABS.map(t => (
+              <button key={t.id} onClick={() => setTab(t.id)}
+                style={{ background: "transparent", border: "none", cursor: "pointer",
+                  fontFamily: "inherit", fontSize: 13.5, padding: "0 0 10px",
+                  color: tab === t.id ? color.text : color.textFaint,
+                  fontWeight: tab === t.id ? 600 : 400,
+                  borderBottom: tab === t.id ? `2px solid ${color.accent}` : "2px solid transparent",
+                  marginBottom: -1 }}>
+                {t.label}
+              </button>
+            ))}
           </div>
         </div>
 
-        <div style={{ overflowY: "auto", flex: 1, padding: "16px 20px" }}>
+        <div style={{ overflowY: "auto", flex: 1, padding: `${space.lg}px ${space.xl}px` }}>
+
+          {/* ── Roadmaps ── */}
           {tab === "roadmaps" && (
             <>
-              <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
-                {Object.values(roadmaps).length === 0 && (
-                  <div style={{ fontSize: 13, color: "#555", textAlign: "center", padding: "20px 0" }}>
-                    No roadmaps yet
-                  </div>
-                )}
-                {Object.values(roadmaps).map(rm => (
-                  <div key={rm.id} style={{ display: "flex", alignItems: "center", gap: 8,
-                    background: "#0f0f13", borderRadius: 8, padding: "11px 13px",
-                    border: `1px solid ${rm.color}33` }}>
-                    <div style={{ width: 10, height: 10, borderRadius: "50%", background: rm.color, flexShrink: 0 }} />
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 13, color: "#ccc", fontWeight: 500,
-                        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{rm.label}</div>
-                      <div style={{ fontSize: 11, color: "#555", marginTop: 1 }}>
-                        {Object.keys(rm.sections).length} sections  {Object.values(rm.sections).reduce((acc, ts) => acc + flatTopicNames(ts).length, 0)} topics
-                      </div>
+              {Object.values(roadmaps).length === 0 && (
+                <div style={{ fontSize: 13.5, color: color.textFaint, textAlign: "center", padding: "24px 0" }}>
+                  No roadmaps yet
+                </div>
+              )}
+              {Object.values(roadmaps).map((rm, i) => (
+                <div key={rm.id} style={{ display: "flex", alignItems: "center", gap: space.sm,
+                  padding: "10px 0", borderTop: i > 0 ? `1px solid ${color.ruleSoft}` : "none" }}>
+                  <div style={{ width: 8, height: 8, borderRadius: "50%", background: rm.color, flexShrink: 0 }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13.5, color: color.text,
+                      overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{rm.label}</div>
+                    <div style={{ fontSize: 12, color: color.textFaint, marginTop: 1 }}>
+                      {Object.keys(rm.sections).length} sections · {Object.values(rm.sections).reduce((acc, ts) => acc + flatTopicNames(ts).length, 0)} topics
                     </div>
-                    <button onClick={() => { onEdit(rm); onClose(); }}
-                      style={{ padding: "5px 10px", background: rm.color + "22", border: `1px solid ${rm.color}44`,
-                        borderRadius: 6, color: rm.accent, fontSize: 11, cursor: "pointer", fontFamily: "inherit" }}>
-                      Edit
-                    </button>
-                    <button onClick={() => onDelete(rm.id)}
-                      style={{ padding: "5px 10px", background: "#1f1212", border: "1px solid #3a2020",
-                        borderRadius: 6, color: "#e05252", fontSize: 11, cursor: "pointer", fontFamily: "inherit" }}>
-                      Delete
-                    </button>
                   </div>
-                ))}
-              </div>
+                  <button onClick={() => { onEdit(rm); onClose(); }}
+                    style={{ ...button("ghost"), padding: "5px 10px", fontSize: 12 }}>Edit</button>
+                  <button onClick={() => onDelete(rm.id)}
+                    style={{ ...button("danger"), padding: "5px 10px", fontSize: 12 }}>Delete</button>
+                </div>
+              ))}
 
-              <div style={{ display: "flex", flexDirection: "column", gap: 8, paddingTop: 14, borderTop: "1px solid #1e1e24" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: space.sm, marginTop: space.lg,
+                paddingTop: space.lg, borderTop: `1px solid ${color.rule}` }}>
                 <button onClick={() => { onCreate(); onClose(); }}
-                  style={{ width: "100%", padding: "10px", background: "#7b5ea7", border: "none",
-                    borderRadius: 8, color: "#fff", fontSize: 13, cursor: "pointer", fontFamily: "inherit", fontWeight: 600 }}>
+                  style={{ ...button("primary"), width: "100%", padding: "11px" }}>
                   Create new roadmap
                 </button>
                 <button onClick={() => fileRef.current?.click()}
-                  style={{ width: "100%", padding: "10px", background: "#1e1e24", border: "1px solid #2a2a35",
-                    borderRadius: 8, color: "#888", fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>
+                  style={{ ...button("default"), width: "100%", padding: "11px" }}>
                   Import roadmap file (.json)
                 </button>
                 <input ref={fileRef} type="file" accept=".json"
                   onChange={e => { onImportRoadmap(e); onClose(); }} style={{ display: "none" }} />
 
-                <div style={{ fontSize: 11, color: "#444", textAlign: "center", margin: "4px 0 2px" }}>or download a template</div>
-                <div style={{ display: "flex", gap: 6 }}>
+                <div style={{ fontSize: 12, color: color.textFaint, textAlign: "center", margin: "6px 0 0" }}>
+                  or start from a template
+                </div>
+                <div style={{ display: "flex", gap: space.xs }}>
                   {Object.values(TEMPLATES).map(t => (
                     <button key={t.id} onClick={() => downloadJSON(t, `${t.id}-roadmap.json`)}
-                      style={{ flex: 1, padding: "7px 4px", background: t.color + "22", border: `1px solid ${t.color}44`,
-                        borderRadius: 6, color: t.accent, fontSize: 11, cursor: "pointer", fontFamily: "inherit" }}>
+                      style={{ flex: 1, padding: "7px 4px", background: "transparent",
+                        border: `1px solid ${color.rule}`, borderRadius: radius.sm,
+                        color: color.textMuted, fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>
                       {t.label.split(" ")[0]}
                     </button>
                   ))}
@@ -130,138 +134,108 @@ export function ManageModal({ roadmaps, onClose, onImportRoadmap, onDelete, onEd
             </>
           )}
 
+          {/* ── Data ── */}
           {tab === "data" && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: space.md }}>
               <StorageIndicator />
-              <div style={{ fontSize: 12, color: "#555", lineHeight: 1.6, marginBottom: 4 }}>
+              <div style={{ fontSize: 13, color: color.textMuted, lineHeight: 1.6 }}>
                 Export a full backup of all your roadmaps, progress, notes and resources.
                 Import to restore on any device.
               </div>
               <button onClick={() => { onExportBackup(); onClose(); }}
-                style={{ width: "100%", padding: "12px", background: "#1e2e1e", border: "1px solid #52b78844",
-                  borderRadius: 8, color: "#52b788", fontSize: 13, cursor: "pointer", fontFamily: "inherit", fontWeight: 600 }}>
+                style={{ ...button("success"), width: "100%", padding: "12px" }}>
                 Export full backup
               </button>
               <button onClick={() => backupRef.current?.click()}
-                style={{ width: "100%", padding: "12px", background: "#1e1e24", border: "1px solid #2a2a35",
-                  borderRadius: 8, color: "#888", fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>
+                style={{ ...button("default"), width: "100%", padding: "12px" }}>
                 Import backup
               </button>
               <input ref={backupRef} type="file" accept=".json"
                 onChange={e => { onImportBackup(e); onClose(); }} style={{ display: "none" }} />
-              <div style={{ fontSize: 11, color: "#444", marginTop: 8, padding: "10px", background: "#0f0f13",
-                borderRadius: 8, lineHeight: 1.6 }}>
-                Importing a backup will merge with your current data, not replace it.
+              <div style={{ fontSize: 12, color: color.textFaint, lineHeight: 1.6 }}>
+                Importing a backup merges with your current data — it won't replace it.
               </div>
             </div>
           )}
 
+          {/* ── Sync ── */}
           {tab === "sync" && (
             <SyncTab onGetSnapshot={onGetSnapshot} onApplySnapshot={onApplySnapshot} />
           )}
 
+          {/* ── Account ── */}
           {tab === "account" && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-              {/* Account info */}
-              <div style={{ background: "#0f0f13", borderRadius: 10, padding: "14px 16px",
-                border: "1px solid #1e1e24" }}>
-                {user ? (
-                  <>
-                    <div style={{ fontSize: 11, color: "#555", textTransform: "uppercase",
-                      letterSpacing: 1, marginBottom: 6 }}>Signed in as</div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                      <div style={{ width: 36, height: 36, borderRadius: "50%",
-                        background: "#7b5ea722", border: "1px solid #7b5ea744",
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                        fontSize: 16 }}>👤</div>
-                      <div>
-                        <div style={{ fontSize: 14, fontWeight: 700, color: "#fff" }}>
-                          {user.email}
-                        </div>
-                        <div style={{ fontSize: 11, color: "#52b788", marginTop: 2 }}>
-                          ☁️ Cloud sync active
-                        </div>
-                      </div>
-                    </div>
-                  </>
-                ) : (
-                  <div style={{ fontSize: 13, color: "#666" }}>
-                    You are in guest mode. Data is stored locally only.
+            <div style={{ display: "flex", flexDirection: "column", gap: space.lg }}>
+              {user ? (
+                <div style={{ display: "flex", alignItems: "center", gap: space.md }}>
+                  <div style={{ width: 38, height: 38, borderRadius: "50%",
+                    background: color.accentSoft, border: `1px solid ${color.accentBorder}`,
+                    display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0 }}>👤</div>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 14, color: color.text,
+                      overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{user.email}</div>
+                    <div style={{ fontSize: 12, color: color.success, marginTop: 2 }}>Cloud sync active</div>
                   </div>
-                )}
-              </div>
+                </div>
+              ) : (
+                <div style={{ fontSize: 13.5, color: color.textMuted }}>
+                  You're in guest mode — data is stored locally only.
+                </div>
+              )}
 
-              {/* Reset password */}
               {user && onResetPassword && (
-                <div>
-                  <div style={{ fontSize: 11, color: "#555", textTransform: "uppercase",
-                    letterSpacing: 1, marginBottom: 8 }}>Password</div>
-                  <button onClick={async () => {
+                <button onClick={async () => {
                     try {
                       await onResetPassword(user.email);
                       alert("Password reset email sent to " + user.email);
                     } catch(e) { alert("Failed: " + e.message); }
                   }}
-                    style={{ width: "100%", padding: "11px", background: "#1e1e24",
-                      border: "1px solid #2a2a35", borderRadius: 8, color: "#888",
-                      fontSize: 13, cursor: "pointer", fontFamily: "inherit", textAlign: "left" }}>
-                    🔑 Send password reset email
-                  </button>
-                </div>
+                  style={{ ...button("default"), width: "100%", padding: "11px", textAlign: "left" }}>
+                  Send password reset email
+                </button>
               )}
 
-              {/* Sign in (guest) */}
               {isGuest && (
                 <div>
-                  <div style={{ fontSize: 11, color: "#555", textTransform: "uppercase",
-                    letterSpacing: 1, marginBottom: 8 }}>Account</div>
-                  <button onClick={() => { onClose(); }}
-                    style={{ width: "100%", padding: "11px", background: "#7b5ea722",
-                      border: "1px solid #7b5ea744", borderRadius: 8, color: "#c4b5fd",
-                      fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
-                    👤 Sign in or create account
+                  <button onClick={() => onClose()}
+                    style={{ ...button("primary"), width: "100%", padding: "11px" }}>
+                    Sign in or create account
                   </button>
-                  <div style={{ fontSize: 11, color: "#444", marginTop: 8, lineHeight: 1.6 }}>
+                  <div style={{ fontSize: 12, color: color.textFaint, marginTop: space.sm, lineHeight: 1.6 }}>
                     Sign in to sync your data across devices and keep it backed up online.
                   </div>
                 </div>
               )}
 
-              {/* Sign out */}
               {user && onSignOut && (
-                <div style={{ marginTop: 8 }}>
-                  <div style={{ fontSize: 11, color: "#555", textTransform: "uppercase",
-                    letterSpacing: 1, marginBottom: 8 }}>Danger zone</div>
+                <div style={{ paddingTop: space.md, borderTop: `1px solid ${color.rule}` }}>
                   <button onClick={() => {
-                    if (window.confirm("Sign out of your account?")) { onSignOut(); onClose(); }
-                  }}
-                    style={{ width: "100%", padding: "11px", background: "#2e1a1a",
-                      border: "1px solid #e0525233", borderRadius: 8, color: "#e05252",
-                      fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
-                    ↪ Sign out
+                      if (window.confirm("Sign out of your account?")) { onSignOut(); onClose(); }
+                    }}
+                    style={{ ...button("danger"), width: "100%", padding: "11px" }}>
+                    Sign out
                   </button>
                 </div>
               )}
             </div>
           )}
 
+          {/* ── AI ── */}
           {tab === "settings" && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: space.lg }}>
+
+              {/* Provider — one segmented control, not two separate cards */}
               <div>
-                <div style={{ fontSize: 11, color: "#555", textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>
-                  AI Provider
-                </div>
-                <div style={{ display: "flex", gap: 6 }}>
-                  {Object.entries(PROVIDERS).filter(([,p]) => !p.sageOnly).map(([id, p]) => (
+                <div style={label}>AI provider</div>
+                <div style={{ display: "flex", border: `1px solid ${color.rule}`, borderRadius: radius.sm, overflow: "hidden" }}>
+                  {Object.entries(PROVIDERS).filter(([,p]) => !p.sageOnly).map(([id, p], i) => (
                     <button key={id} onClick={() => setAIConfig(c => ({ ...c, provider: id }))}
-                      style={{ flex: 1, padding: "10px 8px", borderRadius: 8, cursor: "pointer",
-                        fontFamily: "inherit", border: `1px solid ${aiConfig.provider === id ? p.color : "#2a2a35"}`,
-                        background: aiConfig.provider === id ? p.color + "22" : "#0f0f13",
-                        color: aiConfig.provider === id ? "#fff" : "#666" }}>
-                      <div style={{ fontSize: 13, fontWeight: 600 }}>{p.name}</div>
-                      <div style={{ fontSize: 10, color: aiConfig.provider === id ? p.color : "#444", marginTop: 2 }}>
-                        {p.free ? "Free tier" : ""}
-                      </div>
+                      style={{ flex: 1, padding: "10px 8px", border: "none", cursor: "pointer",
+                        fontFamily: "inherit", borderLeft: i > 0 ? `1px solid ${color.rule}` : "none",
+                        background: aiConfig.provider === id ? color.accentSoft : "transparent",
+                        color: aiConfig.provider === id ? color.accent : color.textMuted }}>
+                      <div style={{ fontSize: 13.5, fontWeight: aiConfig.provider === id ? 600 : 400 }}>{p.name}</div>
+                      {p.free && <div style={{ fontSize: 11, color: aiConfig.provider === id ? color.accent : color.textFaint, marginTop: 2, opacity: 0.8 }}>Free tier</div>}
                     </button>
                   ))}
                 </div>
@@ -269,26 +243,22 @@ export function ManageModal({ roadmaps, onClose, onImportRoadmap, onDelete, onEd
 
               {Object.entries(PROVIDERS).filter(([,p]) => !p.sageOnly).map(([id, p]) => (
                 <div key={id}>
-                  <div style={{ fontSize: 11, color: "#555", textTransform: "uppercase",
-                    letterSpacing: 1, marginBottom: 6 }}>{p.name} API Key</div>
-                  <div style={{ display: "flex", gap: 6 }}>
+                  <div style={label}>{p.name} API key</div>
+                  <div style={{ display: "flex", gap: space.xs }}>
                     <input
                       type={showKey[id] ? "text" : "password"}
                       value={aiConfig.keys?.[id] || ""}
                       onChange={e => setAIConfig(c => ({ ...c, keys: { ...c.keys, [id]: e.target.value } }))}
-                      placeholder={`Paste your ${p.name} key...`}
-                      style={{ flex: 1, background: "#0f0f13", border: "1px solid #2a2a35",
-                        borderRadius: 7, padding: "9px 12px", color: "#e8e6e0",
-                        fontSize: 13, fontFamily: "inherit", outline: "none" }} />
+                      placeholder={`Paste your ${p.name} key…`}
+                      style={{ ...input, flex: 1 }} />
                     <button onClick={() => setShowKey(s => ({ ...s, [id]: !s[id] }))}
-                      style={{ padding: "9px 12px", background: "#1e1e24", border: "1px solid #2a2a35",
-                        borderRadius: 7, color: "#666", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>
+                      style={{ ...button("default"), padding: "9px 12px", fontSize: 12 }}>
                       {showKey[id] ? "Hide" : "Show"}
                     </button>
                   </div>
-                  <div style={{ fontSize: 10, color: "#444", marginTop: 4 }}>
+                  <div style={{ fontSize: 12, color: color.textFaint, marginTop: space.xs }}>
                     <a href={p.keyUrl} target="_blank" rel="noopener noreferrer"
-                      style={{ color: "#4361ee" }}>Get a free {p.name} key -&gt;</a>
+                      style={{ color: color.accent }}>Get a free {p.name} key ↗</a>
                   </div>
 
                   {/* Model picker — providers periodically retire model IDs
@@ -296,15 +266,12 @@ export function ManageModal({ roadmaps, onClose, onImportRoadmap, onDelete, onEd
                       and pick from whatever's actually live for their key
                       instead of trusting a string baked into the app. */}
                   {aiConfig.keys?.[id]?.trim() && (
-                    <div style={{ marginTop: 8 }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                        <div style={{ fontSize: 10, color: "#555", textTransform: "uppercase", letterSpacing: 1 }}>
-                          Model
-                        </div>
+                    <div style={{ marginTop: space.sm }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6 }}>
+                        <div style={{ ...label, marginBottom: 0 }}>Model</div>
                         <button onClick={() => handleFetchModels(id)} disabled={modelState[id] === "loading"}
-                          style={{ fontSize: 10, padding: "3px 7px", background: "transparent",
-                            border: "1px solid #2a2a35", borderRadius: 5, color: "#7b8cde",
-                            cursor: "pointer", fontFamily: "inherit" }}>
+                          style={{ fontSize: 11.5, background: "transparent", border: "none",
+                            color: color.accent, cursor: "pointer", fontFamily: "inherit", padding: 0 }}>
                           {modelState[id] === "loading" ? "Fetching…" : "Fetch available models"}
                         </button>
                       </div>
@@ -313,9 +280,7 @@ export function ManageModal({ roadmaps, onClose, onImportRoadmap, onDelete, onEd
                         <select
                           value={aiConfig.models?.[id] || p.model}
                           onChange={e => setAIConfig(c => ({ ...c, models: { ...c.models, [id]: e.target.value } }))}
-                          style={{ width: "100%", background: "#0f0f13", border: "1px solid #2a2a35",
-                            borderRadius: 7, padding: "9px 12px", color: "#e8e6e0", fontSize: 12,
-                            fontFamily: "monospace", outline: "none", boxSizing: "border-box" }}>
+                          style={{ ...input, fontSize: 12.5, fontFamily: font.mono }}>
                           {!modelLists[id].some(m => m.id === (aiConfig.models?.[id] || p.model)) && (
                             <option value={aiConfig.models?.[id] || p.model}>
                               {aiConfig.models?.[id] || p.model} (saved, not in fetched list)
@@ -326,57 +291,49 @@ export function ManageModal({ roadmaps, onClose, onImportRoadmap, onDelete, onEd
                           ))}
                         </select>
                       ) : (
-                        <div style={{ background: "#0f0f13", border: "1px solid #2a2a35", borderRadius: 7,
-                          padding: "9px 12px", color: "#888", fontSize: 12, fontFamily: "monospace" }}>
+                        <div style={{ ...input, color: color.textMuted, fontSize: 12.5, fontFamily: font.mono }}>
                           {aiConfig.models?.[id] || p.model}
                         </div>
                       )}
 
                       {modelState[id] && modelState[id] !== "loading" && modelState[id] !== "idle" && (
-                        <div style={{ fontSize: 10, color: "#e05252", marginTop: 4 }}>⚠️ {modelState[id]}</div>
+                        <div style={{ fontSize: 12, color: color.danger, marginTop: space.xs }}>{modelState[id]}</div>
                       )}
                     </div>
                   )}
                 </div>
               ))}
 
-              {/* ── Sage / NVIDIA key ── */}
-              <div style={{ background: "#13131a", borderRadius: 10,
-                border: "1px solid #76b90033", padding: "12px 14px" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-                  <span style={{ fontSize: 16 }}>🌿</span>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: "#76b900" }}>Sage AI — NVIDIA NIM</div>
-                  <span style={{ fontSize: 10, background: "#76b90022", color: "#76b900",
-                    padding: "1px 6px", borderRadius: 4, fontWeight: 700 }}>FREE</span>
+              <hr style={divider} />
+
+              {/* ── Sage / NVIDIA key — de-emphasized, it's an optional extra ── */}
+              <div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                  <div style={{ fontSize: 13.5, color: color.text }}>Sage AI — NVIDIA NIM</div>
+                  <span style={{ fontSize: 11, color: color.success }}>Free</span>
                 </div>
-                <div style={{ fontSize: 11, color: "#555", marginBottom: 8, lineHeight: 1.6 }}>
-                  Sage uses NVIDIA NIM for intelligent app control — add notes, mark topics, create clippings, read images.
+                <div style={{ fontSize: 12.5, color: color.textMuted, marginBottom: space.sm, lineHeight: 1.6 }}>
+                  Uses NVIDIA NIM for intelligent app control — add notes, mark topics, create clippings, read images.
                   Get a free key at{" "}
                   <a href="https://build.nvidia.com/settings/api-keys" target="_blank" rel="noopener noreferrer"
-                    style={{ color: "#76b900" }}>build.nvidia.com</a>
+                    style={{ color: color.accent }}>build.nvidia.com</a>
                 </div>
-                <div style={{ display: "flex", gap: 6 }}>
+                <div style={{ display: "flex", gap: space.xs }}>
                   <input
                     type={showKey["nvidia"] ? "text" : "password"}
                     value={aiConfig.keys?.nvidia || ""}
                     onChange={e => setAIConfig(c => ({ ...c, keys: { ...c.keys, nvidia: e.target.value } }))}
                     placeholder="nvapi-..."
-                    style={{ flex: 1, background: "#0f0f13", border: "1px solid #2a2a35",
-                      borderRadius: 7, padding: "9px 12px", color: "#e8e6e0",
-                      fontSize: 13, fontFamily: "inherit", outline: "none" }} />
+                    style={{ ...input, flex: 1 }} />
                   <button onClick={() => setShowKey(s => ({ ...s, nvidia: !s.nvidia }))}
-                    style={{ padding: "9px 12px", background: "#1e1e24", border: "1px solid #2a2a35",
-                      borderRadius: 7, color: "#666", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>
+                    style={{ ...button("default"), padding: "9px 12px", fontSize: 12 }}>
                     {showKey["nvidia"] ? "Hide" : "Show"}
                   </button>
                 </div>
               </div>
 
-              <button onClick={handleSaveAI}
-                style={{ width: "100%", padding: "11px", background: "#7b5ea7", border: "none",
-                  borderRadius: 8, color: "#fff", fontSize: 13, cursor: "pointer",
-                  fontFamily: "inherit", fontWeight: 600, marginTop: 4 }}>
-                Save AI Settings
+              <button onClick={handleSaveAI} style={{ ...button("primary"), width: "100%", padding: "12px" }}>
+                Save AI settings
               </button>
             </div>
           )}
