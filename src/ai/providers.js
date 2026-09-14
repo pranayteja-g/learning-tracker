@@ -350,7 +350,8 @@ export async function callAIWithSearch({ provider, apiKey, systemPrompt, userPro
 
 async function callGeminiWithSearch({ apiKey, systemPrompt, userPrompt }) {
   return withRetry(async () => {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${apiKey}`;
+    const model = getModelForProvider("gemini");
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
     const body = {
       system_instruction: { parts: [{ text: systemPrompt }] },
       contents: [{ role: "user", parts: [{ text: userPrompt }] }],

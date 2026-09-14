@@ -23,7 +23,6 @@ export function NoteModal({ noteModal, roadmaps, notes, resources, topicMeta, on
   const [linkUrl,     setLinkUrl]     = useState("");
   const [linkError,   setLinkError]   = useState("");
   const [tab,         setTab]         = useState("notes");
-  const [expanded,    setExpanded]    = useState(false);
   const [editing,     setEditing]     = useState(false);
 
   // AI resource finding state
@@ -185,70 +184,56 @@ Write thorough, useful notes a student would actually want to study from.`;
   const tabs = ["notes", "generate", "resources", "meta"];
 
   return (
-    <div onClick={onClose} style={{ position: "fixed", inset: 0,
-      background: isMobile ? "#13131a" : "rgba(0,0,0,0.75)",
-      display: "flex", alignItems: isMobile ? "flex-start" : "center",
-      justifyContent: "center", zIndex: 200,
-      padding: isMobile ? 0 : "8px" }}>
-      <div onClick={e => e.stopPropagation()} style={{
-        background: "#16161b",
-        border: isMobile ? "none" : "1px solid #2a2a35",
-        borderRadius: isMobile ? 0 : 12,
-        width: "100%",
-        maxWidth: isMobile ? "100%" : (expanded && tab === "notes" ? 820 : 620),
-        boxShadow: isMobile ? "none" : "0 20px 60px rgba(0,0,0,0.6)",
-        transition: "max-width 0.2s",
-        display: "flex", flexDirection: "column",
-        height: isMobile ? "100dvh" : "auto",
-        maxHeight: isMobile ? "100dvh" : "92vh",
-        paddingTop: isMobile ? "env(safe-area-inset-top)" : 0,
-        boxSizing: "border-box" }}>
+    <div style={{ position: "fixed", inset: 0, background: "#0f0f13", zIndex: 200,
+      display: "flex", flexDirection: "column",
+      height: "100dvh",
+      paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)",
+      boxSizing: "border-box" }}>
 
         {/* Header */}
-        <div style={{ padding: "18px 20px 0" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
-            <div>
-              <div style={{ fontSize: 10, color: rm?.accent, textTransform: "uppercase", letterSpacing: 1, marginBottom: 3 }}>
-                {rm?.label}
+        <div style={{ padding: "18px 20px 0", flexShrink: 0 }}>
+          <div style={{ maxWidth: 720, margin: "0 auto", width: "100%", boxSizing: "border-box" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
+              <div>
+                <div style={{ fontSize: 10, color: rm?.accent, textTransform: "uppercase", letterSpacing: 1, marginBottom: 3 }}>
+                  {rm?.label}
+                </div>
+                <div style={{ fontSize: 15, fontWeight: 600, color: "#fff" }}>{topic}</div>
               </div>
-              <div style={{ fontSize: 15, fontWeight: 600, color: "#fff" }}>{topic}</div>
+              <button onClick={onClose} style={{ background: "transparent", border: "none", color: "#555",
+                fontSize: 20, cursor: "pointer", lineHeight: 1, padding: "0 0 0 8px" }}>×</button>
             </div>
-            <button onClick={onClose} style={{ background: "transparent", border: "none", color: "#555",
-              fontSize: 20, cursor: "pointer", lineHeight: 1, padding: "0 0 0 8px" }}>×</button>
-          </div>
 
-          {/* Tabs */}
-          <div style={{ display: "flex", gap: 2, borderBottom: "1px solid #1e1e24" }}>
-            {tabs.map(t => (
-              <button key={t} onClick={() => setTab(t)} style={{
-                padding: "7px 14px", border: "none", background: "transparent", cursor: "pointer",
-                fontFamily: "inherit", fontSize: 12,
-                color: tab === t ? rm?.accent : "#555",
-                borderBottom: tab === t ? `2px solid ${rm?.color}` : "2px solid transparent",
-                marginBottom: -1,
-              }}>{{ notes: "Notes", generate: "📸 AI", resources: "Resources", meta: "Meta" }[t] || t}</button>
-            ))}
+            {/* Tabs */}
+            <div style={{ display: "flex", gap: 2, borderBottom: "1px solid #1e1e24" }}>
+              {tabs.map(t => (
+                <button key={t} onClick={() => setTab(t)} style={{
+                  padding: "7px 14px", border: "none", background: "transparent", cursor: "pointer",
+                  fontFamily: "inherit", fontSize: 12,
+                  color: tab === t ? rm?.accent : "#555",
+                  borderBottom: tab === t ? `2px solid ${rm?.color}` : "2px solid transparent",
+                  marginBottom: -1,
+                }}>{{ notes: "Notes", generate: "📸 AI", resources: "Resources", meta: "Meta" }[t] || t}</button>
+              ))}
+            </div>
           </div>
         </div>
 
-        {/* Tab content */}
+        {/* Tab content — capped and centered for comfortable line length on
+            wide desktop windows; this is a full-viewport overlay so without
+            a cap, text would stretch edge to edge. */}
         <div style={{ padding: "16px 20px", overflowY: "auto", flex: 1,
           display: "flex", flexDirection: "column", minHeight: 0 }}>
+          <div style={{ maxWidth: 720, margin: "0 auto", width: "100%", boxSizing: "border-box",
+            display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
+
 
           {/* ── Notes tab ── */}
           {tab === "notes" && (
             <div style={{ display: "flex", flexDirection: "column", gap: 8,
               flex: isMobile ? 1 : "none", minHeight: 0 }}>
               <div style={{ display: "flex", justifyContent: "flex-end", gap: 6 }}>
-                {editing && (
-                  <button onClick={() => setExpanded(v => !v)}
-                    style={{ fontSize: 11, padding: "4px 10px", background: "transparent",
-                      border: "1px solid #2a2a35", borderRadius: 5,
-                      color: expanded ? "#c4b5fd" : "#555", cursor: "pointer", fontFamily: "inherit" }}>
-                    {expanded ? "⊡ Collapse" : "⊞ Expand"}
-                  </button>
-                )}
-                <button onClick={() => { setEditing(v => !v); }}
+                <button onClick={() => setEditing(v => !v)}
                   style={{ fontSize: 11, padding: "4px 12px", background: editing ? "#7b5ea722" : "#1e1e24",
                     border: `1px solid ${editing ? "#7b5ea7" : "#2a2a35"}`, borderRadius: 5,
                     color: editing ? "#c4b5fd" : "#888", cursor: "pointer", fontFamily: "inherit", fontWeight: editing ? 600 : 400 }}>
@@ -260,7 +245,7 @@ Write thorough, useful notes a student would actually want to study from.`;
                 <textarea ref={textareaRef} value={note} onChange={e => setNote(e.target.value)}
                   autoFocus
                   placeholder="Add your notes, key concepts, takeaways…"
-                  style={{ width: "100%", minHeight: isMobile ? 0 : (expanded ? 420 : 220),
+                  style={{ width: "100%", minHeight: isMobile ? 0 : 420,
                     flex: isMobile ? 1 : "none",
                     background: "#0f0f13", border: "1px solid #2a2a35",
                     borderRadius: 7, padding: "14px 16px", color: "#e8e6e0",
@@ -268,15 +253,18 @@ Write thorough, useful notes a student would actually want to study from.`;
                     resize: isMobile ? "none" : "vertical",
                     outline: "none", boxSizing: "border-box", lineHeight: 1.9 }} />
               ) : (
-                <div onClick={() => setEditing(true)}
-                  style={{ width: "100%", minHeight: isMobile ? 0 : 220,
+                // Read-only — no click-to-edit on the content itself, since
+                // that made it impossible to tap around while reading (select
+                // text, scroll, etc.) without accidentally entering edit
+                // mode. Editing is only ever entered via the button above.
+                <div style={{ width: "100%", minHeight: isMobile ? 0 : 220,
                     flex: isMobile ? 1 : "none",
                     background: "#0f0f13", border: "1px solid #1e1e24",
                     borderRadius: 7, padding: "16px 18px",
-                    cursor: "text", boxSizing: "border-box", overflowY: "auto" }}>
+                    boxSizing: "border-box", overflowY: "auto" }}>
                   {note
                     ? <Prose content={note} accentColor={rm?.accent} size={isMobile ? 15 : 16} />
-                    : <div style={{ color: "#444", fontSize: 14, lineHeight: 1.8 }}>
+                    : <div onClick={() => setEditing(true)} style={{ color: "#444", fontSize: 14, lineHeight: 1.8, cursor: "text" }}>
                         No notes yet. Tap ✏️ Edit to add notes, key concepts, takeaways…
                       </div>}
                 </div>
@@ -590,23 +578,26 @@ Write thorough, useful notes a student would actually want to study from.`;
               </div>
             </div>
           )}
+          </div>
         </div>
 
         {/* Footer */}
         <div style={{ padding: "12px 20px 18px", borderTop: "1px solid #1e1e24",
-          display: "flex", gap: 8, justifyContent: "flex-end" }}>
-          <button onClick={onClose} style={{ padding: "8px 16px", background: "transparent",
-            border: "1px solid #2a2a35", borderRadius: 6, color: "#666", fontSize: 13,
-            cursor: "pointer", fontFamily: "inherit" }}>
-            Cancel
-          </button>
-          <button onClick={handleSave} style={{ padding: "8px 20px", background: rm?.color,
-            border: "none", borderRadius: 6, color: "#fff", fontSize: 13,
-            cursor: "pointer", fontFamily: "inherit", fontWeight: 600 }}>
-            Save
-          </button>
+          flexShrink: 0 }}>
+          <div style={{ maxWidth: 720, margin: "0 auto", width: "100%", boxSizing: "border-box",
+            display: "flex", gap: 8, justifyContent: "flex-end" }}>
+            <button onClick={onClose} style={{ padding: "8px 16px", background: "transparent",
+              border: "1px solid #2a2a35", borderRadius: 6, color: "#666", fontSize: 13,
+              cursor: "pointer", fontFamily: "inherit" }}>
+              Cancel
+            </button>
+            <button onClick={handleSave} style={{ padding: "8px 20px", background: rm?.color,
+              border: "none", borderRadius: 6, color: "#fff", fontSize: 13,
+              cursor: "pointer", fontFamily: "inherit", fontWeight: 600 }}>
+              Save
+            </button>
+          </div>
         </div>
-      </div>
     </div>
   );
 }

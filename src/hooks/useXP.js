@@ -1,5 +1,6 @@
 import { useCallback } from "react";
 import { useCloudField } from "../lib/cloudField.js";
+import { callAI } from "../ai/providers.js";
 
 export const LEVELS = [
   { name: "Novice",      min: 0,    color: "#888",    icon: "🌱" },
@@ -116,7 +117,7 @@ export function checkMilestoneBadges(xpData, quest, phaseResults, activePhases) 
   };
 }
 
-export async function generateAIBadge(quest, phaseResults, activePhases, xpData, apiKey) {
+export async function generateAIBadge(quest, phaseResults, activePhases, xpData, provider, apiKey) {
   if (!apiKey) return null;
   try {
     const scores = activePhases.map((p, i) => `${p.name}: ${phaseResults?.[i]?.score ?? "N/A"}%`).join(", ");
@@ -124,16 +125,13 @@ export async function generateAIBadge(quest, phaseResults, activePhases, xpData,
     const hour = new Date().getHours();
     const timeOfDay = hour < 6 ? "late night" : hour < 12 ? "morning" : hour < 17 ? "afternoon" : hour < 21 ? "evening" : "night";
 
-    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
-      body: JSON.stringify({
-        model: "llama-3.1-8b-instant",
-        max_tokens: 120,
-        response_format: { type: "json_object" },
-        messages: [{
-          role: "user",
-          content: `A student just completed a learning quest. Generate a unique, personal badge for this specific performance.
+    // Routed through the shared callAI() so this always uses whichever
+    // model the user has actually selected (and picks up model-retirement
+    // fixes) instead of a hardcoded model string baked in here.
+    const { text } = await callAI({
+      provider, apiKey,
+      systemPrompt: "You are a witty badge-naming assistant for a study app. Respond only with JSON, no commentary.",
+      userPrompt: `A student just completed a learning quest. Generate a unique, personal badge for this specific performance.
 
 Quest: "${quest.title}" (${quest.roadmapLabel})
 Scores: ${scores}
@@ -145,14 +143,10 @@ Create a witty, specific badge that reflects something unique about THIS perform
 Be creative and specific. Reference the topics, time, score pattern, or quest number if interesting.
 
 Respond ONLY with JSON:
-{ "name": "Badge Name (2-4 words)", "desc": "One sentence describing what makes this performance special", "icon": "single emoji" }`
-        }]
-      })
+{ "name": "Badge Name (2-4 words)", "desc": "One sentence describing what makes this performance special", "icon": "single emoji" }`,
+      maxTokens: 120,
     });
 
-    if (!response.ok) return null;
-    const data   = await response.json();
-    const text   = data.choices?.[0]?.message?.content || "";
     const parsed = JSON.parse(text.replace(/```json\n?/gi,"").replace(/```\n?/g,"").trim());
     if (!parsed.name || !parsed.icon) return null;
     return { id: `ai_${Date.now()}`, name: parsed.name, desc: parsed.desc, icon: parsed.icon, type: "ai" };
@@ -171,13 +165,13 @@ const DEFAULT_XP_DATA = {
 export function useXP(userId) {
   const [xpData, setXpData, loaded] = useCloudField(userId, "xp_data", DEFAULT_XP_DATA);
 
-  const awardQuestXP = useCallback(async (quest, phaseResults, activePhases, passed, apiKey) => {
+  const awardQuestXP = useCallback(async (quest, phaseResults, activePhases, passed, provider, apiKey) => {
     const earned = passed ? xpForQuest(phaseResults, activePhases) : 0;
 
     // AI badge (async, non-blocking)
     let aiBadge = null;
     if (passed && apiKey) {
-      aiBadge = await generateAIBadge(quest, phaseResults, activePhases, xpData, apiKey);
+      aiBadge = await generateAIBadge(quest, phaseResults, activePhases, xpData, provider, apiKey);
     }
 
     setXpData(prev => {
