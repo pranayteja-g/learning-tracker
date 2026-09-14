@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { loadAIConfig, callVisionAI } from "../../ai/providers.js";
+import { loadAIConfig, callVisionAI, callAI } from "../../ai/providers.js";
 import { Prose } from "../ui/Prose.jsx";
 import { color, radius, space, font } from "../../styles/theme.js";
 
@@ -55,7 +55,9 @@ Be thorough — these are notes the user will study from.`;
 
 async function generateFromUrl(url) {
 
-  const prompt = `Fetch and analyse this URL, then create comprehensive study notes from its content: ${url}
+  const systemPrompt = "You are an expert at creating study notes from web content. When given a URL, create detailed, well-structured notes about the content at that URL based on your knowledge of the topic, clearly noting it's based on your training knowledge.";
+
+  const userPrompt = `Fetch and analyse this URL, then create comprehensive study notes from its content: ${url}
 
 Create well-structured notes with:
 - A clear title
@@ -65,37 +67,24 @@ Create well-structured notes with:
 
 Format with markdown headings and bullet points.`;
 
-  // Use Groq with search if available, otherwise ask AI to work from URL knowledge
-  const groqKey = loadAIConfig().keys?.groq?.trim();
-  if (groqKey) {
-    const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${groqKey}` },
-      body: JSON.stringify({
-        model: "llama-3.3-70b-versatile",
-        max_tokens: 2048,
-        messages: [
-          { role: "system", content: "You are an expert at creating study notes from web content. When given a URL, create detailed, well-structured notes about the content at that URL based on your knowledge of the topic, clearly noting it's based on your training knowledge." },
-          { role: "user", content: prompt }
-        ]
-      })
-    });
-    if (!res.ok) { const e = await res.json(); throw new Error(e.error?.message || "API error"); }
-    const data = await res.json();
-    return data.choices?.[0]?.message?.content?.trim() || "";
-  }
+  // Route through the shared callAI() rather than hand-rolling fetch calls
+  // here — that's what keeps this in sync with whichever model the user
+  // has actually selected (and picks up fixes like retiring dead model IDs)
+  // instead of drifting out of sync with a hardcoded string, which is
+  // exactly what happened before.
+  const aiConfig = loadAIConfig();
+  const groqKey   = aiConfig.keys?.groq?.trim();
+  const geminiKey = aiConfig.keys?.gemini?.trim();
 
-  // Fallback: Gemini
-  const geminiKey = loadAIConfig().keys?.gemini?.trim();
-  if (!geminiKey) throw new Error("No API key configured.");
-  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${geminiKey}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
-  });
-  if (!res.ok) { const e = await res.json(); throw new Error(e.error?.message || "API error"); }
-  const data = await res.json();
-  return data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "";
+  if (groqKey) {
+    const { text } = await callAI({ provider: "groq", apiKey: groqKey, systemPrompt, userPrompt, maxTokens: 2048 });
+    return text.trim();
+  }
+  if (geminiKey) {
+    const { text } = await callAI({ provider: "gemini", apiKey: geminiKey, systemPrompt, userPrompt, maxTokens: 2048 });
+    return text.trim();
+  }
+  throw new Error("No API key configured.");
 }
 
 // ── Add Clipping Modal ────────────────────────────────────────────────────────
