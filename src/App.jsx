@@ -751,11 +751,12 @@ export default function App() {
               completeQuest(rmId, passed);
               if (!passed) return null;
               const prevXP  = xpData.xp || 0;
-              const apiKey  = loadAIConfig().keys?.groq?.trim();
+              const aiCfg   = loadAIConfig();
+              const apiKey  = aiCfg.keys?.[aiCfg.provider]?.trim();
               return {
                 prevXP,
                 xpData,
-                awardXP: () => awardQuestXP(getQuest(rmId) || {}, allResults, activePhases, true, apiKey),
+                awardXP: () => awardQuestXP(getQuest(rmId) || {}, allResults, activePhases, true, aiCfg.provider, apiKey),
               };
             }}
             onClose={() => setActiveQuestRmId(null)}
