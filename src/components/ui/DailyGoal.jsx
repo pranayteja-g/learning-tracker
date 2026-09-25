@@ -1,6 +1,7 @@
 import { useState } from "react";
+import { color as themeColor, radius, font } from "../../styles/theme.js";
 
-export function DailyGoalWidget({ goal, todayCount, pct, goalMet, goalStreak, onSetGoal, color = "#7b5ea7" }) {
+export function DailyGoalWidget({ goal, todayCount, pct, goalMet, goalStreak, onSetGoal, color = themeColor.accent }) {
   const [editing, setEditing] = useState(false);
   const [input,   setInput]   = useState(String(goal));
 
@@ -13,66 +14,80 @@ export function DailyGoalWidget({ goal, todayCount, pct, goalMet, goalStreak, on
   const dots = Array.from({ length: goal }, (_, i) => i < todayCount);
 
   return (
-    <div style={{ background: goalMet ? "#1a2e1a" : "#16161b",
-      borderRadius: 12, border: `1px solid ${goalMet ? "#52b78833" : "#1e1e24"}`,
-      padding: "14px 16px", marginBottom: 12, transition: "all 0.3s" }}>
-
+    <div style={{
+      background: goalMet ? "#121d17" : "#16151a",
+      borderRadius: radius.md, border: `1px solid ${goalMet ? "#6f9a8233" : "#222027"}`,
+      padding: "14px 16px", fontFamily: font.body, transition: "border-color 0.2s"
+    }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ fontSize: 16 }}>{goalMet ? "🎯" : "📌"}</span>
+          <span style={{ fontSize: 15 }}>{goalMet ? "🎯" : "📌"}</span>
           <div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: goalMet ? "#52b788" : "#fff" }}>
-              Daily Goal {goalMet && "— Met! ✓"}
+            <div style={{ fontSize: 13, fontWeight: 600, color: goalMet ? "#6f9a82" : "#e9e4d9" }}>
+              Daily Target {goalMet && "· Completed!"}
             </div>
             {goalStreak > 1 && (
-              <div style={{ fontSize: 10, color: "#ee9b00" }}>🔥 {goalStreak} day streak</div>
+              <div style={{ fontSize: 11, color: "#d9a441", marginTop: 1 }}>{goalStreak} day streak</div>
             )}
           </div>
         </div>
         <button onClick={() => setEditing(e => !e)}
-          style={{ fontSize: 11, color: "#444", background: "transparent", border: "none",
-            cursor: "pointer", fontFamily: "inherit", padding: "2px 6px" }}>
-          {editing ? "✕" : "⚙️"}
+          title="Configure daily target"
+          style={{
+            fontSize: 12, color: "#8c8577", background: "transparent", border: "none",
+            cursor: "pointer", fontFamily: "inherit", padding: "2px 6px"
+          }}>
+          {editing ? "✕" : "⚙"}
         </button>
       </div>
 
       {editing ? (
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <div style={{ fontSize: 12, color: "#888", flex: 1 }}>Topics per day:</div>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 4 }}>
+          <div style={{ fontSize: 12, color: "#948d80", flex: 1 }}>Topics target:</div>
           <input type="number" min={1} max={50} value={input}
             onChange={e => setInput(e.target.value)}
-            style={{ width: 56, padding: "5px 8px", background: "#0f0f13",
-              border: "1px solid #2a2a35", borderRadius: 6, color: "#fff",
-              fontSize: 13, outline: "none", fontFamily: "inherit", textAlign: "center" }} />
+            style={{
+              width: 56, padding: "5px 8px", background: "#0d0c11",
+              border: "1px solid #282630", borderRadius: radius.sm, color: "#e9e4d9",
+              fontSize: 13, outline: "none", fontFamily: "inherit", textAlign: "center"
+            }} />
           <button onClick={save}
-            style={{ padding: "5px 12px", background: color, border: "none",
-              borderRadius: 6, color: "#fff", fontSize: 12, fontWeight: 700,
-              cursor: "pointer", fontFamily: "inherit" }}>
+            style={{
+              padding: "5px 12px", background: color, border: "none",
+              borderRadius: radius.sm, color: "#0f0e12", fontSize: 12, fontWeight: 600,
+              cursor: "pointer", fontFamily: "inherit"
+            }}>
             Save
           </button>
         </div>
       ) : (
         <>
-          {/* Progress bar */}
-          <div style={{ background: "#0f0f13", borderRadius: 4, height: 6,
-            overflow: "hidden", marginBottom: 8 }}>
-            <div style={{ height: "100%", borderRadius: 4, transition: "width 0.4s",
+          <div style={{
+            background: "#0d0c11", borderRadius: 4, height: 5,
+            overflow: "hidden", marginBottom: 10
+          }}>
+            <div style={{
+              height: "100%", borderRadius: 4, transition: "width 0.4s",
               width: `${pct}%`,
-              background: goalMet ? "#52b788" : color }} />
+              background: goalMet ? "#6f9a82" : color
+            }} />
           </div>
 
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            {/* Dots */}
-            <div style={{ display: "flex", gap: 3, flexWrap: "wrap", maxWidth: "70%" }}>
+            <div style={{ display: "flex", gap: 4, flexWrap: "wrap", maxWidth: "70%" }}>
               {dots.slice(0, 20).map((done, i) => (
-                <div key={i} style={{ width: 8, height: 8, borderRadius: "50%",
-                  background: done ? (goalMet ? "#52b788" : color) : "#1e1e24",
-                  transition: "background 0.3s" }} />
+                <div key={i} style={{
+                  width: 7, height: 7, borderRadius: "50%",
+                  background: done ? (goalMet ? "#6f9a82" : color) : "#252329",
+                  transition: "background 0.3s"
+                }} />
               ))}
-              {goal > 20 && <span style={{ fontSize: 10, color: "#444" }}>+{goal - 20}</span>}
+              {goal > 20 && <span style={{ fontSize: 10, color: "#6e685f" }}>+{goal - 20}</span>}
             </div>
-            <div style={{ fontSize: 12, color: goalMet ? "#52b788" : "#888",
-              fontVariantNumeric: "tabular-nums" }}>
+            <div style={{
+              fontSize: 12, color: goalMet ? "#6f9a82" : "#948d80",
+              fontVariantNumeric: "tabular-nums"
+            }}>
               {todayCount} / {goal}
             </div>
           </div>
