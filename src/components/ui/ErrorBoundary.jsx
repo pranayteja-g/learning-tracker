@@ -61,7 +61,7 @@ export class ErrorBoundary extends Component {
               An unexpected error occurred. Try reloading the page or clearing your browser cache if the problem persists.
             </p>
 
-            {process.env.NODE_ENV === "development" && this.state.error && (
+            {(import.meta.env.DEV || (typeof process !== "undefined" && process.env?.NODE_ENV === "development")) && this.state.error && (
               <div
                 style={{
                   background: "#0d1117",
