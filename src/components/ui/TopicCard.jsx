@@ -1,12 +1,13 @@
 import { topicName, isExpanded, isCollapsed, subtopics } from "../../utils/topics.js";
 
 // ── Single checkable row ───────────────────────────────────────────────────────
-function TopicRow({ name, rmKey, rm, isDone, hasNote, hasMeta, hasResources,
+function TopicRow({
+  name, rmKey, rm, isDone, hasNote, hasMeta, hasResources,
   onToggle, onOpenNote, indent = 0, isParent = false, isOpen = false,
-  onToggleCollapse, subtopicCount = 0, allSubDone = false, hasPassed = false, stars = 0 }) {
-
+  onToggleCollapse, subtopicCount = 0, allSubDone = false, hasPassed = false, stars = 0
+}) {
   const meta = hasMeta || {};
-  const diffColors = { easy: "#52b788", medium: "#ee9b00", hard: "#e05252" };
+  const diffColors = { easy: "#6f9a82", medium: "#d9a441", hard: "#c2543f" };
 
   const handleRowClick = () => {
     if (isParent) {
@@ -18,87 +19,92 @@ function TopicRow({ name, rmKey, rm, isDone, hasNote, hasMeta, hasResources,
 
   return (
     <div style={{
-      background: isDone && !isParent ? rm.color + "12" : isParent ? "#16161b" : "#13131a",
+      background: isDone && !isParent ? (rm.color || "#d9a441") + "0c" : isParent ? "#16151a" : "#131217",
       borderRadius: indent > 0 ? 6 : 8,
-      border: `1px solid ${isDone && !isParent ? rm.color + "40" : isParent ? "#1e1e24" : "#191924"}`,
-      transition: "all 0.15s"
+      border: `1px solid ${isDone && !isParent ? (rm.color || "#d9a441") + "33" : isParent ? "#222027" : "#1d1c22"}`,
+      transition: "background 0.15s, border-color 0.15s"
     }}>
       <div style={{
         display: "flex", alignItems: "center", gap: 10,
-        padding: indent === 1 ? "9px 10px 9px 12px" : indent === 2 ? "7px 10px 7px 10px" : "12px 13px",
+        padding: indent === 1 ? "9px 12px" : indent === 2 ? "7px 10px" : "11px 14px",
         cursor: "pointer", userSelect: "none", WebkitUserSelect: "none",
       }}>
 
-        {/* Collapse arrow for parent — takes up left tap zone */}
+        {/* Collapse arrow for parent */}
         {isParent ? (
           <div onClick={handleRowClick}
-            style={{ width: 20, height: 20, display: "flex", alignItems: "center",
-              justifyContent: "center", flexShrink: 0, color: "#555", fontSize: 10,
-              transition: "transform 0.15s", transform: isOpen ? "rotate(90deg)" : "rotate(0deg)" }}>
+            style={{
+              width: 20, height: 20, display: "flex", alignItems: "center",
+              justifyContent: "center", flexShrink: 0, color: "#777", fontSize: 10,
+              transition: "transform 0.15s", transform: isOpen ? "rotate(90deg)" : "rotate(0deg)"
+            }}>
             ▶
           </div>
         ) : (
-          /* Checkbox — tap here OR anywhere on the name area */
+          /* Checkbox */
           <div onClick={() => onToggle(rmKey, name)}
-            style={{ width: 20, height: 20, borderRadius: 4,
-              border: `2px solid ${isDone ? rm.color : "#444"}`,
-              background: isDone ? rm.color : "transparent",
+            style={{
+              width: 19, height: 19, borderRadius: 5,
+              border: `1.5px solid ${isDone ? (rm.color || "#d9a441") : "#47454f"}`,
+              background: isDone ? (rm.color || "#d9a441") : "transparent",
               display: "flex", alignItems: "center", justifyContent: "center",
-              flexShrink: 0, transition: "all 0.15s" }}>
-            {isDone && <span style={{ color: "#fff", fontSize: 12 }}>✓</span>}
+              flexShrink: 0, transition: "all 0.15s"
+            }}>
+            {isDone && <span style={{ color: "#000", fontWeight: 800, fontSize: 11 }}>✓</span>}
           </div>
         )}
 
-        {/* Topic name — tapping here also toggles */}
+        {/* Topic name */}
         <span onClick={handleRowClick} style={{
           flex: 1,
-          fontSize: indent === 0 && isParent ? 14 : indent === 1 ? 13 : 12,
-          color: allSubDone && isParent ? rm.accent : isDone ? rm.accent : "#ccc",
+          fontSize: indent === 0 && isParent ? 13.5 : indent === 1 ? 13 : 12.5,
+          fontWeight: isParent ? 600 : isDone ? 400 : 500,
+          color: allSubDone && isParent ? (rm.accent || "#e9e4d9") : isDone ? "#827d75" : "#e9e4d9",
           textDecoration: isDone && !isParent ? "line-through" : "none",
-          opacity: isDone && !isParent ? 0.7 : 1,
-          paddingTop: 2, paddingBottom: 2, // extra tap area vertically
+          opacity: isDone && !isParent ? 0.75 : 1,
+          paddingTop: 2, paddingBottom: 2,
         }}>
           {name}
           {isParent && (
-            <span style={{ fontSize: 10, color: "#444", marginLeft: 8 }}>
-              {subtopicCount} subtopics{allSubDone ? " ✓" : ""}
+            <span style={{ fontSize: 11, color: "#6e685f", marginLeft: 8, fontWeight: 400 }}>
+              {subtopicCount} subtopics{allSubDone ? " · completed" : ""}
             </span>
           )}
         </span>
 
-        {/* Badges + note button — isolated from toggle */}
-        <div style={{ display: "flex", gap: 5, alignItems: "center", flexShrink: 0 }}>
+        {/* Unboxed clean metadata (zero-pill discipline) */}
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexShrink: 0, fontSize: 11, color: "#787268" }}>
           {!isParent && meta.difficulty && (
-            <span style={{ fontSize: 10, color: diffColors[meta.difficulty],
-              background: diffColors[meta.difficulty] + "20", padding: "2px 6px",
-              borderRadius: 4, textTransform: "capitalize" }}>{meta.difficulty}</span>
+            <span style={{ color: diffColors[meta.difficulty] || "#787268", textTransform: "capitalize", fontWeight: 500 }}>
+              {meta.difficulty}
+            </span>
           )}
           {!isParent && meta.timeEst && (
-            <span style={{ fontSize: 10, color: "#666", background: "#1e1e24",
-              padding: "2px 6px", borderRadius: 4 }}>⏱ {meta.timeEst}</span>
+            <span>{meta.timeEst}</span>
           )}
           {hasResources && (
-            <span style={{ fontSize: 10, color: "#7b8cde", background: "#4361ee20",
-              padding: "2px 6px", borderRadius: 4 }}>🔗</span>
+            <span title="Has resources">🔗</span>
           )}
           {hasNote && !isParent && (
-            <span style={{ fontSize: 10, color: rm.accent, background: rm.color + "20",
-              padding: "2px 6px", borderRadius: 4 }}>note</span>
+            <span style={{ color: rm.accent || "#d9a441" }}>note</span>
           )}
           {stars > 0 && !isParent && (
             <span title={`${stars === 3 ? "Mastered" : stars === 2 ? "Advanced" : "Passed"} (${stars}/3 stars)`}
-              style={{ fontSize: 12, letterSpacing: -2 }}>
+              style={{ fontSize: 11, letterSpacing: -1 }}>
               {"⭐".repeat(stars)}
             </span>
           )}
           {hasPassed && stars === 0 && !isParent && (
-            <span title="Attempted" style={{ fontSize: 11, color: "#555" }}>○</span>
+            <span title="Attempted" style={{ fontSize: 11, color: "#666" }}>○</span>
           )}
           <button
             onClick={e => { e.stopPropagation(); onOpenNote(rmKey, name); }}
-            style={{ padding: "6px 10px", background: "transparent", border: "1px solid #2a2a35",
-              borderRadius: 4, color: "#555", fontSize: 13, cursor: "pointer",
-              minWidth: 36, minHeight: 36, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            title="Edit topic notes & resources"
+            style={{
+              padding: "4px 8px", background: "transparent", border: "1px solid #282630",
+              borderRadius: 5, color: "#8a8479", fontSize: 12, cursor: "pointer",
+              display: "flex", alignItems: "center", justifyContent: "center"
+            }}>
             ✏️
           </button>
         </div>
@@ -106,8 +112,10 @@ function TopicRow({ name, rmKey, rm, isDone, hasNote, hasMeta, hasResources,
 
       {/* Note preview */}
       {hasNote && !isParent && (
-        <div style={{ padding: "5px 13px 10px 43px", fontSize: 12, color: "#666", fontStyle: "italic",
-          borderTop: `1px solid ${rm.color}1a`, lineHeight: 1.5 }}>
+        <div style={{
+          padding: "4px 14px 9px 40px", fontSize: 12, color: "#8c8577", fontStyle: "italic",
+          borderTop: `1px solid ${rm.color || "#d9a441"}15`, lineHeight: 1.5
+        }}>
           {hasNote.length > 130 ? hasNote.slice(0, 130) + "…" : hasNote}
         </div>
       )}
@@ -116,9 +124,10 @@ function TopicRow({ name, rmKey, rm, isDone, hasNote, hasMeta, hasResources,
 }
 
 // ── Main TopicCard ─────────────────────────────────────────────────────────────
-export function TopicCard({ topic, rmKey, rm, progress, notes, resources, topicMeta,
-  onToggle, onOpenNote, onToggleCollapse, hasPassedQuiz, getStars }) {
-
+export function TopicCard({
+  topic, rmKey, rm, progress, notes, resources, topicMeta,
+  onToggle, onOpenNote, onToggleCollapse, hasPassedQuiz, getStars
+}) {
   const name     = topicName(topic);
   const expanded = isExpanded(topic);
   const open     = expanded && !isCollapsed(topic);
@@ -145,9 +154,10 @@ export function TopicCard({ topic, rmKey, rm, progress, notes, resources, topicM
   });
 
   return (
-    <div style={{ border: `1px solid ${open ? rm.color + "33" : "#1e1e24"}`,
-      borderRadius: 8, overflow: "hidden", transition: "border-color 0.15s" }}>
-
+    <div style={{
+      border: `1px solid ${open ? (rm.color || "#d9a441") + "33" : "#222027"}`,
+      borderRadius: 8, overflow: "hidden", transition: "border-color 0.15s"
+    }}>
       <TopicRow name={name} rmKey={rmKey} rm={rm} isDone={false}
         isParent onToggleCollapse={onToggleCollapse}
         isOpen={open} subtopicCount={subs.length} allSubDone={allSubDone}
@@ -157,9 +167,11 @@ export function TopicCard({ topic, rmKey, rm, progress, notes, resources, topicM
         onToggle={onToggle} onOpenNote={onOpenNote} />
 
       {open && (
-        <div style={{ background: "#0f0f13", borderTop: `1px solid ${rm.color}22`,
-          padding: "8px 8px 8px 28px", display: "flex", flexDirection: "column", gap: 5 }}>
-          {subs.map((st, si) => {
+        <div style={{
+          background: "#0d0c11", borderTop: `1px solid ${(rm.color || "#d9a441")}20`,
+          padding: "8px 8px 8px 24px", display: "flex", flexDirection: "column", gap: 5
+        }}>
+          {subs.map(st => {
             const stName     = topicName(st);
             const stExpanded = isExpanded(st);
             const stOpen     = stExpanded && !isCollapsed(st);
@@ -180,8 +192,10 @@ export function TopicCard({ topic, rmKey, rm, progress, notes, resources, topicM
 
             const allL2Done = stSubs.every(sst => !!progress[`${rmKey}::${topicName(sst)}`]);
             return (
-              <div key={stName} style={{ border: `1px solid ${stOpen ? rm.color + "22" : "#1e1e24"}`,
-                borderRadius: 6, overflow: "hidden" }}>
+              <div key={stName} style={{
+                border: `1px solid ${stOpen ? (rm.color || "#d9a441") + "26" : "#222027"}`,
+                borderRadius: 6, overflow: "hidden"
+              }}>
                 <TopicRow name={stName} rmKey={rmKey} rm={rm} isDone={false}
                   isParent indent={1}
                   onToggleCollapse={() => onToggleCollapse?.(name, stName)}
@@ -192,8 +206,10 @@ export function TopicCard({ topic, rmKey, rm, progress, notes, resources, topicM
                   onToggle={onToggle} onOpenNote={onOpenNote} />
 
                 {stOpen && (
-                  <div style={{ background: "#0a0a10", borderTop: `1px solid ${rm.color}15`,
-                    padding: "6px 6px 6px 22px", display: "flex", flexDirection: "column", gap: 4 }}>
+                  <div style={{
+                    background: "#08080c", borderTop: `1px solid ${(rm.color || "#d9a441")}15`,
+                    padding: "6px 6px 6px 20px", display: "flex", flexDirection: "column", gap: 4
+                  }}>
                     {stSubs.map(sst => {
                       const sstName = topicName(sst);
                       const isDone  = !!progress[`${rmKey}::${sstName}`];

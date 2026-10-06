@@ -1,14 +1,15 @@
 import { useState, useEffect, useRef } from "react";
+import { color as themeColor, radius, font } from "../../styles/theme.js";
 
 const PRESETS = [
-  { label: "25m", secs: 25 * 60, type: "pomodoro" },
-  { label: "15m", secs: 15 * 60, type: "short"    },
-  { label: "10m", secs: 10 * 60, type: "short"    },
-  { label: "5m",  secs:  5 * 60, type: "break"    },
+  { label: "25m", secs: 25 * 60 },
+  { label: "15m", secs: 15 * 60 },
+  { label: "10m", secs: 10 * 60 },
+  { label: "5m",  secs:  5 * 60 },
 ];
 
-export function StudyTimer({ color = "#7b5ea7", isMobile }) {
-  const [selected,  setSelected]  = useState(0);    // preset index
+export function StudyTimer({ color = themeColor.accent, _isMobile }) {
+  const [selected,  setSelected]  = useState(0);
   const [timeLeft,  setTimeLeft]  = useState(PRESETS[0].secs);
   const [running,   setRunning]   = useState(false);
   const [finished,  setFinished]  = useState(false);
@@ -22,7 +23,6 @@ export function StudyTimer({ color = "#7b5ea7", isMobile }) {
             clearInterval(intervalRef.current);
             setRunning(false);
             setFinished(true);
-            // Vibrate on mobile
             navigator.vibrate?.([200, 100, 200]);
             return 0;
           }
@@ -50,63 +50,71 @@ export function StudyTimer({ color = "#7b5ea7", isMobile }) {
   const toggle = () => { setFinished(false); setRunning(r => !r); };
   const reset  = () => { setRunning(false); setFinished(false); setTimeLeft(PRESETS[selected].secs); };
 
-  // Circumference for SVG circle
-  const R  = 32;
+  const R  = 30;
   const C  = 2 * Math.PI * R;
   const dash = C - (pct / 100) * C;
 
   return (
-    <div style={{ background: "#16161b", borderRadius: 12, border: "1px solid #1e1e24",
-      padding: "14px 16px", marginBottom: 12 }}>
-      {/* Preset buttons */}
-      <div style={{ display: "flex", gap: 5, marginBottom: 14 }}>
+    <div style={{
+      background: "#16151a", borderRadius: radius.md, border: "1px solid #222027",
+      padding: "14px 16px", fontFamily: font.body
+    }}>
+      {/* Preset tabs */}
+      <div style={{ display: "flex", gap: 5, marginBottom: 12 }}>
         {PRESETS.map((p, i) => (
           <button key={i} onClick={() => selectPreset(i)}
-            style={{ flex: 1, padding: "5px 0", background: selected === i ? color + "22" : "transparent",
-              border: `1px solid ${selected === i ? color : "#2a2a35"}`,
-              borderRadius: 6, color: selected === i ? "#fff" : "#555",
-              fontSize: 11, fontWeight: selected === i ? 700 : 400,
-              cursor: "pointer", fontFamily: "inherit" }}>
+            style={{
+              flex: 1, padding: "5px 0",
+              background: selected === i ? color + "20" : "transparent",
+              border: `1px solid ${selected === i ? color + "55" : "#222027"}`,
+              borderRadius: radius.sm, color: selected === i ? color : "#8c8577",
+              fontSize: 11.5, fontWeight: selected === i ? 600 : 400,
+              cursor: "pointer", fontFamily: "inherit"
+            }}>
             {p.label}
           </button>
         ))}
       </div>
 
       {/* Timer display */}
-      <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-        {/* SVG ring */}
+      <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
         <div style={{ position: "relative", flexShrink: 0 }}>
-          <svg width={80} height={80} style={{ transform: "rotate(-90deg)" }}>
-            <circle cx={40} cy={40} r={R} fill="none" stroke="#1e1e24" strokeWidth={6} />
-            <circle cx={40} cy={40} r={R} fill="none" stroke={finished ? "#52b788" : color}
-              strokeWidth={6} strokeLinecap="round"
+          <svg width={72} height={72} style={{ transform: "rotate(-90deg)" }}>
+            <circle cx={36} cy={36} r={R} fill="none" stroke="#222027" strokeWidth={5} />
+            <circle cx={36} cy={36} r={R} fill="none" stroke={finished ? "#6f9a82" : color}
+              strokeWidth={5} strokeLinecap="round"
               strokeDasharray={C} strokeDashoffset={dash}
               style={{ transition: "stroke-dashoffset 1s linear" }} />
           </svg>
-          <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center",
-            justifyContent: "center" }}>
-            <span style={{ fontSize: finished ? 22 : 15, fontWeight: 700,
-              color: finished ? "#52b788" : "#fff",
-              fontVariantNumeric: "tabular-nums" }}>
+          <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <span style={{
+              fontSize: finished ? 20 : 14, fontWeight: 700,
+              color: finished ? "#6f9a82" : "#e9e4d9", fontVariantNumeric: "tabular-nums"
+            }}>
               {finished ? "🎉" : `${mins}:${secs}`}
             </span>
           </div>
         </div>
 
         <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 12, color: "#888", marginBottom: 8 }}>
-            {finished ? "Time's up! Great work." : running ? "Stay focused…" : "Ready to start"}
+          <div style={{ fontSize: 12, color: "#948d80", marginBottom: 8 }}>
+            {finished ? "Session finished!" : running ? "Stay focused…" : "Ready to study"}
           </div>
           <div style={{ display: "flex", gap: 6 }}>
             <button onClick={toggle}
-              style={{ flex: 1, padding: "8px", background: running ? "#2e1a1a" : color,
-                border: "none", borderRadius: 7, color: running ? "#e05252" : "#fff",
-                fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
-              {running ? "⏸ Pause" : finished ? "↺ Again" : "▶ Start"}
+              style={{
+                flex: 1, padding: "8px", background: running ? "#331a1a" : color,
+                border: "none", borderRadius: radius.sm,
+                color: running ? "#e06b6b" : "#0f0e12",
+                fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit"
+              }}>
+              {running ? "Pause" : finished ? "Again" : "Start"}
             </button>
             <button onClick={reset}
-              style={{ padding: "8px 12px", background: "#1e1e24", border: "1px solid #2a2a35",
-                borderRadius: 7, color: "#555", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>
+              style={{
+                padding: "8px 12px", background: "transparent", border: "1px solid #282630",
+                borderRadius: radius.sm, color: "#8c8577", fontSize: 12, cursor: "pointer", fontFamily: "inherit"
+              }}>
               ↺
             </button>
           </div>

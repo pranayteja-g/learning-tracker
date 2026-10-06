@@ -285,15 +285,16 @@ export function QuestModal({ quest, rmId, roadmaps, progress, onAdvancePhase, on
   const [loadingPhase, setLoadingPhase] = useState(false);
   const [error,        setError]        = useState("");
 
-  const rm = roadmaps?.[quest.roadmapId];
-  if (!rm) return null;
-
-  const activePhases = getActivePhases(quest);
+  const rm = roadmaps?.[quest?.roadmapId];
+  const activePhases = quest ? getActivePhases(quest) : [];
   const totalPhases  = activePhases.length;
 
   useEffect(() => {
+    if (!rm || !quest) return;
     if (quest.phase > 0 && !phaseData && !phaseResult) generatePhaseContent();
-  }, [quest.phase, phaseData, phaseResult, rm, progress, quest]);
+  }, [quest?.phase, phaseData, phaseResult, rm, progress, quest]);
+
+  if (!rm) return null;
 
   const generatePhaseContent = async () => {
     setLoadingPhase(true); setError("");
