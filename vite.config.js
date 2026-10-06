@@ -83,13 +83,13 @@ export default defineConfig({
         cleanupOutdatedCaches: true,
       },
       devOptions: {
-        // Enable PWA in dev mode so you can test it locally
-        enabled: true,
-        type: 'module',
+        enabled: false,
       },
     }),
   ],
   server: {
-    host: true, // Expose to local network — useful for testing on a real phone
+    host: '0.0.0.0',
+    port: 3000,
+    allowedHosts: true,
   },
 })

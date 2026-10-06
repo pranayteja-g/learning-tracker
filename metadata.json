@@ -1,0 +1,8 @@
+{
+  "name": "Learning Tracker",
+  "description": "Track your progress across any learning roadmap. AI-powered quizzes, flashcards, and interview prep.",
+  "permissions": [],
+  "capabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
