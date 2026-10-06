@@ -503,13 +503,17 @@ export default function App() {
 
           {mobileScreen === "sections" && rm && (
             <div style={{ padding: "16px" }}>
-              {/* Roadmap switcher card */}
-              <div style={{
-                background: "#16151a", borderRadius: radius.md, padding: "14px 16px",
-                border: `1px solid ${rm.color || "#d9a441"}33`, marginBottom: 14
-              }}>
+              {/* Roadmap switcher card — tap to switch roadmaps */}
+              <div onClick={() => setRmDropdownOpen(true)}
+                style={{
+                  background: "#16151a", borderRadius: radius.md, padding: "14px 16px",
+                  border: `1px solid ${rm.color || "#d9a441"}33`, marginBottom: 14, cursor: "pointer"
+                }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6 }}>
-                  <span style={{ fontSize: 14, fontWeight: 600, color: "#e9e4d9" }}>{rm.label}</span>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <span style={{ fontSize: 14, fontWeight: 600, color: "#e9e4d9" }}>{rm.label}</span>
+                    <span style={{ fontSize: 10, color: "#666" }}>▾</span>
+                  </div>
                   <span style={{ fontSize: 12, color: rm.accent || "#d9a441" }}>{stats.done} / {stats.total} · {stats.pct}%</span>
                 </div>
                 <div style={{ background: "#0d0c11", borderRadius: 4, height: 5, overflow: "hidden" }}>
@@ -680,6 +684,54 @@ export default function App() {
         )}
         <InstallPrompt />
         {feedback && <Toast feedback={feedback} isMobile={isMobile} />}
+        {rmDropdownOpen && (
+          <div onClick={() => setRmDropdownOpen(false)}
+            style={{
+              position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 200,
+              display: "flex", alignItems: "flex-end"
+            }}>
+            <div onClick={e => e.stopPropagation()}
+              style={{
+                width: "100%", background: "#17161c", borderTop: "1px solid #282630",
+                borderTopLeftRadius: radius.md, borderTopRightRadius: radius.md,
+                padding: "6px 6px calc(12px + env(safe-area-inset-bottom))",
+                maxHeight: "70vh", overflowY: "auto"
+              }}>
+              <div style={{ width: 36, height: 4, borderRadius: 2, background: "#333", margin: "10px auto 12px" }} />
+              <div style={{ fontSize: 12, color: "#6e685f", padding: "0 12px 8px", fontWeight: 600 }}>Switch Roadmap</div>
+              {Object.values(roadmaps).map(r => {
+                const rStats = getRoadmapStats(r, progress);
+                const isCurrent = r.id === rmKey;
+                return (
+                  <button key={r.id}
+                    onClick={() => { setActiveRoadmap(r.id); setActiveSection(null); setMobileScreen("sections"); setRmDropdownOpen(false); }}
+                    style={{
+                      width: "100%", padding: "12px", display: "flex", alignItems: "center",
+                      justifyContent: "space-between", background: isCurrent ? "#201e26" : "transparent",
+                      border: "none", borderRadius: radius.sm, cursor: "pointer", textAlign: "left",
+                      color: isCurrent ? "#fff" : "#948d80", fontSize: 14, fontFamily: font.body
+                    }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <div style={{ width: 8, height: 8, borderRadius: "50%", background: r.color || themeColor.accent }} />
+                      <span style={{ fontWeight: isCurrent ? 600 : 400 }}>{r.label}</span>
+                    </div>
+                    <span style={{ fontSize: 12, color: "#6e685f" }}>{rStats.pct}%</span>
+                  </button>
+                );
+              })}
+              <div style={{ borderTop: "1px solid #222027", marginTop: 4, paddingTop: 4 }}>
+                <button
+                  onClick={() => { setShowManage(true); setManageTab("roadmaps"); setRmDropdownOpen(false); }}
+                  style={{
+                    width: "100%", padding: "12px", background: "transparent", border: "none",
+                    color: themeColor.accent, fontSize: 13, cursor: "pointer", textAlign: "left", fontFamily: font.body
+                  }}>
+                  + Manage / Add Roadmap
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
         {noteModal && (
           <NoteModal noteModal={noteModal} roadmaps={roadmaps} notes={notes}
             resources={resources} topicMeta={topicMeta} onSave={saveNote} onClose={() => setNoteModal(null)} />

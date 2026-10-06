@@ -1,7 +1,71 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { STATUS_CYCLE } from "../../hooks/useLogbook.js";
 import { Prose } from "../ui/Prose.jsx";
 import { color as theme } from "../../styles/theme.js";
+
+// Normalize a category value against the existing category list: trims
+// whitespace, and if it matches an existing category case-insensitively,
+// reuses that category's canonical casing instead of creating a near-duplicate.
+function normalizeCategory(value, categories) {
+  const trimmed = (value || "").trim();
+  if (!trimmed) return "";
+  const existing = categories.find(c => c.toLowerCase() === trimmed.toLowerCase());
+  return existing || trimmed;
+}
+
+// ── Category combobox: a custom dropdown that works on mobile, where the
+// native <input list> + <datalist> combo doesn't render suggestions
+// (notably iOS Safari). Shows matching categories as the user types, and
+// lets them tap one instead of retyping it (which is what was causing
+// near-duplicate categories from whitespace/casing differences).
+function CategoryCombobox({ value, onChange, categories }) {
+  const [open, setOpen] = useState(false);
+  const blurTimer = useRef(null);
+
+  const q = value.trim().toLowerCase();
+  const matches = categories.filter(c => !q || c.toLowerCase().includes(q));
+  const exactCaseInsensitive = categories.some(c => c.toLowerCase() === q);
+
+  const select = (c) => {
+    onChange(c);
+    setOpen(false);
+  };
+
+  return (
+    <div style={{ position: "relative" }}>
+      <input value={value} onChange={e => onChange(e.target.value)}
+        onFocus={() => setOpen(true)}
+        onBlur={() => { blurTimer.current = setTimeout(() => setOpen(false), 120); }}
+        placeholder="e.g. Core Java, Spring Security, SQL…"
+        style={{ width: "100%", padding: "9px 12px", background: "#0f0f13", border: "1px solid #2a2a35",
+          borderRadius: 7, color: "#ccc", fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
+      {open && categories.length > 0 && (
+        <div
+          onMouseDown={e => e.preventDefault()}
+          style={{ position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0, zIndex: 20,
+            background: "#17161c", border: "1px solid #2a2a35", borderRadius: 8,
+            maxHeight: 180, overflowY: "auto", boxShadow: "0 8px 24px rgba(0,0,0,0.45)" }}>
+          {matches.length === 0 && (
+            <div style={{ padding: "9px 12px", fontSize: 12, color: "#444" }}>No matching categories</div>
+          )}
+          {matches.map(c => (
+            <div key={c} onClick={() => select(c)}
+              style={{ padding: "9px 12px", fontSize: 13, color: "#ccc", cursor: "pointer" }}>
+              {c}
+            </div>
+          ))}
+          {q && !exactCaseInsensitive && (
+            <div onClick={() => select(value.trim())}
+              style={{ padding: "9px 12px", fontSize: 12, color: "#d9a352", cursor: "pointer",
+                borderTop: matches.length > 0 ? "1px solid #2a2a35" : "none" }}>
+              + Use "{value.trim()}" as a new category
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 const STATUS_CONFIG = {
   "not-started": { label: "Not started", icon: "○", color: "#444" },
@@ -149,13 +213,9 @@ function EntryForm({ draft, setDraft, categories, roadmaps, onSave, onCancel, ac
       {/* Category */}
       <div>
         <div style={{ fontSize: 11, color: "#555", textTransform: "uppercase", letterSpacing: 1, marginBottom: 6 }}>Category</div>
-        <input value={draft.category} onChange={e => setDraft({ ...draft, category: e.target.value })}
-          placeholder="e.g. Core Java, Spring Security, SQL…" list="logbook-categories"
-          style={{ width: "100%", padding: "9px 12px", background: "#0f0f13", border: "1px solid #2a2a35",
-            borderRadius: 7, color: "#ccc", fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
-        <datalist id="logbook-categories">
-          {categories.map(c => <option key={c} value={c} />)}
-        </datalist>
+        <CategoryCombobox value={draft.category}
+          onChange={v => setDraft({ ...draft, category: v })}
+          categories={categories} />
       </div>
 
       {/* Link to roadmap topic */}
@@ -388,20 +448,32 @@ export function LogbookScreen({ entries, roadmaps, onAdd, onUpdate, onDelete, on
   const [search,     setSearch]     = useState("");
   const [catFilter,  setCatFilter]  = useState(null);
 
-  const categories = [...new Set(entries.map(e => e.category).filter(Boolean))].sort();
+  // Case-insensitive category list: legacy entries saved before normalization
+  // may have near-duplicate categories ("SQL" vs "sql"); group them under
+  // whichever casing was seen first so they don't show up as separate chips.
+  const categories = [];
+  const seenCat = new Map(); // lowercase -> canonical casing
+  for (const e of entries) {
+    if (!e.category) continue;
+    const key = e.category.toLowerCase();
+    if (!seenCat.has(key)) { seenCat.set(key, e.category); categories.push(e.category); }
+  }
+  categories.sort((a, b) => a.localeCompare(b));
+  const categoryOf = (e) => e.category ? (seenCat.get(e.category.toLowerCase()) || e.category) : e.category;
+
   const stats = getStats();
 
   const filtered = entries.filter(e => {
     const q = search.toLowerCase();
     const matchSearch = !q || e.title.toLowerCase().includes(q) || e.category.toLowerCase().includes(q) ||
       e.notes?.toLowerCase().includes(q);
-    const matchCat = !catFilter || e.category === catFilter;
+    const matchCat = !catFilter || categoryOf(e) === catFilter;
     return matchSearch && matchCat;
   });
 
   const grouped = categories
     .filter(c => !catFilter || c === catFilter)
-    .map(cat => ({ cat, items: filtered.filter(e => e.category === cat) }))
+    .map(cat => ({ cat, items: filtered.filter(e => categoryOf(e) === cat) }))
     .filter(g => g.items.length > 0);
   const uncategorized = filtered.filter(e => !e.category);
 
@@ -410,13 +482,14 @@ export function LogbookScreen({ entries, roadmaps, onAdd, onUpdate, onDelete, on
   const openNew = () => { setDraft(emptyEntry()); setFormOpen(true); setSelectedId(null); };
   const openEdit = (entry) => { setDraft({ ...entry }); setFormOpen(true); };
   const saveForm = () => {
-    if (draft.id && entries.some(e => e.id === draft.id)) {
-      onUpdate(draft.id, draft);
+    const normalized = { ...draft, category: normalizeCategory(draft.category, categories) };
+    if (normalized.id && entries.some(e => e.id === normalized.id)) {
+      onUpdate(normalized.id, normalized);
     } else {
-      onAdd(draft);
+      onAdd(normalized);
     }
     setFormOpen(false);
-    setSelectedId(draft.id);
+    setSelectedId(normalized.id);
   };
   const cancelForm = () => setFormOpen(false);
 
